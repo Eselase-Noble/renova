@@ -216,3 +216,20 @@ BM25 alone, which caused the extra input. BM25-only selection was removed. This 
 a benefit, because the guards leave only three judgement calls; measuring RAG needs harder apps (roadmap:
 benchmark harness), so RAG stays off by default.
 
+### Benchmark, 2026-10-05 (`renova benchmark --configs ai,ai-rag --repeat 2`)
+
+Four apps, two runs each, claude-opus-5-5, cards selected by trigger only:
+
+| Configuration | Runs passed | Builds pass | Repair rounds | Input / output tokens |
+|---|---|---|---|---|
+| ai | 6/8 | 6/8 | 0 | 32.4K / 16.6K |
+| ai-rag | 8/8 | 8/8 | 4 | 45.9K / 16.3K |
+
+(One ai-rag run first scored 7/8 because a check matched a comment mentioning `sun.misc`; the check now
+matches imports only.) The difference is `claims-portal`, where cancelling a job needs that job's own stop
+method. Without RAG, Claude declined both times, rightly: it could not see `HeartbeatJob`, and guessing
+`interrupt()` would have left the heartbeat running. With RAG, structural retrieval supplied `HeartbeatJob`
+and the tests that pin the expected behaviour, and both runs passed with `job.shutdownGracefully()`,
+`toCharArray()` in place of reflection, and a MIME encoder that keeps the legacy line layout. On the
+easier apps RAG changed nothing but cost 10–40% more input tokens.
+

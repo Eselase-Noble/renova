@@ -53,8 +53,8 @@ apps:
   - id: claims-portal
     path: claims-portal
     checks:
-      - { file: "**/*.java", absent: "sun.misc", why: "removed in Java 9" }
-      - { file: "**/*.java", absent: ".stop()", why: "Thread.stop throws on Java 20+" }
+      - { file: "**/*.java", absent: "import sun.misc", why: "removed in Java 9" }
+      - { file: "**/*.java", absent: "thread.stop()", why: "Thread.stop throws on Java 20+" }
       - { file: "**/*.java", absent: 'getDeclaredField("value")', why: "JDK internals are encapsulated on Java 17+" }
       - { file: "**/pom*.xml", absent: "add-opens", why: "no encapsulation workarounds" }
       - { file: "**/pom*.xml", absent: "add-exports", why: "no encapsulation workarounds" }
