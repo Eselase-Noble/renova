@@ -14,15 +14,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Lexical retrieval over a playbook's knowledge cards. A card is returned when one of its triggers
- * appears in the request's rules, errors or target files, or when its text shares enough rare terms
- * with the rules and errors (BM25). Cards are ranked by BM25 plus a bonus per matched trigger.
- * Needs no model or key.
+ * Lexical retrieval over a playbook's knowledge cards. A card is returned only when one of its
+ * triggers appears in the request's rules, errors or target files; cards are ranked by the number of
+ * matched triggers plus their BM25 score against the rules and errors. Needs no model or key.
+ *
+ * <p>BM25 alone does not select cards: rule hints are long and share common migration words
+ * ("removed", "dependency", "Spring") with most cards. On the inventory-platform benchmark every card
+ * it added on its own was unrelated, and input tokens rose by about 70% with no change in outcome.
  */
 public final class KnowledgeRetriever implements Retriever {
 
-    /** BM25 score a card needs without a trigger match: several distinctive shared terms. */
-    static final double MIN_SCORE_WITHOUT_TRIGGER = 4.0;
     private static final double TRIGGER_WEIGHT = 3.0;
     private static final double K1 = 1.2;
     private static final double B = 0.75;
@@ -74,14 +75,11 @@ public final class KnowledgeRetriever implements Retriever {
             KnowledgeCard card = cards.get(i);
             List<String> matched = card.triggers().stream()
                     .filter(t -> !t.isBlank() && haystack.contains(t.toLowerCase(Locale.ROOT))).toList();
-            double bm25 = bm25(i, queryTerms);
-            if (matched.isEmpty() && bm25 < MIN_SCORE_WITHOUT_TRIGGER) {
+            if (matched.isEmpty()) {
                 continue;
             }
-            String why = matched.isEmpty() ? "shares terms with the rules or errors"
-                    : "the request mentions " + String.join(", ", matched);
             results.add(new ContextItem(card.id(), "# " + card.title() + "\n\n" + card.body(), ContextItem.Kind.KNOWLEDGE,
-                    bm25 + TRIGGER_WEIGHT * matched.size(), why));
+                    bm25(i, queryTerms) + TRIGGER_WEIGHT * matched.size(), "the request mentions " + String.join(", ", matched)));
         }
         results.sort(Comparator.comparingDouble(ContextItem::score).reversed());
         return results;

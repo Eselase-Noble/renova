@@ -59,6 +59,10 @@ class RagTest {
 
         assertThat(retriever.retrieve(new RetrievalQuery(Map.of("B.java", "class B {}"), List.of("Rename packages"), List.of())))
                 .isEmpty();
+        // Sharing many words is not enough: only a trigger selects a card.
+        assertThat(retriever.retrieve(new RetrievalQuery(Map.of("C.java", "class C {}"),
+                List.of("Use StandardServletMultipartResolver and move limits to multipart-config; Spring 6 removed it"), List.of())))
+                .isEmpty();
     }
 
     @Test

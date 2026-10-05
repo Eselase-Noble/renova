@@ -185,9 +185,10 @@ Java structural retrieval is `JavaPlugin.referencedFiles`. Differences from the 
 
 - Knowledge cards are inline in the playbook YAML (`knowledge:`), so they load the same way from the
   classpath and from a customer's playbook file.
-- Lexical search is an in-memory BM25 over the cards, not Lucene: the corpus is small. A card is used when
-  one of its triggers appears in the request, or when its BM25 score alone is high. Lucene arrives with
-  code-level lexical search and the semantic channel.
+- Lexical search is an in-memory BM25 over the cards, not Lucene: the corpus is small. A card is used only
+  when one of its triggers appears in the request; BM25 ranks the cards that qualify. Selecting on BM25
+  alone added only unrelated cards on the benchmark (see below). Lucene arrives with code-level lexical
+  search and the semantic channel.
 - Knowledge notes go in the user message, not a cached system block, because each request gets a different
   selection. Prompt caching can follow once a migration's cards are sent as one stable block.
 - The context each request received is listed in its AI audit log (`.renova/ai/NNN.md`), not yet in
@@ -199,3 +200,19 @@ Java structural retrieval is `JavaPlugin.referencedFiles`. Differences from the 
 2. Should lessons be on by default per organisation, or opt-in per project?
 3. For the web product: Lucene per tenant, or PostgreSQL with pgvector?
 4. Which harder synthetic test apps come next (e.g. multi-module Maven, Spring XML-heavy, EJB)?
+
+## 8. Results
+
+`inventory-platform` with Claude (claude-opus-5-5), 2026-10-05, after the recipe-leftover guards:
+
+| Run | Build | Repair rounds | Unit tests | Input / output tokens |
+|---|---|---|---|---|
+| No RAG | passes | 0 | 4 of 4 | 6.6K / 2.8K |
+| RAG, cards selected by trigger or BM25 | passes | 0 | 4 of 4 | 11.5K / 2.8K |
+
+Both runs produced the same migrated code. The three AI requests each got the right card by trigger
+(`HandlerInterceptorAdapter`, `CommonsMultipartResolver`, `nashorn`) plus 1 to 5 unrelated cards chosen by
+BM25 alone, which caused the extra input. BM25-only selection was removed. This app is now too easy to show
+a benefit, because the guards leave only three judgement calls; measuring RAG needs harder apps (roadmap:
+benchmark harness), so RAG stays off by default.
+
