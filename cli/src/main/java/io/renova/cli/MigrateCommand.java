@@ -42,6 +42,9 @@ final class MigrateCommand implements Callable<Integer> {
     @Option(names = "--no-verify", description = "Skip building the migrated project.")
     boolean noVerify;
 
+    @Option(names = "--skip-tests", description = "Build the migrated project without running its tests.")
+    boolean skipTests;
+
     @Option(names = "--skip", split = ",", paramLabel = "STRATEGY", description = "Strategies to skip, e.g. --skip recipe,ai.")
     List<String> skip = new ArrayList<>();
 
@@ -65,6 +68,9 @@ final class MigrateCommand implements Callable<Integer> {
         }
         if (offline) {
             tools.put("maven.offline", "true");
+        }
+        if (skipTests) {
+            tools.put("verify.skipTests", "true");
         }
         AiConfiguration aiConfig = AiConfiguration.load(registry, ai);
         System.err.println("AI: " + aiConfig.describe());

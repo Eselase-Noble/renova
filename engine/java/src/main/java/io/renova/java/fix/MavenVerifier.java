@@ -14,7 +14,10 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Builds every Maven build root and turns compiler output into structured errors for the AI loop. */
+/**
+ * Builds and tests every Maven build root ({@code clean verify} by default) and turns compiler,
+ * project-model and test failures into structured errors for the AI repair loop.
+ */
 public final class MavenVerifier implements Verifier {
 
     private static final Pattern COMPILER_ERROR = Pattern.compile("^\\[ERROR\\] (.+?\\.(?:java|kt|groovy)):\\[(\\d+)(?:,\\d+)?\\] (.*)$");
@@ -23,11 +26,15 @@ public final class MavenVerifier implements Verifier {
     /** Project-model errors: "The project g:a:v (/path/pom.xml) has 1 error", then the errors with "@ line N". */
     private static final Pattern MODEL_PROJECT = Pattern.compile("^\\[ERROR\\]\\s+The project \\S+ \\((.+?pom[^)]*\\.xml)\\) has \\d+ errors?");
     private static final Pattern MODEL_ERROR = Pattern.compile("^\\[ERROR\\]\\s+(.+?) @ (?:.*?, )?line (\\d+), column \\d+");
+    /** Runs the project's tests: compiling is not enough to show the migrated code still works. */
+    public static final String DEFAULT_GOALS = "clean verify";
+    public static final String SKIP_TESTS_GOALS = "clean package -DskipTests";
     private static final Duration TIMEOUT = Duration.ofMinutes(60);
 
     @Override
     public VerifyResult verify(MigrationContext context) throws Exception {
-        String goals = context.options().toolOptions().getOrDefault("maven.verifyGoals", "clean package -DskipTests");
+        String goals = context.options().toolOptions().getOrDefault("maven.verifyGoals",
+                "true".equals(context.options().toolOption("verify.skipTests")) ? SKIP_TESTS_GOALS : DEFAULT_GOALS);
         Path workspace = context.workspace().root();
         List<BuildError> errors = new ArrayList<>();
         StringBuilder log = new StringBuilder();
@@ -41,6 +48,7 @@ public final class MavenVerifier implements Verifier {
                 success = false;
                 log.append(result.tail(40)).append('\n');
                 errors.addAll(parse(result.output(), workspace, root));
+                errors.addAll(TestReports.parse(workspace, root));
             }
         }
         return new VerifyResult(success, errors, log.toString());
@@ -66,7 +74,10 @@ public final class MavenVerifier implements Verifier {
             Matcher goal = GOAL_FAILURE.matcher(line);
             if (goal.matches()) {
                 // Compilation failures repeat the per-file errors already collected; keep the rest.
-                if (!goal.group(1).startsWith("Compilation failure")) {
+                // Compilation and test failures are reported in detail elsewhere; keep the rest.
+                String message = goal.group(1);
+                if (!message.startsWith("Compilation failure") && !message.startsWith("There are test failures")
+                        && !message.startsWith("There was a timeout")) {
                     String pom = workspace.relativize(buildRoot.resolve("pom.xml")).toString().replace('\\', '/');
                     errors.add(new BuildError(pom, 0, goal.group(1).strip()));
                 }
