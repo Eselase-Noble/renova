@@ -171,6 +171,17 @@ scenarios:
       - { method: POST, path: /items/import, multipart: { file: { filename: stock.csv, content: "sku,qty\nA-1,4\n" } } }
 ```
 
+With an AI provider configured, differences go to the same repair loop as build errors (`--no-behaviour-repair`
+to only report them). Each difference is attributed to the file that handles the request: the controller method,
+the JSP, or for URL-matching differences such as trailing slashes, the Spring configuration. Each round rebuilds,
+runs the tests and compares again, and the guards check every round's edits. A difference that is intended, such
+as dropping trailing-slash URLs on purpose, is listed under `accept:` in the scenario file:
+
+```yaml
+accept:
+  - 'GET /items/: status 200 became 404'
+```
+
 It needs Docker and currently runs single-WAR Maven applications on servlet containers. Applications that need
 a full Jakarta EE server are reported as skipped. See
 [docs/behavioural-verification-design.md](docs/behavioural-verification-design.md).
@@ -286,8 +297,8 @@ twenty lines and is a good starting point. See [`engine/README.md`](engine/READM
 
 1. **RAG:** phase 1 (structural code retrieval and curated knowledge, no key needed) is in and on by default.
    Next: lessons from accepted fixes, then optional embeddings on the customer's own key.
-2. **Behavioural verification:** phases 1 and 2 (`--verify-behaviour`: HTTP answers, scenario files, database
-   changes) are in. Next: differences fed to AI repair, then JBoss/WildFly and Spring Boot
+2. **Behavioural verification:** phases 1–3 (`--verify-behaviour`: HTTP answers, scenario files, database changes,
+   AI repair of differences) are in. Next: JBoss/WildFly and Spring Boot runners, recorded-traffic replay
    ([design](docs/behavioural-verification-design.md)).
 3. **Benchmark harness:** `renova benchmark` scores migrations of synthetic legacy apps (see
    [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.

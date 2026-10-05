@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 /**
  * Behavioural verification: runs the original and the migrated application side by side, sends both
@@ -89,31 +90,74 @@ public final class BehaviourVerifier {
         String candidatePlatform = deployments.candidate().platform();
         if (!run.baselineReady()) {
             return new BehaviourReport(BehaviourReport.Status.FAILED, "the original application did not start on "
-                    + baselinePlatform, baselinePlatform, candidatePlatform, List.of(), Map.of(), run.baselineLog(), run.candidateLog());
+                    + baselinePlatform, baselinePlatform, candidatePlatform, List.of(), Map.of(), List.of(), run.baselineLog(),
+                    run.candidateLog());
         }
         if (!run.candidateReady()) {
             return new BehaviourReport(BehaviourReport.Status.DIFFERENT, "the migrated application did not start on "
-                    + candidatePlatform, baselinePlatform, candidatePlatform, List.of(), Map.of(), run.baselineLog(), run.candidateLog());
+                    + candidatePlatform, baselinePlatform, candidatePlatform, List.of(), Map.of(), List.of(), run.baselineLog(),
+                    run.candidateLog());
         }
+        List<Route> routes = runner.get().routes(originalModel, original);
+        List<Pattern> accept = file == null ? List.of() : file.accept().stream().map(Pattern::compile).toList();
+        List<String> accepted = new ArrayList<>();
         List<ScenarioResult> results = new ArrayList<>();
         for (Scenario scenario : scenarios) {
             for (int i = 0; i < scenario.steps().size(); i++) {
                 DockerSandbox.Answers answers = run.answers().get(scenario.id() + ":" + i);
-                results.add(answers == null
+                ScenarioResult result = answers == null
                         ? new ScenarioResult(scenario, i, Exchange.failed("not sent"), Exchange.failed("not sent"), List.of(),
                                 List.of("no answers recorded"))
-                        : ResponseComparator.compare(scenario, i, answers.baseline(), answers.baselineAgain(), answers.candidate()));
+                        : ResponseComparator.compare(scenario, i, answers.baseline(), answers.baselineAgain(), answers.candidate());
+                result = result.withHandler(handler(scenario, i, routes));
+                ScenarioResult r = result;
+                List<String> intended = result.differences().stream()
+                        .filter(d -> accept.stream().anyMatch(p -> p.matcher(r.label() + ": " + d).find())).toList();
+                intended.forEach(d -> accepted.add(r.label() + ": " + d));
+                results.add(intended.isEmpty() ? result : result.accepting(intended));
             }
         }
+        Map<String, List<String>> databaseResults = new LinkedHashMap<>();
+        run.databases().forEach((id, diffs) -> {
+            List<String> left = new ArrayList<>();
+            for (String d : diffs) {
+                if (accept.stream().anyMatch(p -> p.matcher(id + " database: " + d).find())) {
+                    accepted.add(id + " database: " + d);
+                } else {
+                    left.add(d);
+                }
+            }
+            databaseResults.put(id, left);
+        });
         long differing = results.stream().filter(r -> !r.same()).count();
-        long databases = run.databases().values().stream().filter(d -> !d.isEmpty()).count();
+        long databases = databaseResults.values().stream().filter(d -> !d.isEmpty()).count();
         String summary = (differing == 0 ? "all " + results.size() + " request(s) answered the same"
                 : differing + " of " + results.size() + " request(s) answered differently")
-                + (run.databases().isEmpty() ? "" : databases == 0 ? "; database changes the same in all "
-                        + run.databases().size() + " scenario(s)" : "; " + databases + " of " + run.databases().size()
-                        + " scenario(s) changed the database differently");
+                + (databaseResults.isEmpty() ? "" : databases == 0 ? "; database changes the same in all "
+                        + databaseResults.size() + " scenario(s)" : "; " + databases + " of " + databaseResults.size()
+                        + " scenario(s) changed the database differently")
+                + (accepted.isEmpty() ? "" : "; " + accepted.size() + " accepted change(s)");
         return new BehaviourReport(differing + databases == 0 ? BehaviourReport.Status.SAME : BehaviourReport.Status.DIFFERENT,
-                summary, baselinePlatform, candidatePlatform, results, run.databases(), run.baselineLog(), run.candidateLog());
+                summary, baselinePlatform, candidatePlatform, results, databaseResults, accepted, run.baselineLog(),
+                run.candidateLog());
+    }
+
+    /** The scenario's own handler for a request found in the code, else the most specific matching route's. */
+    static String handler(Scenario scenario, int step, List<Route> routes) {
+        if (scenario.handlerFile() != null && scenario.steps().size() == 1) {
+            return scenario.handlerFile();
+        }
+        Step s = scenario.steps().get(step);
+        Route best = null;
+        int bestScore = -1;
+        for (Route route : routes) {
+            int score = route.match(s.method(), s.path());
+            if (score > bestScore) {
+                best = route;
+                bestScore = score;
+            }
+        }
+        return best == null ? null : best.handlerFile();
     }
 
     /** The project as it was before migration: the workspace's first commit, exported to {@code workDir/original}. */
@@ -201,6 +245,11 @@ public final class BehaviourVerifier {
                 md.append('\n');
             }
         }
+        if (!report.accepted().isEmpty()) {
+            md.append("## Accepted changes\n\nListed under `accept:` in the scenario file as intended:\n\n");
+            report.accepted().forEach(a -> md.append("- ").append(a).append('\n'));
+            md.append('\n');
+        }
         if (!report.databases().isEmpty()) {
             md.append("## Database changes\n\n| Scenario | Result |\n|---|---|\n");
             report.databases().forEach((id, diffs) -> md.append("| `").append(id).append("` | ")
@@ -246,6 +295,7 @@ public final class BehaviourVerifier {
             m.put("method", r.method());
             m.put("path", r.path());
             m.put("source", r.scenario().why());
+            m.put("handler", r.handlerFile());
             m.put("same", r.same());
             m.put("differences", r.differences());
             m.put("notes", r.notes());
@@ -255,6 +305,7 @@ public final class BehaviourVerifier {
         }
         doc.put("results", results);
         doc.put("databases", report.databases());
+        doc.put("accepted", report.accepted());
         return doc;
     }
 

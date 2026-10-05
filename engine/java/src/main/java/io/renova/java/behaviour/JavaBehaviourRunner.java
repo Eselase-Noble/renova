@@ -3,6 +3,7 @@ package io.renova.java.behaviour;
 import io.renova.core.behaviour.AppDeployment;
 import io.renova.core.behaviour.BehaviourRunner;
 import io.renova.core.behaviour.DockerSandbox;
+import io.renova.core.behaviour.Route;
 import io.renova.core.behaviour.Scenario;
 import io.renova.core.engine.MigrationContext;
 import io.renova.core.model.Module;
@@ -66,6 +67,11 @@ public final class JavaBehaviourRunner implements BehaviourRunner {
     }
 
     @Override
+    public List<Route> routes(ProjectModel model, Path root) {
+        return EndpointDiscovery.find(model, root, warModules(model).getFirst()).routes();
+    }
+
+    @Override
     public Deployments prepare(MigrationContext context, Path originalSource, Path workDir, Consumer<String> progress)
             throws Exception {
         Module war = warModules(context.project()).getFirst();
@@ -73,31 +79,14 @@ public final class JavaBehaviourRunner implements BehaviourRunner {
         Files.createDirectories(workDir);
         Playbook playbook = context.playbook();
 
-        // Built in a copy, so the exported sources stay as they were.
-        Path baselineSource = workDir.resolve("original-build");
-        deleteRecursively(baselineSource);
-        copyTree(originalSource, baselineSource);
-
-        String buildImage = setting(playbook, "behaviour.baseline.build", DEFAULT_BASELINE_BUILD);
-        progress.accept("Building the original application with " + buildImage);
-        List<String> build = new ArrayList<>(List.of("docker", "run", "--rm"));
-        build.addAll(userFlag());
-        Path m2 = Path.of(System.getProperty("user.home"), ".m2");
-        Files.createDirectories(m2);
-        build.addAll(List.of("-e", "MAVEN_CONFIG=/var/maven/.m2", "-v", m2 + ":/var/maven/.m2",
-                "-v", baselineSource.toAbsolutePath() + ":/src", "-w", "/src", buildImage,
-                "mvn", "-B", "-q", "-Duser.home=/var/maven", "package", "-DskipTests"));
-        String settings = context.options().toolOption("maven.settings");
-        if (settings != null) {
-            build.addAll(build.indexOf(buildImage), List.of("-v", Path.of(settings).toAbsolutePath() + ":/var/maven/settings.xml:ro"));
-            build.addAll(List.of("-s", "/var/maven/settings.xml"));
+        // The original does not change during a migration: build it once, reuse it in later repair rounds.
+        Path baselineWar = workDir.resolve("baseline.war");
+        Path key = workDir.resolve("baseline.key");
+        String sourceKey = treeKey(originalSource);
+        if (!Files.isRegularFile(baselineWar) || !Files.isRegularFile(key) || !Files.readString(key).equals(sourceKey)) {
+            buildOriginal(context, originalSource, war, workDir, baselineWar, progress);
+            Files.writeString(key, sourceKey);
         }
-        if ("true".equals(context.options().toolOption("maven.offline"))) {
-            build.add("-o");
-        }
-        run(build, workDir, 1800, "build the original application");
-
-        Path baselineWar = copyWar(baselineSource.resolve(war.path()), workDir.resolve("baseline.war"));
         Path candidateWar = copyWar(workspace.resolve(war.path()), workDir.resolve("candidate.war"));
         String appPath = "/usr/local/tomcat/webapps/ROOT.war";
         return new Deployments(
@@ -123,6 +112,45 @@ public final class JavaBehaviourRunner implements BehaviourRunner {
             opts.append(opts.isEmpty() ? "" : " ").append("-D").append(k).append('=').append(v);
         });
         return Map.of("CATALINA_OPTS", opts.toString());
+    }
+
+    private void buildOriginal(MigrationContext context, Path originalSource, Module war, Path workDir, Path baselineWar,
+                               Consumer<String> progress) throws Exception {
+        // Built in a copy, so the exported sources stay as they were.
+        Path baselineSource = workDir.resolve("original-build");
+        deleteRecursively(baselineSource);
+        copyTree(originalSource, baselineSource);
+
+        String buildImage = setting(context.playbook(), "behaviour.baseline.build", DEFAULT_BASELINE_BUILD);
+        progress.accept("Building the original application with " + buildImage);
+        List<String> build = new ArrayList<>(List.of("docker", "run", "--rm"));
+        build.addAll(userFlag());
+        Path m2 = Path.of(System.getProperty("user.home"), ".m2");
+        Files.createDirectories(m2);
+        build.addAll(List.of("-e", "MAVEN_CONFIG=/var/maven/.m2", "-v", m2 + ":/var/maven/.m2",
+                "-v", baselineSource.toAbsolutePath() + ":/src", "-w", "/src", buildImage,
+                "mvn", "-B", "-q", "-Duser.home=/var/maven", "package", "-DskipTests"));
+        String settings = context.options().toolOption("maven.settings");
+        if (settings != null) {
+            build.addAll(build.indexOf(buildImage), List.of("-v", Path.of(settings).toAbsolutePath() + ":/var/maven/settings.xml:ro"));
+            build.addAll(List.of("-s", "/var/maven/settings.xml"));
+        }
+        if ("true".equals(context.options().toolOption("maven.offline"))) {
+            build.add("-o");
+        }
+        run(build, workDir, 1800, "build the original application");
+        copyWar(baselineSource.resolve(war.path()), baselineWar);
+    }
+
+    /** Identifies the original sources by their files' paths and sizes. */
+    private static String treeKey(Path root) throws IOException {
+        StringBuilder key = new StringBuilder();
+        try (Stream<Path> files = Files.walk(root)) {
+            for (Path f : files.filter(Files::isRegularFile).sorted().toList()) {
+                key.append(root.relativize(f)).append(':').append(Files.size(f)).append(';');
+            }
+        }
+        return Integer.toHexString(key.toString().hashCode()) + "-" + key.length();
     }
 
     static List<Module> warModules(ProjectModel model) {

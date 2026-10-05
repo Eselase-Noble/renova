@@ -1,5 +1,6 @@
 package io.renova.java.behaviour;
 
+import io.renova.core.behaviour.Route;
 import io.renova.core.behaviour.Scenario;
 import io.renova.core.model.ProjectModel;
 import io.renova.java.JavaPlugin;
@@ -28,6 +29,7 @@ class EndpointDiscoveryTest {
                 </web-app>
                 """);
         write(root, "src/main/webapp/index.jsp", "hi");
+        write(root, "src/main/java/com/acme/Health.java", "package com.acme;\npublic class Health {}\n");
         write(root, "src/main/webapp/WEB-INF/views/orders.jsp", "not directly reachable");
         write(root, "src/main/java/com/acme/OrderController.java", """
                 package com.acme;
@@ -59,6 +61,17 @@ class EndpointDiscoveryTest {
                 tuple("/app/orders/by-ref/sample", "OrderController#show (Spring @GetMapping)"),
                 tuple("/app/orders/by-ref/sample/", "OrderController#show (Spring @GetMapping), with a trailing slash"),
                 tuple("/index.jsp", "JSP page"));
+
+        // Each request knows the file to fix: the controller, the JSP, or for URL matching the configuration.
+        assertThat(runner.discover(model, root)).extracting(Scenario::handlerFile).containsExactly(
+                "src/main/webapp/WEB-INF/web.xml", "src/main/java/com/acme/Health.java",
+                "src/main/java/com/acme/OrderController.java", "src/main/webapp/WEB-INF/web.xml",
+                "src/main/java/com/acme/OrderController.java", "src/main/webapp/WEB-INF/web.xml",
+                "src/main/java/com/acme/OrderController.java", "src/main/webapp/WEB-INF/web.xml",
+                "src/main/webapp/index.jsp");
+        assertThat(runner.routes(model, root)).extracting(Route::method, Route::template).contains(
+                tuple(null, "/health"), tuple("GET", "/app/orders"), tuple("POST", "/app/orders/{id}"),
+                tuple("GET", "/app/orders/{orderId}"), tuple(null, "/index.jsp"));
     }
 
     @Test

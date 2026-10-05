@@ -28,6 +28,11 @@ public interface BehaviourRunner {
      */
     Deployments prepare(MigrationContext context, Path originalSource, Path workDir, Consumer<String> progress) throws Exception;
 
+    /** Every entry point and the file that handles it, for sending differences to the code behind them. */
+    default List<Route> routes(ProjectModel model, Path root) {
+        return List.of();
+    }
+
     /**
      * Environment variables that give the application these settings, e.g. for Java the JVM system
      * properties in {@code CATALINA_OPTS}. Used to point each application at its own sandbox database.

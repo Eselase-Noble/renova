@@ -4,6 +4,8 @@ import io.renova.core.ai.AiFixer;
 import io.renova.core.ai.AiProviderException;
 import io.renova.core.ai.AiUsage;
 import io.renova.core.ai.MeteredAiProvider;
+import io.renova.core.behaviour.BehaviourCheckingVerifier;
+import io.renova.core.behaviour.BehaviourErrors;
 import io.renova.core.behaviour.BehaviourReport;
 import io.renova.core.behaviour.BehaviourVerifier;
 import io.renova.core.model.ProjectModel;
@@ -33,6 +35,8 @@ public final class Migrator {
     private static final int MAX_GUARD_PASSES = 3;
     /** Tool option that turns on behavioural verification after a passing build. */
     public static final String VERIFY_BEHAVIOUR = "verify.behaviour";
+    /** Tool option: "false" reports behaviour differences without sending them to AI repair. */
+    public static final String REPAIR_BEHAVIOUR = "repair.behaviour";
     /** A repair round that edited files and rebuilt, as {@link AiFixer#repair} logs it. */
     private static final Pattern REPAIR_ROUND = Pattern.compile("^round \\d+: edited ");
 
@@ -51,7 +55,7 @@ public final class Migrator {
             Workspace workspace = Workspace.create(analysis.project().root(), options.outputDir());
             MigrationOutcome outcome = run(new MigrationContext(workspace, analysis.project(), plan.playbook(), options, ai,
                     registry.plugin(plan.playbook().ecosystem())), plan);
-            int rounds = (int) outcome.stages().stream().filter(s -> s.stage().equals("ai-repair"))
+            int rounds = (int) outcome.stages().stream().filter(s -> s.stage().equals("ai-repair") || s.stage().equals("ai-behaviour-repair"))
                     .flatMap(s -> s.details().stream()).filter(l -> REPAIR_ROUND.matcher(l).find()).count();
             return new MigrationOutcome(outcome.workspace(), outcome.stages(), outcome.verification(), outcome.manualSteps(),
                     ai.usage(), rounds, outcome.behaviour());
@@ -77,16 +81,8 @@ public final class Migrator {
                 progress.accept("Build fails with " + verification.errors().size() + " error(s); starting AI repair");
                 List<String> log = new ArrayList<>();
                 try {
-                    // Repair edits can bring back what the guards prevent (a bundled server API, a missing
-                    // implementation), so the guards check each round's edits before the rebuild.
                     verification = new AiFixer().repair(context, verifier.get(), verification, options.maxAiIterations(), log,
-                            round -> {
-                                for (PlanStep step : runGuards(context, stages, "guard after repair round " + round, false)) {
-                                    if (manual.stream().noneMatch(m -> m.rule().id().equals(step.rule().id()))) {
-                                        manual.add(step);
-                                    }
-                                }
-                            });
+                            guardsAfterRepair(context, stages, manual, "repair round "));
                 } catch (AiProviderException e) {
                     log.add("stopped: " + e.getMessage());
                 }
@@ -99,15 +95,64 @@ public final class Migrator {
         if ("true".equals(options.toolOption(VERIFY_BEHAVIOUR)) && verification != null && verification.success()) {
             progress.accept("Verifying behaviour: running the original and the migrated application side by side");
             behaviour = BehaviourVerifier.verify(context, progress);
-            stages.add(new StageResult("behaviour", switch (behaviour.status()) {
-                case SAME -> StageResult.Status.APPLIED;
-                case DIFFERENT -> StageResult.Status.PARTIAL;
-                case SKIPPED -> StageResult.Status.SKIPPED;
-                case FAILED -> StageResult.Status.FAILED;
-            }, behaviour.summary(), behaviour.results().stream().filter(r -> !r.same())
-                    .map(r -> r.label() + ": " + String.join("; ", r.differences())).toList()));
+            stages.add(behaviourStage("behaviour", behaviour));
+            if (behaviour.status() == BehaviourReport.Status.DIFFERENT && context.ai().available()
+                    && options.maxAiIterations() > 0 && !"false".equals(options.toolOption(REPAIR_BEHAVIOUR))) {
+                // Differences go to the same repair loop as build errors, attributed to the files that handle the
+                // requests; each round rebuilds (with tests) and compares again.
+                progress.accept("Behaviour differs in " + behaviour.differing() + " place(s); starting AI repair");
+                BehaviourCheckingVerifier checking = new BehaviourCheckingVerifier(verifier.get(),
+                        c -> BehaviourVerifier.verify(c, progress));
+                List<String> log = new ArrayList<>();
+                VerifyResult repaired = new VerifyResult(false, BehaviourErrors.of(behaviour), behaviour.summary());
+                try {
+                    repaired = new AiFixer().repair(context, checking, repaired, options.maxAiIterations(), log,
+                            guardsAfterRepair(context, stages, manual, "behaviour repair round "));
+                } catch (AiProviderException e) {
+                    log.add("stopped: " + e.getMessage());
+                }
+                if (checking.last() != null) {
+                    behaviour = checking.last();
+                }
+                // A repair may break the build; then the build result is what the migration ends with.
+                boolean buildBroken = !repaired.success() && repaired.errors().stream()
+                        .noneMatch(e -> e.message().startsWith("behaviour differs"));
+                if (buildBroken) {
+                    verification = repaired;
+                }
+                stages.add(new StageResult("ai-behaviour-repair",
+                        behaviour.status() == BehaviourReport.Status.SAME && !buildBroken ? StageResult.Status.APPLIED
+                                : StageResult.Status.PARTIAL,
+                        buildBroken ? "a repair broke the build" : "behaviour " + behaviour.status().name().toLowerCase(
+                                java.util.Locale.ROOT) + ": " + behaviour.summary(), log));
+            }
         }
         return new MigrationOutcome(workspace.root(), stages, verification, manual, AiUsage.NONE, 0, behaviour);
+    }
+
+    private static StageResult behaviourStage(String name, BehaviourReport behaviour) {
+        return new StageResult(name, switch (behaviour.status()) {
+            case SAME -> StageResult.Status.APPLIED;
+            case DIFFERENT -> StageResult.Status.PARTIAL;
+            case SKIPPED -> StageResult.Status.SKIPPED;
+            case FAILED -> StageResult.Status.FAILED;
+        }, behaviour.summary(), behaviour.results().stream().filter(r -> !r.same())
+                .map(r -> r.label() + ": " + String.join("; ", r.differences())).toList());
+    }
+
+    /**
+     * Repair edits can bring back what the guards prevent (a bundled server API, a missing implementation),
+     * so the guards check each round's edits before the rebuild.
+     */
+    private AiFixer.RoundHook guardsAfterRepair(MigrationContext context, List<StageResult> stages, List<PlanStep> manual,
+                                                String label) {
+        return round -> {
+            for (PlanStep step : runGuards(context, stages, "guard after " + label + round, false)) {
+                if (manual.stream().noneMatch(m -> m.rule().id().equals(step.rule().id()))) {
+                    manual.add(step);
+                }
+            }
+        };
     }
 
     /** Runs each strategy's steps in stage order, committing after every stage. */

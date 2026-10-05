@@ -1,6 +1,6 @@
 # Behavioural verification design
 
-**Status:** phases 1 and 2 implemented (`--verify-behaviour`, `renova verify-behaviour`); phases 3–4 proposed
+**Status:** phases 1–3 implemented (`--verify-behaviour`, `renova verify-behaviour`); phase 4 proposed
 **Scope:** `engine/core` (contracts, comparison, report), ecosystem plugins (launching apps, finding endpoints), CLI and benchmark
 
 ## 1. Problem
@@ -197,4 +197,19 @@ No app behaved the same after migration, although every check passed:
 - `acme-shop`: `/orders.jsp` is now sent as `text/html;charset=utf-8` instead of `iso-8859-1`; pages with
   non-ASCII text would change.
 - The JSTL guard fixed the 500 on `inventory-platform`'s item list found in phase 1.
+
+## 9. Phase 3 as built (2026-10-05)
+
+- `BehaviourCheckingVerifier` builds (with tests), then compares behaviour. Differences become errors for the
+  existing AI repair loop (`BehaviourErrors`), so behaviour repair has the same safety rules as build repair:
+  only offered files are edited, tests are never edited, guards check each round, and every exchange is in the
+  AI audit log.
+- Each difference is attributed to the file that handles the request. Discovery records every route (all HTTP
+  methods) with its handler file; a request found in the code keeps its handler, a scenario-file step uses the
+  most specific matching route, and a database difference goes to the handler of the step that wrote. Requests
+  with a trailing slash go to the Spring configuration that sets URL matching (the DispatcherServlet's
+  `contextConfigLocation`, else `web.xml`), because that is where such a fix belongs.
+- `accept:` in the scenario file lists regexes for intended changes (`"GET /items/: status 200 became 404"`); they
+  are reported as accepted and left alone.
+- The original is built once per migration and reused in later rounds. `--no-behaviour-repair` only reports.
 

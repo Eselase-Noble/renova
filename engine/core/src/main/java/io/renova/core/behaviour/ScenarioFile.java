@@ -37,8 +37,12 @@ import java.util.Set;
  * </pre>
  *
  * The database is PostgreSQL with user, password and database {@code renova}/{@code renova}/{@code app}.
+ *
+ * <p>{@code accept:} lists regexes for differences that are intended, e.g. {@code "GET /items/: status 200 became 404"}
+ * once the team has decided to drop trailing-slash URLs. They are reported as accepted, not as differences,
+ * and AI repair leaves them alone.
  */
-public record ScenarioFile(Database database, List<ScenarioSpec> scenarios) {
+public record ScenarioFile(Database database, List<ScenarioSpec> scenarios, List<String> accept) {
 
     public static final String DEFAULT_NAME = "renova-scenarios.yaml";
     static final String BOUNDARY = "----RenovaScenarioBoundary7MA4YWxkTrZu0gW";
@@ -77,7 +81,8 @@ public record ScenarioFile(Database database, List<ScenarioSpec> scenarios) {
     public static ScenarioFile load(Path file) throws IOException {
         ObjectMapper yaml = new ObjectMapper(new YAMLFactory()).configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
         ScenarioFile parsed = yaml.readValue(file.toFile(), ScenarioFile.class);
-        return new ScenarioFile(parsed.database(), parsed.scenarios() == null ? List.of() : parsed.scenarios());
+        return new ScenarioFile(parsed.database(), parsed.scenarios() == null ? List.of() : parsed.scenarios(),
+                parsed.accept() == null ? List.of() : parsed.accept());
     }
 
     /** The scenarios as steps ready to send; ids are prefixed to keep them apart from discovered ones. */
