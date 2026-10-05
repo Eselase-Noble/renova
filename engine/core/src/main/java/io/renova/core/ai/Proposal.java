@@ -8,9 +8,11 @@ import java.util.Map;
  * A provider's answer to one request.
  *
  * @param edits     new complete content by project-relative path; empty unless {@link Outcome#CHANGED}
- * @param rationale why files were changed, left alone, or the request declined
+ * @param rationale   why files were changed, left alone, or the request declined
+ * @param rawResponse the model's answer as received, for the audit log; null if none
  */
-public record Proposal(Outcome outcome, Map<String, String> edits, String rationale, long inputTokens, long outputTokens) {
+public record Proposal(Outcome outcome, Map<String, String> edits, String rationale, long inputTokens, long outputTokens,
+                       String rawResponse) {
 
     public enum Outcome { CHANGED, UNCHANGED, DECLINED }
 
@@ -19,14 +21,18 @@ public record Proposal(Outcome outcome, Map<String, String> edits, String ration
     }
 
     public static Proposal changed(Map<String, String> edits, String rationale, long in, long out) {
-        return new Proposal(Outcome.CHANGED, edits, rationale, in, out);
+        return new Proposal(Outcome.CHANGED, edits, rationale, in, out, null);
     }
 
     public static Proposal unchanged(String rationale, long in, long out) {
-        return new Proposal(Outcome.UNCHANGED, null, rationale, in, out);
+        return new Proposal(Outcome.UNCHANGED, null, rationale, in, out, null);
     }
 
     public static Proposal declined(String reason, long in, long out) {
-        return new Proposal(Outcome.DECLINED, null, reason, in, out);
+        return new Proposal(Outcome.DECLINED, null, reason, in, out, null);
+    }
+
+    public Proposal withRawResponse(String raw) {
+        return new Proposal(outcome, edits, rationale, inputTokens, outputTokens, raw);
     }
 }

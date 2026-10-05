@@ -26,6 +26,7 @@ public final class Migrator {
 
     /** Deterministic before judgement: AI sees code that recipes have already modernised. */
     private static final List<String> STAGE_ORDER = List.of(FixSpec.RECIPE, FixSpec.REPLACE, FixSpec.AI);
+    private static final int MAX_GUARD_PASSES = 3;
 
     private final PluginRegistry registry;
     private final Consumer<String> progress;
@@ -125,22 +126,42 @@ public final class Migrator {
         if (guards.isEmpty()) {
             return List.of();
         }
-        progress.accept("Checking " + guards.size() + " guard rule(s) on the migrated code");
-        ProjectModel migrated = context.plugin().model(context.workspace().root());
-        AnalysisResult check = new Analyzer(registry).check(migrated, playbook, guards);
-        MigrationPlan guardPlan = new Planner().plan(check);
+        // Fixing one guard can create work for another (adding an API can call for its implementation),
+        // so check again until nothing new is found.
+        List<PlanStep> left = List.of();
+        Set<String> previous = Set.of();
+        for (int pass = 1; pass <= MAX_GUARD_PASSES; pass++) {
+            progress.accept("Checking " + guards.size() + " guard rule(s) on the migrated code"
+                    + (pass > 1 ? " (pass " + pass + ")" : ""));
+            ProjectModel migrated = context.plugin().model(context.workspace().root());
+            AnalysisResult check = new Analyzer(registry).check(migrated, playbook, guards);
+            MigrationPlan guardPlan = new Planner().plan(check);
+            String stage = pass == 1 ? "guard" : "guard pass " + pass;
 
-        List<String> details = new ArrayList<>(check.warnings());
-        check.findings().forEach(f -> details.add(f.ruleId() + ": " + f.file() + (f.line() > 0 ? ":" + f.line() : "")
-                + (f.evidence() == null ? "" : " (" + f.evidence() + ")")));
-        if (guardPlan.steps().isEmpty()) {
-            stages.add(new StageResult("guard", StageResult.Status.APPLIED,
-                    "all " + guards.size() + " guard rule(s) passed", details));
-            return List.of();
+            List<String> details = new ArrayList<>(check.warnings());
+            check.findings().forEach(f -> details.add(f.ruleId() + ": " + f.file() + (f.line() > 0 ? ":" + f.line() : "")
+                    + (f.evidence() == null ? "" : " (" + f.evidence() + ")")));
+            Set<String> found = new LinkedHashSet<>();
+            check.findings().forEach(f -> found.add(f.ruleId() + "|" + f.file() + "|" + f.evidence()));
+            if (guardPlan.steps().isEmpty()) {
+                if (pass == 1) {
+                    stages.add(new StageResult(stage, StageResult.Status.APPLIED,
+                            "all " + guards.size() + " guard rule(s) passed", details));
+                }
+                return List.of();
+            }
+            left = guardPlan.steps(FixSpec.MANUAL);
+            if (found.equals(previous)) {
+                break; // nothing changed since the last pass: the rest needs a person
+            }
+            stages.add(new StageResult(stage, StageResult.Status.PARTIAL, guardPlan.steps().size() + " of "
+                    + guards.size() + " guard rule(s) found problems (" + check.findings().size() + " finding(s))", details));
+            applyPlan(context, guardPlan, stage + " ", stages);
+            if (guardPlan.steps().stream().allMatch(s -> s.strategy().equals(FixSpec.MANUAL))) {
+                break;
+            }
+            previous = found;
         }
-        stages.add(new StageResult("guard", StageResult.Status.PARTIAL, guardPlan.steps().size() + " of "
-                + guards.size() + " guard rule(s) found problems (" + check.findings().size() + " finding(s))", details));
-        applyPlan(context, guardPlan, "guard ", stages);
-        return guardPlan.steps(FixSpec.MANUAL);
+        return left;
     }
 }

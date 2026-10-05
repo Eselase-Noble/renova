@@ -73,6 +73,39 @@ class GuardRulesTest {
                         + playbook.rules().stream().filter(r -> r.guard()).count() + " guard rule(s) found problems"));
     }
 
+    @Test
+    void guardsRunAgainWhenOneFixCreatesWorkForAnother(@TempDir Path tmp) throws Exception {
+        Path project = Files.createDirectories(tmp.resolve("project"));
+        Files.writeString(project.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>g</groupId>
+                    <artifactId>xml</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.release>21</maven.compiler.release>
+                    </properties>
+                    <dependencies>
+                    </dependencies>
+                </project>
+                """);
+        Path src = Files.createDirectories(project.resolve("src/main/java/x"));
+        Files.writeString(src.resolve("Feed.java"), "package x;\nimport jakarta.xml.bind.JAXBContext;\nclass Feed {}\n");
+
+        PluginRegistry registry = PluginRegistry.load();
+        Playbook playbook = registry.defaultPlaybook(project);
+        AnalysisResult analysis = new Analyzer(registry).analyze(project, playbook);
+        Path out = tmp.resolve("out");
+        MigrationOutcome outcome = new Migrator(registry, m -> { }).migrate(analysis, new Planner().plan(analysis),
+                new MigrationOptions(out, AiSettings.NONE, 0, false, Map.of(), List.of()));
+
+        // Pass 1 declares the API the code imports; pass 2 sees it and adds the implementation.
+        assertThat(Files.readString(out.resolve("pom.xml")))
+                .contains("<artifactId>jakarta.xml.bind-api</artifactId>")
+                .contains("<artifactId>jaxb-runtime</artifactId>\n            <version>4.0.5</version>\n            <scope>runtime</scope>");
+        assertThat(outcome.stages()).extracting(StageResult::stage).contains("guard", "guard maven", "guard pass 2", "guard pass 2 maven");
+    }
+
     private static Path copyFixture(Path target) throws Exception {
         Path source = Path.of(GuardRulesTest.class.getResource("/fixtures/legacy-webapp").toURI());
         try (Stream<Path> files = Files.walk(source)) {

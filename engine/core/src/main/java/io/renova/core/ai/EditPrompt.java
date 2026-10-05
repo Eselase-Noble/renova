@@ -90,6 +90,10 @@ public final class EditPrompt {
 
     /** Turns the model's JSON answer into a proposal; malformed answers are declined, never written. */
     public static Proposal parse(String json, long inputTokens, long outputTokens) {
+        return interpret(json, inputTokens, outputTokens).withRawResponse(json);
+    }
+
+    private static Proposal interpret(String json, long inputTokens, long outputTokens) {
         JsonNode answer;
         try {
             answer = JSON.readTree(json);
@@ -101,8 +105,13 @@ public final class EditPrompt {
         for (JsonNode edit : answer.path("edits")) {
             String path = edit.path("path").asText("");
             String content = edit.path("content").asText("");
-            if (path.isBlank() || content.isBlank()) {
-                return Proposal.declined("the response contained an edit without a path or content", inputTokens, outputTokens);
+            if (path.isBlank()) {
+                return Proposal.declined("the response contained an edit without a path", inputTokens, outputTokens);
+            }
+            if (content.isBlank()) {
+                // Deleting files is not supported; refuse the whole answer rather than apply part of it.
+                return Proposal.declined("the response asked to empty " + path + " (deleting files is not supported); "
+                        + "rationale: " + rationale, inputTokens, outputTokens);
             }
             edits.put(path, content);
         }

@@ -111,6 +111,10 @@ class AiFixerTest {
         assertThat(Files.readString(root.resolve("build.txt"))).contains("lib");
         assertThat(Files.readString(root.resolve("secret.txt"))).isEqualTo("do not touch\n");
         assertThat(tmp.resolve("escape.txt")).doesNotExist();
+        Path audit = root.resolve(".renova/ai/001.md");
+        assertThat(audit).exists();
+        assertThat(Files.readString(audit)).contains("# AI exchange 1", "`src/A.java` (target)",
+                "`build.txt` (related: build file of module toy)", "package lib does not exist");
         assertThat(log).anyMatch(l -> l.contains("rejected edit to secret.txt"))
                 .anyMatch(l -> l.contains("rejected edit to ../escape.txt"))
                 .anyMatch(l -> l.contains("round 1: edited build.txt; build passes"));

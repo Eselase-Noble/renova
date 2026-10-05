@@ -172,6 +172,7 @@ public final class AiFixer implements Fixer {
         }
         tally.inputTokens += proposal.inputTokens();
         tally.outputTokens += proposal.outputTokens();
+        AiAuditLog.record(context, request, proposal);
         switch (proposal.outcome()) {
             case CHANGED -> write(context, request, proposal, label, tally);
             case UNCHANGED -> {
