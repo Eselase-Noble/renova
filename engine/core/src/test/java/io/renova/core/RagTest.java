@@ -121,8 +121,8 @@ class RagTest {
     }
 
     @Test
-    void ragIsOffByDefault(@TempDir Path tmp) throws Exception {
-        assertThat(new MigrationOptions(tmp, AiSettings.NONE, 0, false, Map.of(), List.of()).rag().enabled()).isFalse();
+    void ragIsOnByDefault(@TempDir Path tmp) throws Exception {
+        assertThat(new MigrationOptions(tmp, AiSettings.NONE, 0, false, Map.of(), List.of()).rag().enabled()).isTrue();
     }
 
     private static Retriever retriever(List<ContextItem> items) {

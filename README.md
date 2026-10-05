@@ -168,21 +168,21 @@ or reports.
 | `anthropic.baseUrl` | `ANTHROPIC_BASE_URL` | Anthropic API |
 | `openai.apiKey` | `OPENAI_API_KEY` | — |
 | `openai.baseUrl` | `OPENAI_BASE_URL` | OpenAI API. Point it at an on-premises OpenAI-compatible server to keep code in your network |
-| `rag.enabled` | `RENOVA_RAG` | `false`. `--rag` / `--no-rag` override it for one migration |
+| `rag.enabled` | `RENOVA_RAG` | `true`. `--rag` / `--no-rag` override it for one migration |
 | `rag.budget` | `RENOVA_RAG_BUDGET` | `0.3`: the share of each AI request that retrieved context may use |
 
 ### Retrieval (RAG)
 
-With `--rag`, each AI request also carries context retrieved for it, with no extra key or model call:
+Each AI request also carries context retrieved for it, with no extra key or model call (`--no-rag` to turn it off):
 
-- **Related project code:** for Java, the project types a file extends or imports, the configuration files
+- **Related project code:** for Java, the project types a file extends or imports, the tests that use it, the configuration files
   that name it, and the classes a Spring XML or JSP file names. These files are sent as reference only and
   can never be edited.
 - **Curated knowledge:** short notes shipped with the playbook (`knowledge:`), chosen when a note's trigger
   terms appear in the request's rules, build errors or files, and ranked with BM25.
 
-Each AI exchange's log (`.renova/ai/NNN.md`) lists the context it received. RAG is off by default until
-benchmarks show it improves results. See [docs/rag-design.md](docs/rag-design.md).
+Each AI exchange's log (`.renova/ai/NNN.md`) lists the context it received. RAG is on by default because the
+benchmark showed it decides migrations where a fix depends on other code; see [docs/rag-design.md](docs/rag-design.md).
 
 ## Playbooks
 
@@ -237,7 +237,7 @@ twenty lines and is a good starting point. See [`engine/README.md`](engine/READM
 
 ## Roadmap
 
-1. **RAG:** phase 1 (structural code retrieval and curated knowledge, no key needed) is in, behind `--rag`.
+1. **RAG:** phase 1 (structural code retrieval and curated knowledge, no key needed) is in and on by default.
    Next: lessons from accepted fixes, then optional embeddings on the customer's own key.
 2. **Behavioural verification:** run the original and migrated applications side by side and compare responses and data effects
    (design: [docs/behavioural-verification-design.md](docs/behavioural-verification-design.md)).

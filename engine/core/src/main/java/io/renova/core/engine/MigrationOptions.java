@@ -22,12 +22,12 @@ public record MigrationOptions(Path outputDir, AiSettings ai, int maxAiIteration
         ai = ai == null ? AiSettings.NONE : ai;
         toolOptions = Map.copyOf(toolOptions);
         skipStrategies = List.copyOf(skipStrategies);
-        rag = rag == null ? RagSettings.OFF : rag;
+        rag = rag == null ? RagSettings.ON : rag;
     }
 
     public MigrationOptions(Path outputDir, AiSettings ai, int maxAiIterations, boolean verify,
                             Map<String, String> toolOptions, List<String> skipStrategies) {
-        this(outputDir, ai, maxAiIterations, verify, toolOptions, skipStrategies, RagSettings.OFF);
+        this(outputDir, ai, maxAiIterations, verify, toolOptions, skipStrategies, RagSettings.ON);
     }
 
     public String toolOption(String key) {

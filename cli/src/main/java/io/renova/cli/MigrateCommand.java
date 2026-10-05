@@ -43,7 +43,7 @@ final class MigrateCommand implements Callable<Integer> {
 
     @Option(names = "--rag", negatable = true,
             description = "Add retrieved context (related project code, curated migration knowledge) to AI requests. "
-                    + "Needs no extra key. Default: the rag.enabled setting, else off.")
+                    + "Needs no extra key. Default: the rag.enabled setting, else on.")
     Boolean rag;
 
     @Option(names = "--maven-settings", paramLabel = "FILE", description = "Maven settings.xml (e.g. for a private Nexus).")

@@ -133,6 +133,7 @@ final class BenchmarkCommand implements Callable<Integer> {
             if (config.skipTests()) {
                 tools.put("verify.skipTests", "true");
             }
+            // Each configuration states whether it retrieves, whatever the user's rag.enabled default.
             RagSettings rag = config.rag() ? new RagSettings(true, aiConfig.ragSettings(true).budget()) : RagSettings.OFF;
             MigrationOptions options = new MigrationOptions(workspace, config.ai() ? aiConfig.aiSettings() : AiSettings.NONE,
                     maxAiIterations, true, tools, config.skip(), rag);

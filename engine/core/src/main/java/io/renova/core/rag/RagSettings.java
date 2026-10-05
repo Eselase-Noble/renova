@@ -1,8 +1,8 @@
 package io.renova.core.rag;
 
 /**
- * Retrieval for AI requests. Off by default until benchmarks show it raises build-pass rates or
- * cuts repair rounds or tokens.
+ * Retrieval for AI requests. On by default: on the benchmark it turned failing migrations into passing
+ * ones where a fix depends on other code, for 10–40% more input tokens (see docs/rag-design.md).
  *
  * @param budget share of the request size (see {@code AiFixer}) that retrieved context may use
  */

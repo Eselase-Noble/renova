@@ -114,7 +114,7 @@ final class AiConfiguration {
     }
 
     /**
-     * Retrieval for AI requests: the --rag/--no-rag flag when given, else {@code rag.enabled} (off by
+     * Retrieval for AI requests: the --rag/--no-rag flag when given, else {@code rag.enabled} (on by
      * default), with {@code rag.budget} as the share of each request it may use.
      */
     RagSettings ragSettings(Boolean flag) {
@@ -123,7 +123,7 @@ final class AiConfiguration {
                 throw new IllegalArgumentException(RAG + " must be true or false, not '" + v + "'");
             }
             return Boolean.parseBoolean(v);
-        }).orElse(false);
+        }).orElse(true);
         double budget;
         try {
             budget = settings.get(RAG_BUDGET).map(Double::parseDouble).orElse(RagSettings.DEFAULT_BUDGET);

@@ -1,6 +1,6 @@
 # RAG design: retrieval for AI-assisted migration
 
-**Status:** phase 1 implemented (off by default, `--rag`); phases 2–4 proposed
+**Status:** phase 1 implemented and on by default (`--no-rag` to turn it off); phases 2–4 proposed
 **Scope:** `engine/core` (contracts, assembler), ecosystem plugins (code retrieval), new `engine/rag-*` modules
 
 ## 1. Problem
@@ -214,7 +214,7 @@ Both runs produced the same migrated code. The three AI requests each got the ri
 (`HandlerInterceptorAdapter`, `CommonsMultipartResolver`, `nashorn`) plus 1 to 5 unrelated cards chosen by
 BM25 alone, which caused the extra input. BM25-only selection was removed. This app is now too easy to show
 a benefit, because the guards leave only three judgement calls; measuring RAG needs harder apps (roadmap:
-benchmark harness), so RAG stays off by default.
+benchmark harness), so RAG stayed off by default until the benchmark below.
 
 ### Benchmark, 2026-10-05 (`renova benchmark --configs ai,ai-rag --repeat 2`)
 
@@ -233,3 +233,4 @@ and the tests that pin the expected behaviour, and both runs passed with `job.sh
 `toCharArray()` in place of reflection, and a MIME encoder that keeps the legacy line layout. On the
 easier apps RAG changed nothing but cost 10–40% more input tokens.
 
+On this evidence RAG is on by default from 2026-10-05.
