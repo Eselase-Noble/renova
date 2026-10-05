@@ -73,9 +73,24 @@ public final class AiFixer implements Fixer {
                 + " flagged file(s) by " + describe(ai) + "; " + tally.usage(), tally.log);
     }
 
+    /** Called after a repair round's edits are committed and before the build runs again. */
+    @FunctionalInterface
+    public interface RoundHook {
+        void afterEdits(int round) throws Exception;
+    }
+
     /** Re-runs the build after each round of fixes until it passes or {@code maxIterations} is spent. */
     public VerifyResult repair(MigrationContext context, Verifier verifier, VerifyResult failed,
                                int maxIterations, List<String> log) throws Exception {
+        return repair(context, verifier, failed, maxIterations, log, round -> { });
+    }
+
+    /**
+     * As {@link #repair(MigrationContext, Verifier, VerifyResult, int, List)}, running {@code afterEdits}
+     * on each round's edits before rebuilding, so the engine can check them (for example with guards).
+     */
+    public VerifyResult repair(MigrationContext context, Verifier verifier, VerifyResult failed,
+                               int maxIterations, List<String> log, RoundHook afterEdits) throws Exception {
         VerifyResult current = failed;
         Tally tally = new Tally();
         for (int round = 1; round <= maxIterations && !current.success() && context.ai().available(); round++) {
@@ -97,6 +112,7 @@ public final class AiFixer implements Fixer {
                 break;
             }
             context.workspace().commitAll("renova: AI build repair, round " + round);
+            afterEdits.afterEdits(round);
             current = verifier.verify(context);
             log.add("round " + round + ": edited " + String.join(", ", changedThisRound) + "; build "
                     + (current.success() ? "passes" : "still fails"));

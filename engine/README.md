@@ -55,14 +55,15 @@ Implement `EcosystemPlugin`, register it in
 ## Status and roadmap
 
 Working now: analysis, planning, a safe workspace with per-stage commits, OpenRewrite recipes,
-text replacement, Maven build verification with structured errors, the AI fix and repair loop
-with a Claude provider, and Markdown/JSON reports.
+text replacement, format-preserving pom.xml edits, guard rules (checked after the fix stages and after
+each AI repair round), Maven build and test verification with structured errors, the AI fix and repair
+loop with Claude and OpenAI-compatible providers (including on-premises servers), retrieval (RAG phase 1,
+`--rag`), an AI audit log, Markdown/JSON reports, and the benchmark harness.
 
 Next:
-1. **More AI providers**: an on-premises option.
-2. **Guards after AI repair**: re-check guards on edits made by the repair loop.
-3. **Behavioural verification**: run the old and new apps side by side and diff HTTP responses and DB effects.
-4. **Benchmark harness**: `renova benchmark` (see `benchmark/`); next, public open-source legacy projects.
-5. **Category E detector**: classes used in code but only available through transitive dependencies.
-6. Gradle recipe runner, `pom.*.xml` variant handling, more playbooks (Spring Boot 2→3, Java EE→Quarkus, then .NET/Python).
-7. Licensing, a playbook marketplace and private playbook packs.
+1. **Behavioural verification**: run the old and new apps side by side and diff HTTP responses and DB effects.
+2. **More benchmark apps**, including public open-source legacy projects.
+3. **RAG phase 2**: lessons from accepted fixes, per migration and per organisation.
+4. **Transitive-only classes**: classes used in code but available only through transitive dependencies.
+5. Gradle recipe runner, `pom.*.xml` variant handling, more playbooks (Spring Boot 2→3, Java EE→Quarkus, then .NET/Python).
+6. Licensing, a playbook marketplace and private playbook packs.

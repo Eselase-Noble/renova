@@ -55,7 +55,7 @@ most of the effort. Renova treats the two differently:
 ```
 
 **Guards** are playbook rules with `phase: guard`. They run on the migrated code before the build is
-verified and catch what earlier stages introduced or left behind, for example a container API moved to
+verified, and again on each AI repair round's edits before the rebuild, and catch what earlier stages introduced or left behind, for example a container API moved to
 `compile` scope, a build plugin too old for the new JDK, a compiler target that no longer matches the
 source level, a package the code imports that no declared dependency supplies, a dependency a recipe left
 without a version or declared twice, or a Spring `Assert` call a recipe could not convert.
@@ -239,12 +239,11 @@ twenty lines and is a good starting point. See [`engine/README.md`](engine/READM
 
 1. **RAG:** phase 1 (structural code retrieval and curated knowledge, no key needed) is in, behind `--rag`.
    Next: lessons from accepted fixes, then optional embeddings on the customer's own key.
-2. **Guards after AI repair:** re-check guards on edits made by the repair loop.
-3. **Behavioural verification:** run the original and migrated applications side by side and compare responses and data effects.
-4. **Benchmark harness:** `renova benchmark` scores migrations of synthetic legacy apps (see
+2. **Behavioural verification:** run the original and migrated applications side by side and compare responses and data effects.
+3. **Benchmark harness:** `renova benchmark` scores migrations of synthetic legacy apps (see
    [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.
-5. **Web console and REST API**, then the **desktop** and **IDE** products.
-6. **More playbooks and ecosystems:** Spring Boot 2 → 3, Java EE → Quarkus, then .NET and Python.
+4. **Web console and REST API**, then the **desktop** and **IDE** products.
+5. **More playbooks and ecosystems:** Spring Boot 2 → 3, Java EE → Quarkus, then .NET and Python.
 
 ## Contributing
 

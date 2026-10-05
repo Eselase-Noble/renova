@@ -61,7 +61,7 @@ public final class Migrator {
         List<StageResult> stages = new ArrayList<>();
         applyPlan(context, plan, "", stages);
         List<PlanStep> manual = new ArrayList<>(plan.steps(FixSpec.MANUAL));
-        manual.addAll(runGuards(context, stages));
+        manual.addAll(runGuards(context, stages, "guard", true));
 
         VerifyResult verification = null;
         Optional<Verifier> verifier = registry.plugin(ecosystem).verifier();
@@ -72,7 +72,16 @@ public final class Migrator {
                 progress.accept("Build fails with " + verification.errors().size() + " error(s); starting AI repair");
                 List<String> log = new ArrayList<>();
                 try {
-                    verification = new AiFixer().repair(context, verifier.get(), verification, options.maxAiIterations(), log);
+                    // Repair edits can bring back what the guards prevent (a bundled server API, a missing
+                    // implementation), so the guards check each round's edits before the rebuild.
+                    verification = new AiFixer().repair(context, verifier.get(), verification, options.maxAiIterations(), log,
+                            round -> {
+                                for (PlanStep step : runGuards(context, stages, "guard after repair round " + round, false)) {
+                                    if (manual.stream().noneMatch(m -> m.rule().id().equals(step.rule().id()))) {
+                                        manual.add(step);
+                                    }
+                                }
+                            });
                 } catch (AiProviderException e) {
                     log.add("stopped: " + e.getMessage());
                 }
@@ -125,9 +134,12 @@ public final class Migrator {
      * Checks the playbook's guard rules against the migrated workspace and fixes what they find, so
      * problems introduced by recipes or AI edits are caught before the build is verified.
      *
+     * @param label       stage name of the first pass, e.g. "guard"; later passes add " pass N"
+     * @param reportClean whether to add a stage when every guard passes
      * @return guard steps left for a person
      */
-    private List<PlanStep> runGuards(MigrationContext context, List<StageResult> stages) throws Exception {
+    private List<PlanStep> runGuards(MigrationContext context, List<StageResult> stages, String label, boolean reportClean)
+            throws Exception {
         Playbook playbook = context.playbook();
         List<Rule> guards = playbook.rules().stream().filter(Rule::guard).toList();
         if (guards.isEmpty()) {
@@ -139,11 +151,12 @@ public final class Migrator {
         Set<String> previous = Set.of();
         for (int pass = 1; pass <= MAX_GUARD_PASSES; pass++) {
             progress.accept("Checking " + guards.size() + " guard rule(s) on the migrated code"
+                    + (label.equals("guard") ? "" : " (" + label.substring("guard ".length()) + ")")
                     + (pass > 1 ? " (pass " + pass + ")" : ""));
             ProjectModel migrated = context.plugin().model(context.workspace().root());
             AnalysisResult check = new Analyzer(registry).check(migrated, playbook, guards);
             MigrationPlan guardPlan = new Planner().plan(check);
-            String stage = pass == 1 ? "guard" : "guard pass " + pass;
+            String stage = pass == 1 ? label : label + " pass " + pass;
 
             List<String> details = new ArrayList<>(check.warnings());
             check.findings().forEach(f -> details.add(f.ruleId() + ": " + f.file() + (f.line() > 0 ? ":" + f.line() : "")
@@ -151,7 +164,7 @@ public final class Migrator {
             Set<String> found = new LinkedHashSet<>();
             check.findings().forEach(f -> found.add(f.ruleId() + "|" + f.file() + "|" + f.evidence()));
             if (guardPlan.steps().isEmpty()) {
-                if (pass == 1) {
+                if (pass == 1 && reportClean) {
                     stages.add(new StageResult(stage, StageResult.Status.APPLIED,
                             "all " + guards.size() + " guard rule(s) passed", details));
                 }
