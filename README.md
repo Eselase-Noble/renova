@@ -80,7 +80,7 @@ Every finding belongs to a change category, and plan steps run in the order A â†
 | [`engine/ai-openai`](engine) | AI provider for OpenAI or any OpenAI-compatible server (Azure OpenAI, vLLM, Ollama), using the user's own key | Working |
 | [`cli`](cli) | `renova` command for terminals and CI pipelines | Working |
 | [`web`](web) | REST API and web console, hosted or on-premises | Planned |
-| [`desktop`](desktop) | Offline desktop application reusing the web UI | Planned |
+| [`desktop`](desktop) | Offline JavaFX desktop application running the engine locally | Planned |
 | [`ide`](ide) | IntelliJ IDEA and VS Code integrations | Planned |
 
 ## Getting started
