@@ -6,8 +6,8 @@ Renova analyses a legacy codebase, produces a migration plan, and carries out th
 of the project. Deterministic rewrites handle the mechanical bulk. Context-dependent changes go to an
 AI model or a person, and the real build checks every change.
 
-> **Status:** early development (`0.1.0-SNAPSHOT`). The engine, command-line interface and web console work
-> for Java projects. The desktop and IDE products are planned. See the [roadmap](#roadmap).
+> **Status:** early development (`0.1.0-SNAPSHOT`). The engine, command-line interface, web console and desktop
+> app work for Java projects. The IDE plugins are planned. See the [roadmap](#roadmap).
 
 ---
 
@@ -80,7 +80,7 @@ Every finding belongs to a change category, and plan steps run in the order A �
 | [`engine/ai-openai`](engine) | AI provider for OpenAI or any OpenAI-compatible server (Azure OpenAI, vLLM, Ollama), using the user's own key | Working |
 | [`cli`](cli) | `renova` command for terminals and CI pipelines | Working |
 | [`web`](web) | REST API (Spring Boot) and web console (Next.js) with accounts and organisations, on-premises | Working |
-| [`desktop`](desktop) | Offline JavaFX desktop application running the engine locally | Planned |
+| [`desktop`](desktop) | JavaFX desktop app running the engine on your machine, packaged with jpackage | Working |
 | [`ide`](ide) | IntelliJ IDEA and VS Code integrations | Planned |
 
 ## Getting started
@@ -302,7 +302,7 @@ twenty lines and is a good starting point. See [`engine/README.md`](engine/READM
    ([design](docs/behavioural-verification-design.md)).
 3. **Benchmark harness:** `renova benchmark` scores migrations of synthetic legacy apps (see
    [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.
-4. **Web console:** single sign-on, audit log and licensing; then the **desktop** (JavaFX) and **IDE** products.
+4. **Web console:** single sign-on, audit log and licensing. **Desktop:** installers per OS. Then the **IDE** plugins.
 5. **More playbooks and ecosystems:** Spring Boot 2 → 3, Java EE → Quarkus, then .NET and Python.
 
 ## Contributing

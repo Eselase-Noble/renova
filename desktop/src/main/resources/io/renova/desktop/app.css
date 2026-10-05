@@ -30,7 +30,7 @@
 }
 
 .nav-button:hover, .nav-button.active {
-    -fx-background-color: -color-bg-neutral-muted;
+    -fx-background-color: -color-neutral-muted;
     -fx-text-fill: -color-fg-default;
 }
 
@@ -71,7 +71,7 @@
 .diff .list-cell.removed { -fx-background-color: -color-danger-subtle; -fx-text-fill: -color-danger-fg; }
 .diff .list-cell.hunk { -fx-background-color: -color-accent-subtle; -fx-text-fill: -color-accent-fg; }
 .diff .list-cell.file {
-    -fx-background-color: -color-bg-neutral-muted;
+    -fx-background-color: -color-neutral-muted;
     -fx-font-weight: bold;
 }
 
