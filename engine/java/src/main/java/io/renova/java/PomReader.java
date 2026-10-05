@@ -25,10 +25,20 @@ public final class PomReader {
 
     private static final Pattern EXPRESSION = Pattern.compile("\\$\\{([^}]+)}");
 
-    /** @param managed declared in dependencyManagement, so it sets defaults rather than adding the dependency */
-    public record Dependency(String groupId, String artifactId, String version, String scope, boolean managed) {
+    /**
+     * @param managed    declared in dependencyManagement, so it sets defaults rather than adding the dependency
+     * @param type       declared type, or null for the default (jar)
+     * @param classifier declared classifier, or null
+     */
+    public record Dependency(String groupId, String artifactId, String version, String scope, boolean managed,
+                             String type, String classifier) {
         public String coordinates() {
             return groupId + ":" + artifactId + (version == null ? "" : ":" + version);
+        }
+
+        /** What Maven requires to be unique within one dependency list: groupId:artifactId:type:classifier. */
+        public String key() {
+            return groupId + ":" + artifactId + ":" + (type == null ? "jar" : type) + ":" + (classifier == null ? "" : classifier);
         }
     }
 
@@ -36,9 +46,10 @@ public final class PomReader {
     public record Plugin(String groupId, String artifactId, String version, boolean managed) {
     }
 
+    /** @param parent groupId:artifactId of the declared parent, or null when there is none */
     public record Pom(String groupId, String artifactId, String version, String packaging, String javaVersion,
                       List<String> modules, List<Dependency> dependencies, List<Plugin> plugins,
-                      Map<String, String> properties) {
+                      Map<String, String> properties, String parent) {
     }
 
     private PomReader() {
@@ -86,7 +97,7 @@ public final class PomReader {
 
         return new Pom(interpolate(groupId, props), artifactId, interpolate(version, props),
                 firstNonNull(text(project, "packaging"), "jar"), javaVersion(project, props),
-                modules, deps, plugins, props);
+                modules, deps, plugins, props, parent == null ? null : text(parent, "groupId") + ":" + text(parent, "artifactId"));
     }
 
     /** "1.8" → "8"; checks the usual properties, then the compiler plugin configuration. */
@@ -139,7 +150,8 @@ public final class PomReader {
         for (Element d : children(dependencies)) {
             if (d.getTagName().equals("dependency")) {
                 out.add(new Dependency(interpolate(text(d, "groupId"), props), interpolate(text(d, "artifactId"), props),
-                        interpolate(text(d, "version"), props), text(d, "scope"), managed));
+                        interpolate(text(d, "version"), props), text(d, "scope"), managed,
+                        interpolate(text(d, "type"), props), interpolate(text(d, "classifier"), props)));
             }
         }
     }

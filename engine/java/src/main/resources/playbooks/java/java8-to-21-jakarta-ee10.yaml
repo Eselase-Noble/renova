@@ -502,3 +502,67 @@ rules:
       never declared them. After the rename to jakarta.*, nothing supplies them until the build
       declares the Jakarta EE 10 API. On WildFly/JBoss, packages bundled here may already be provided
       by the server; review the scope for those deployments.
+
+  - id: guard-dependency-version
+    phase: guard
+    title: Dependencies without a version need one when nothing manages them
+    category: E
+    severity: BLOCKER
+    detect: { type: dependencyWithoutVersion }
+    fix:
+      strategy: maven
+      params: { action: setVersion }
+    rationale: >
+      A recipe can rename an artifact in a module but rename the parent's managed entry differently (for
+      example commons-fileupload2-jakarta-servlet5 in the module, -servlet6 in the parent), leaving the
+      module's dependency without a version and the build broken. The version is taken from the managed
+      artifact of the same family. Review whether the module should use the managed artifact instead.
+
+  - id: guard-duplicate-dependencies
+    phase: guard
+    title: A dependency must be declared only once in a build file
+    category: E
+    severity: WARNING
+    detect: { type: duplicateDependency }
+    fix:
+      strategy: maven
+      params: { action: removeDuplicates }
+    rationale: >
+      Recipes that add a dependency can miss an existing declaration they renamed, leaving two copies that
+      disagree on version or scope. Maven only warns. The first declaration, normally the project's own,
+      is kept and later copies are removed.
+
+  - id: guard-spring-assert-messages
+    phase: guard
+    title: Spring Assert calls left without a message (overloads removed in Spring 6)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.java"]
+      requires: 'org\.springframework\.util\.(Assert\b|\*)'
+      pattern: '\bAssert\.(notNull|isNull|isTrue|state|hasText|hasLength)\(\s*[^,()]+(\([^()]*\))?\s*\)\s*;'
+    fix:
+      strategy: replace
+      include: "**/*.java"
+      regex: true
+      params:
+        # The messages the removed overloads used, so exception messages do not change.
+        replacements:
+          - find: '\bAssert\.notNull\(\s*([^,()]+?(?:\([^()]*\))?)\s*\)(\s*;)'
+            replace: 'Assert.notNull($1, "[Assertion failed] - this argument is required; it must not be null")$2'
+          - find: '\bAssert\.isNull\(\s*([^,()]+?(?:\([^()]*\))?)\s*\)(\s*;)'
+            replace: 'Assert.isNull($1, "[Assertion failed] - the object argument must be null")$2'
+          - find: '\bAssert\.isTrue\(\s*([^,()]+?(?:\([^()]*\))?)\s*\)(\s*;)'
+            replace: 'Assert.isTrue($1, "[Assertion failed] - this expression must be true")$2'
+          - find: '\bAssert\.state\(\s*([^,()]+?(?:\([^()]*\))?)\s*\)(\s*;)'
+            replace: 'Assert.state($1, "[Assertion failed] - this state invariant must be true")$2'
+          - find: '\bAssert\.hasText\(\s*([^,()]+?(?:\([^()]*\))?)\s*\)(\s*;)'
+            replace: 'Assert.hasText($1, "[Assertion failed] - this String argument must have text; it must not be null, empty, or blank")$2'
+          - find: '\bAssert\.hasLength\(\s*([^,()]+?(?:\([^()]*\))?)\s*\)(\s*;)'
+            replace: 'Assert.hasLength($1, "[Assertion failed] - this String argument must have length; it must not be null or empty")$2'
+    rationale: >
+      OpenRewrite's MigrateSpringAssert only converts calls whose argument types it can resolve. An
+      argument whose type comes from a sibling module can leave a call unconverted, and Spring 6 no
+      longer compiles it. Calls whose argument contains a comma or nested calls are left to the build
+      and AI repair.

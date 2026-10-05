@@ -69,7 +69,8 @@ class GuardRulesTest {
 
         assertThat(outcome.stages()).extracting(StageResult::stage).contains("guard", "guard maven");
         assertThat(outcome.stages()).filteredOn(s -> s.stage().equals("guard")).singleElement()
-                .satisfies(s -> assertThat(s.summary()).startsWith("4 of "
+                // The fifth is the message-less Assert call the skipped recipe would have converted.
+                .satisfies(s -> assertThat(s.summary()).startsWith("5 of "
                         + playbook.rules().stream().filter(r -> r.guard()).count() + " guard rule(s) found problems"));
     }
 
@@ -104,6 +105,161 @@ class GuardRulesTest {
                 .contains("<artifactId>jakarta.xml.bind-api</artifactId>")
                 .contains("<artifactId>jaxb-runtime</artifactId>\n            <version>4.0.5</version>\n            <scope>runtime</scope>");
         assertThat(outcome.stages()).extracting(StageResult::stage).contains("guard", "guard maven", "guard pass 2", "guard pass 2 maven");
+    }
+
+    @Test
+    void guardsRepairRecipeLeftoversInAMultiModuleBuild(@TempDir Path tmp) throws Exception {
+        // What the recipes left in inventory-platform: the parent manages the -servlet6 artifact, the
+        // module renamed its dependency to -servlet5 without a version, the servlet API was added a
+        // second time, and one Assert call kept its removed one-argument form.
+        Path project = Files.createDirectories(tmp.resolve("project"));
+        Files.writeString(project.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.acme</groupId>
+                    <artifactId>platform</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>web</module>
+                    </modules>
+                    <properties>
+                        <maven.compiler.release>21</maven.compiler.release>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>jakarta.servlet</groupId>
+                                <artifactId>jakarta.servlet-api</artifactId>
+                                <version>6.0.0</version>
+                                <scope>provided</scope>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.apache.commons</groupId>
+                                <artifactId>commons-fileupload2-jakarta-servlet6</artifactId>
+                                <version>2.0.0-M4</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        Path web = Files.createDirectories(project.resolve("web"));
+        Files.writeString(web.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.acme</groupId>
+                        <artifactId>platform</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>web</artifactId>
+                    <packaging>jar</packaging>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.servlet</groupId>
+                            <artifactId>jakarta.servlet-api</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>jakarta.servlet</groupId>
+                            <artifactId>jakarta.servlet-api</artifactId>
+                            <version>5.0.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.apache.commons</groupId>
+                            <artifactId>commons-fileupload2-jakarta-servlet5</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Path src = Files.createDirectories(web.resolve("src/main/java/com/acme/web"));
+        Files.writeString(src.resolve("ItemController.java"), """
+                package com.acme.web;
+
+                import org.springframework.util.Assert;
+
+                class ItemController {
+                    void show(Object item, Request request) {
+                        Assert.notNull(item);
+                        Assert.isTrue(request.isUserInRole("STOCK"));
+                        Assert.hasText(request.name(), "name required");
+                    }
+                }
+                """);
+        // A project's own Assert class with the same method names must not change.
+        String ownAssert = "package com.acme.web;\nimport com.acme.util.Assert;\nclass Other { void x(Object o) { Assert.notNull(o); } }\n";
+        Files.writeString(src.resolve("Other.java"), ownAssert);
+
+        PluginRegistry registry = PluginRegistry.load();
+        Playbook playbook = registry.defaultPlaybook(project);
+        AnalysisResult analysis = new Analyzer(registry).analyze(project, playbook);
+        Path out = tmp.resolve("out");
+        new Migrator(registry, m -> { }).migrate(analysis, new Planner().plan(analysis),
+                new MigrationOptions(out, AiSettings.NONE, 0, false, Map.of(), List.of("recipe", "ai")));
+
+        assertThat(Files.readString(out.resolve("web/pom.xml"))).isEqualTo("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>com.acme</groupId>
+                        <artifactId>platform</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>web</artifactId>
+                    <packaging>jar</packaging>
+                    <dependencies>
+                        <dependency>
+                            <groupId>jakarta.servlet</groupId>
+                            <artifactId>jakarta.servlet-api</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.apache.commons</groupId>
+                            <artifactId>commons-fileupload2-jakarta-servlet5</artifactId>
+                            <version>2.0.0-M4</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        assertThat(Files.readString(out.resolve("web/src/main/java/com/acme/web/ItemController.java")))
+                .contains("Assert.notNull(item, \"[Assertion failed] - this argument is required; it must not be null\");")
+                .contains("Assert.isTrue(request.isUserInRole(\"STOCK\"), \"[Assertion failed] - this expression must be true\");")
+                .contains("Assert.hasText(request.name(), \"name required\");");
+        assertThat(Files.readString(out.resolve("web/src/main/java/com/acme/web/Other.java"))).isEqualTo(ownAssert);
+    }
+
+    @Test
+    void noVersionIsGuessedWhenTheParentIsOutsideTheProject(@TempDir Path tmp) throws Exception {
+        Path project = Files.createDirectories(tmp.resolve("project"));
+        Files.writeString(project.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>3.5.0</version>
+                    </parent>
+                    <artifactId>app</artifactId>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.apache.commons</groupId>
+                                <artifactId>commons-fileupload2-jakarta-servlet6</artifactId>
+                                <version>2.0.0-M4</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.commons</groupId>
+                            <artifactId>commons-fileupload2-jakarta-servlet5</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        PluginRegistry registry = PluginRegistry.load();
+        Playbook playbook = registry.defaultPlaybook(project);
+        AnalysisResult check = new Analyzer(registry).check(new Analyzer(registry).analyze(project, playbook).project(), playbook,
+                playbook.rules().stream().filter(r -> r.id().equals("guard-dependency-version")).toList());
+        assertThat(check.findings()).isEmpty();
     }
 
     private static Path copyFixture(Path target) throws Exception {

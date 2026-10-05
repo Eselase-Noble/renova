@@ -139,4 +139,51 @@ class PomEditorTest {
                 + "    <dependencies>\n        <dependency>\n            <groupId>g</groupId>\n            <artifactId>a</artifactId>\n"
                 + "            <version>1</version>\n        </dependency>\n    </dependencies>\n\n    <build>\n    </build>\n</project>\n");
     }
+
+    @Test
+    void removesLaterDuplicatesWithTheirLinesAndKeepsDistinctClassifiers() {
+        String duplicate = """
+                    <dependency>
+                      <groupId>g</groupId>
+                      <artifactId>a</artifactId>
+                      <version>2</version>
+                    </dependency>
+                """;
+        String pom = """
+                <project>
+                  <dependencies>
+                    <dependency>
+                      <groupId>g</groupId>
+                      <artifactId>a</artifactId>
+                    </dependency>
+                    <dependency>
+                      <groupId>g</groupId>
+                      <artifactId>a</artifactId>
+                      <classifier>tests</classifier>
+                    </dependency>
+                """ + duplicate + """
+                  </dependencies>
+                </project>
+                """;
+        PomEditor.Result result = PomEditor.removeDuplicateDependencies(pom);
+        assertThat(result.changes()).isEqualTo(1);
+        assertThat(result.content()).isEqualTo(pom.replace(duplicate, ""));
+    }
+
+    @Test
+    void setsAVersionOnlyWhereNoneIsDeclared() {
+        String pom = """
+                <project>
+                  <dependencies>
+                    <dependency>
+                      <groupId>g</groupId>
+                      <artifactId>a</artifactId>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """;
+        PomEditor.Result result = PomEditor.setDependencyVersion(pom, "g", "a", "1.0");
+        assertThat(result.content()).contains("      <artifactId>a</artifactId>\n      <version>1.0</version>\n    </dependency>");
+        assertThat(PomEditor.setDependencyVersion(result.content(), "g", "a", "2.0").changes()).isZero();
+    }
 }

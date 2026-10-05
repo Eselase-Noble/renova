@@ -1,7 +1,9 @@
 package io.renova.java.fix;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.BiPredicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -65,6 +67,83 @@ final class PomEditor {
         }
         out.append(pom.substring(last));
         return new Result(out.toString(), changes);
+    }
+
+    /**
+     * Adds a version to every real dependency with this groupId and artifactId that declares none.
+     * Declared versions are left alone.
+     */
+    static Result setDependencyVersion(String pom, String groupId, String artifactId, String version) {
+        List<Span> excluded = realDependencyExclusions(pom);
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        int changes = 0;
+        Matcher block = Pattern.compile("(?s)<dependency>.*?</dependency>").matcher(pom);
+        while (block.find()) {
+            String text = block.group();
+            String own = text.replaceAll("(?s)<exclusions>.*?</exclusions>", "");
+            if (inside(excluded, block.start()) || !groupId.equals(tag(own, "groupId"))
+                    || !artifactId.equals(tag(own, "artifactId")) || tag(own, "version") != null) {
+                continue;
+            }
+            int at = text.indexOf("</artifactId>") + "</artifactId>".length();
+            out.append(pom, last, block.start()).append(text, 0, at).append("\n").append(indentOf(text, "<artifactId>"))
+                    .append("<version>").append(version).append("</version>").append(text.substring(at));
+            last = block.end();
+            changes++;
+        }
+        out.append(pom.substring(last));
+        return new Result(out.toString(), changes);
+    }
+
+    /**
+     * Removes real dependencies declared again with the same groupId, artifactId, type and
+     * classifier, keeping the first declaration of each.
+     */
+    static Result removeDuplicateDependencies(String pom) {
+        List<Span> excluded = realDependencyExclusions(pom);
+        Set<String> seen = new HashSet<>();
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        int changes = 0;
+        Matcher block = Pattern.compile("(?s)<dependency>.*?</dependency>").matcher(pom);
+        while (block.find()) {
+            if (inside(excluded, block.start())) {
+                continue;
+            }
+            String own = block.group().replaceAll("(?s)<exclusions>.*?</exclusions>", "");
+            String type = tag(own, "type");
+            String classifier = tag(own, "classifier");
+            String key = tag(own, "groupId") + ":" + tag(own, "artifactId") + ":" + (type == null ? "jar" : type) + ":"
+                    + (classifier == null ? "" : classifier);
+            if (seen.add(key)) {
+                continue;
+            }
+            // Remove the whole lines the block occupies when it stands on its own lines.
+            int start = block.start();
+            int lineStart = pom.lastIndexOf('\n', start - 1) + 1;
+            if (pom.substring(lineStart, start).isBlank()) {
+                start = lineStart;
+            }
+            int end = block.end();
+            int lineEnd = pom.indexOf('\n', end);
+            if (lineEnd >= 0 && pom.substring(end, lineEnd).isBlank()) {
+                end = lineEnd + 1;
+            }
+            out.append(pom, last, start);
+            last = end;
+            changes++;
+        }
+        out.append(pom.substring(last));
+        return new Result(out.toString(), changes);
+    }
+
+    /** Regions whose dependencies are not the project's own: dependencyManagement, plugins and profiles. */
+    private static List<Span> realDependencyExclusions(String pom) {
+        List<Span> excluded = spans(pom, "dependencyManagement");
+        excluded.addAll(spans(pom, "plugin"));
+        excluded.addAll(spans(pom, "profiles"));
+        return excluded;
     }
 
     /**

@@ -10,6 +10,8 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public final class PlaybookLoader {
@@ -61,8 +63,14 @@ public final class PlaybookLoader {
             if (FixSpec.RECIPE.equals(fix.strategy()) && fix.recipes().isEmpty()) {
                 throw new IllegalArgumentException("rule '" + rule.id() + "' uses strategy recipe without recipes");
             }
-            if (FixSpec.REPLACE.equals(fix.strategy()) && (fix.include() == null || fix.find() == null || fix.replace() == null)) {
-                throw new IllegalArgumentException("rule '" + rule.id() + "' uses strategy replace without include/find/replace");
+            if (FixSpec.REPLACE.equals(fix.strategy())) {
+                List<Map<String, Object>> pairs = fix.params(rule.id()).maps("replacements");
+                boolean single = fix.find() != null && fix.replace() != null;
+                if (fix.include() == null || (!single && pairs.isEmpty())
+                        || pairs.stream().anyMatch(p -> p.get("find") == null || p.get("replace") == null)) {
+                    throw new IllegalArgumentException("rule '" + rule.id()
+                            + "' uses strategy replace without include and find/replace (or params.replacements)");
+                }
             }
         }
     }

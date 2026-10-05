@@ -12,12 +12,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * Text replacement driven entirely by the playbook, for files AST tools do not parse (JSP, TLD,
- * XML, scripts). Files keep their original encoding.
+ * XML, scripts), or for narrow source fixes a recipe missed. Files keep their original encoding.
+ * A rule gives either one {@code find}/{@code replace} pair or, under
+ * {@code params.replacements}, a list of {@code {find, replace}} pairs applied in order; {@code regex}
+ * applies to all of them.
  */
 public final class ReplaceFixer implements Fixer {
 
@@ -33,8 +37,7 @@ public final class ReplaceFixer implements Fixer {
         int changedFiles = 0;
         for (PlanStep step : steps) {
             FixSpec fix = step.rule().fix();
-            Pattern pattern = fix.regex() ? Pattern.compile(fix.find()) : Pattern.compile(Pattern.quote(fix.find()));
-            String replacement = fix.regex() ? fix.replace() : Matcher.quoteReplacement(fix.replace());
+            List<Replacement> replacements = replacements(step.rule().id(), fix);
             int stepFiles = 0;
             for (String file : step.files()) {
                 Path path = root.resolve(file);
@@ -43,7 +46,10 @@ public final class ReplaceFixer implements Fixer {
                 }
                 Charset charset = charsetOf(path);
                 String before = Files.readString(path, charset);
-                String after = pattern.matcher(before).replaceAll(replacement);
+                String after = before;
+                for (Replacement r : replacements) {
+                    after = r.find().matcher(after).replaceAll(r.replace());
+                }
                 if (!after.equals(before)) {
                     Files.writeString(path, after, charset);
                     stepFiles++;
@@ -54,6 +60,25 @@ public final class ReplaceFixer implements Fixer {
         }
         return new StageResult("replace", StageResult.Status.APPLIED,
                 changedFiles + " file(s) changed by " + steps.size() + " text rule(s)", details);
+    }
+
+    private record Replacement(Pattern find, String replace) {
+    }
+
+    private static List<Replacement> replacements(String ruleId, FixSpec fix) {
+        List<Replacement> result = new ArrayList<>();
+        if (fix.find() != null) {
+            result.add(replacement(fix, fix.find(), fix.replace()));
+        }
+        for (Map<String, Object> pair : fix.params(ruleId).maps("replacements")) {
+            result.add(replacement(fix, String.valueOf(pair.get("find")), String.valueOf(pair.get("replace"))));
+        }
+        return result;
+    }
+
+    private static Replacement replacement(FixSpec fix, String find, String replace) {
+        return fix.regex() ? new Replacement(Pattern.compile(find), replace)
+                : new Replacement(Pattern.compile(Pattern.quote(find)), Matcher.quoteReplacement(replace));
     }
 
     private static Charset charsetOf(Path path) throws IOException {

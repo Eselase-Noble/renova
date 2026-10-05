@@ -39,8 +39,10 @@ public final class CoreDetectors {
     }
 
     /**
-     * {@code type: fileContains, include: [glob...], pattern: regex, exclude?: regex} — one finding
-     * per matching line, skipping lines that also match {@code exclude}.
+     * {@code type: fileContains, include: [glob...], pattern: regex, exclude?: regex, requires?: regex} — one
+     * finding per matching line, skipping lines that also match {@code exclude}. With {@code requires},
+     * only files containing a line that matches it are checked (for example an import that tells which
+     * {@code Assert} class a file uses).
      */
     static final class FileContains implements DetectorFactory {
         @Override
@@ -54,10 +56,14 @@ public final class CoreDetectors {
             List<String> include = params.requiredStrings("include");
             Pattern pattern = Pattern.compile(params.string("pattern"));
             Pattern exclude = params.optString("exclude").map(Pattern::compile).orElse(null);
+            Pattern requires = params.optString("requires").map(Pattern::compile).orElse(null);
             return ctx -> {
                 List<Finding> findings = new ArrayList<>();
                 for (Path file : ctx.files(include)) {
                     List<String> lines = ctx.lines(file);
+                    if (requires != null && lines.stream().noneMatch(l -> requires.matcher(l).find())) {
+                        continue;
+                    }
                     for (int i = 0; i < lines.size(); i++) {
                         String line = lines.get(i);
                         Matcher m = pattern.matcher(line);

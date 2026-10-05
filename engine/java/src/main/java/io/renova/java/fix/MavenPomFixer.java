@@ -25,6 +25,9 @@ import java.util.regex.Pattern;
  *   <li>{@code action: addDependency}: adds the dependency each finding describes in its data
  *       (groupId, artifactId, version, scope), or the fixed {@code dependency: "g:a:v"} (and
  *       {@code scope}) given in the params</li>
+ *   <li>{@code action: setVersion}: adds the version each finding gives in its data (groupId,
+ *       artifactId, version) to that dependency, where it declares none</li>
+ *   <li>{@code action: removeDuplicates}: removes repeated declarations of a dependency, keeping the first</li>
  * </ul>
  */
 public final class MavenPomFixer implements Fixer {
@@ -82,8 +85,23 @@ public final class MavenPomFixer implements Fixer {
                         }
                         yield new PomEditor.Result(content, changes);
                     }
+                    case "setVersion" -> {
+                        String content = before;
+                        int changes = 0;
+                        for (Finding f : step.findings()) {
+                            if (!f.file().equals(file) || !f.data().containsKey("version")) {
+                                continue;
+                            }
+                            PomEditor.Result set = PomEditor.setDependencyVersion(content, f.data().get("groupId"),
+                                    f.data().get("artifactId"), f.data().get("version"));
+                            content = set.content();
+                            changes += set.changes();
+                        }
+                        yield new PomEditor.Result(content, changes);
+                    }
+                    case "removeDuplicates" -> PomEditor.removeDuplicateDependencies(before);
                     default -> throw new IllegalArgumentException("Rule '" + ruleId + "': unknown maven action '" + action
-                            + "'; use setScope, setPluginVersion, setProperty or addDependency");
+                            + "'; use setScope, setPluginVersion, setProperty, addDependency, setVersion or removeDuplicates");
                 };
                 if (result.changes() > 0) {
                     Files.writeString(path, result.content(), StandardCharsets.UTF_8);

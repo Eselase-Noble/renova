@@ -57,7 +57,8 @@ most of the effort. Renova treats the two differently:
 **Guards** are playbook rules with `phase: guard`. They run on the migrated code before the build is
 verified and catch what earlier stages introduced or left behind, for example a container API moved to
 `compile` scope, a build plugin too old for the new JDK, a compiler target that no longer matches the
-source level, or a package the code imports that no declared dependency supplies.
+source level, a package the code imports that no declared dependency supplies, a dependency a recipe left
+without a version or declared twice, or a Spring `Assert` call a recipe could not convert.
 
 Every finding belongs to a change category, and plan steps run in the order A → E → B → C → D:
 
@@ -192,7 +193,7 @@ rules:
 |---|---|
 | `recipe` | An ecosystem rewrite tool (OpenRewrite for Java), deterministic and type-aware |
 | `replace` | Text replacement driven by the playbook, for files without a parser |
-| `maven` | Format-preserving pom.xml edits: `setScope`, `setPluginVersion`, `setProperty`, `addDependency` |
+| `maven` | Format-preserving pom.xml edits: `setScope`, `setPluginVersion`, `setProperty`, `addDependency`, `setVersion`, `removeDuplicates` |
 | `ai` | The configured AI provider. The build verifies the result |
 | `manual` | A person, guided by the rule's `hint` in the report |
 
