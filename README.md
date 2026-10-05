@@ -41,6 +41,8 @@ most of the effort. Renova treats the two differently:
   separate git commit in an isolated workspace, so every change can be reviewed, audited or reverted.
 - **Verified.** The migrated project is built, and build failures become structured errors that feed
   an automatic repair loop.
+- **Bring your own AI key.** Each user or organisation supplies its own provider credentials. Token
+  usage is reported per migration.
 - **Any ecosystem.** The engine has no Java-specific code. Java is the first plugin.
 
 ## How it works
@@ -68,6 +70,7 @@ Every finding belongs to a change category, and plan steps run in the order A â†
 |---|---|---|
 | [`engine/core`](engine) | Ecosystem-neutral engine: playbooks, plugin SPI, analysis, planning, migration, AI loop, reports | Working |
 | [`engine/java`](engine) | Java plugin: Maven/Gradle model, Java detectors, OpenRewrite fixer, Maven verifier, bundled playbooks | Working |
+| [`engine/ai-anthropic`](engine) | AI provider for Claude, using each user's own Anthropic API key | Working |
 | [`cli`](cli) | `renova` command for terminals and CI pipelines | Working |
 | [`web`](web) | REST API and web console, hosted or on-premises | Planned |
 | [`desktop`](desktop) | Offline desktop application reusing the web UI | Planned |
@@ -115,6 +118,41 @@ After a migration, `/path/to/migrated` contains:
 
 `migrate` exits with `0` when the migrated build passes, `1` when it fails, and `2` on usage errors.
 
+### Configure AI (bring your own key)
+
+AI steps are optional. Without a provider they appear in the report as manual work. To enable them,
+give Renova **your own** API key in any of these ways:
+
+```sh
+# 1. Store it in your user config file (prompted without echo; file is readable only by you)
+cli/bin/renova config set-key anthropic
+cli/bin/renova config set ai.provider anthropic
+
+# 2. Or use environment variables
+export ANTHROPIC_API_KEY=...        RENOVA_AI_PROVIDER=anthropic
+
+# 3. Or point at a .env file kept outside the repository
+cli/bin/renova migrate <project> --out <dir> --ai anthropic --env-file ~/secrets/renova.env
+
+# Verify the key and model without generating anything (free)
+cli/bin/renova config check
+cli/bin/renova config show           # effective settings and where each came from; keys masked
+```
+
+Settings are resolved in this order: command-line flags, environment variables, `--env-file`, then
+the user config file (`~/.config/renova/config.properties`). Renova never reads the `.env` of the
+project being migrated, never accepts keys as command-line arguments, and never writes keys to logs
+or reports.
+
+| Setting | Environment variable | Default |
+|---|---|---|
+| `ai.provider` | `RENOVA_AI_PROVIDER` | `none` |
+| `ai.model` | `RENOVA_AI_MODEL` | provider default (`claude-opus-5-5`) |
+| `ai.effort` | `RENOVA_AI_EFFORT` | `high` |
+| `ai.fallbacks` | `RENOVA_AI_FALLBACKS` | `default` (server-side refusal fallbacks; `off` to disable) |
+| `anthropic.apiKey` | `ANTHROPIC_API_KEY` | â€” |
+| `anthropic.baseUrl` | `ANTHROPIC_BASE_URL` | Anthropic API |
+
 ## Playbooks
 
 A playbook is a list of rules. Each rule says what to detect and how to fix it:
@@ -160,14 +198,14 @@ classpath is enough.
 | `DetectorFactory` | A new `detect.type` for playbooks |
 | `Fixer` | A new fix strategy |
 | `Verifier` | Proves a migrated workspace builds (and, later, behaves the same) |
-| `AiProvider` | Any model, hosted or on-premises, that proposes file edits |
+| `AiProviderFactory` | Any model, hosted or on-premises, created per run from the caller's own settings and key |
 
 `engine/core/src/test/java/io/renova/core/EngineTest.java` implements a complete toy ecosystem in about
 twenty lines and is a good starting point. See [`engine/README.md`](engine/README.md) for details.
 
 ## Roadmap
 
-1. **AI providers:** Anthropic (via `ANTHROPIC_API_KEY`) and an on-premises option.
+1. **More AI providers:** an on-premises option for customers whose code must not leave their network.
 2. **Post-migration guard rules:** checks on the migrated code, such as keeping the servlet API in `provided` scope.
 3. **Behavioural verification:** run the original and migrated applications side by side and compare responses and data effects.
 4. **Benchmark harness:** measure Renova against public legacy projects with known migrated versions.

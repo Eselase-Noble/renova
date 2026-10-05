@@ -29,7 +29,7 @@ The engine is a library. The products in this repository (`cli`, `web`, `desktop
 | **Detector** | A `detect.type`. Core: `fileExists`, `fileContains`. Java: `import`, `dependency`, `javaVersionBelow` | `DetectorFactory` SPI |
 | **Fix strategy** | `recipe` (OpenRewrite), `replace` (text, for JSP/TLD/config), `ai`, `manual` | `Fixer` SPI |
 | **Ecosystem plugin** | Project model, detectors, fixers, verifier and bundled playbooks for one stack | `EcosystemPlugin` SPI (ServiceLoader) |
-| **AI provider** | Any model (hosted or on-prem) that proposes whole-file edits | `AiProvider` SPI (ServiceLoader) |
+| **AI provider** | Any model (hosted or on-prem) that proposes whole-file edits, created from the caller's own settings | `AiProviderFactory` SPI (ServiceLoader) |
 | **Verifier** | Builds the workspace and turns failures into structured errors for the repair loop | `Verifier` SPI |
 
 Change categories: **A** build/descriptors, **B** namespace renames, **C** API changes,
@@ -41,6 +41,7 @@ This is the headline number for customers.
 ## Modules
 
 - `core` (`renova-core`): ecosystem-neutral engine (model, playbooks, SPI, analyzer, planner, migrator, workspace, AI loop, reports)
+- `ai-anthropic` (`renova-ai-anthropic`): Claude provider (official Anthropic Java SDK, JSON-schema responses, streaming, refusal handling)
 - `java` (`renova-java`): Java plugin (Maven/Gradle model, Java detectors, OpenRewrite fixer, Maven verifier, Java 8→21/Jakarta playbook)
 
 ## Adding an ecosystem
@@ -53,10 +54,10 @@ Implement `EcosystemPlugin`, register it in
 
 Working now: analysis, planning, a safe workspace with per-stage commits, OpenRewrite recipes,
 text replacement, Maven build verification with structured errors, the AI fix and repair loop
-(provider SPI only), and Markdown/JSON reports.
+with a Claude provider, and Markdown/JSON reports.
 
 Next:
-1. **AI provider implementations**: Anthropic (key from `ANTHROPIC_API_KEY`) plus an on-prem option.
+1. **More AI providers**: an on-premises option.
 2. **Post-migration guard rules**: checks that run on the migrated code, e.g. the servlet API must stay `provided` scope (the Jakarta recipe currently changes it to `compile`).
 3. **Behavioural verification**: run the old and new apps side by side and diff HTTP responses and DB effects.
 4. **Benchmark harness**: score the tool against public legacy projects with known migrated versions.
