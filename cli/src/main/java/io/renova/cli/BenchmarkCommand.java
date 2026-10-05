@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import io.renova.core.ai.AiSettings;
 import io.renova.core.engine.MigrationOptions;
 import io.renova.core.engine.MigrationOutcome;
+import io.renova.core.engine.Migrator;
 import io.renova.core.engine.PluginRegistry;
 import io.renova.core.engine.StageResult;
 import io.renova.core.playbook.Playbook;
@@ -133,6 +134,9 @@ final class BenchmarkCommand implements Callable<Integer> {
             if (config.skipTests()) {
                 tools.put("verify.skipTests", "true");
             }
+            if (config.behaviour()) {
+                tools.put(Migrator.VERIFY_BEHAVIOUR, "true");
+            }
             // Each configuration states whether it retrieves, whatever the user's rag.enabled default.
             RagSettings rag = config.rag() ? new RagSettings(true, aiConfig.ragSettings(true).budget()) : RagSettings.OFF;
             MigrationOptions options = new MigrationOptions(workspace, config.ai() ? aiConfig.aiSettings() : AiSettings.NONE,
@@ -155,11 +159,13 @@ final class BenchmarkCommand implements Callable<Integer> {
                     outcome.verification() == null ? 0 : outcome.verification().errors().size(),
                     app.checks().size() - failed.size(), app.checks().size(), failed, outcome.repairRounds(), outcome.aiUsage(),
                     rejected, outcome.manualSteps().size(), run.plan().automationRate(), seconds(start),
-                    outcome.workspace().toString(), stageFailures(outcome));
+                    outcome.workspace().toString(), stageFailures(outcome),
+                    outcome.behaviour() == null ? null : outcome.behaviour().status().name(),
+                    outcome.behaviour() == null ? 0 : (int) outcome.behaviour().differing());
         } catch (Exception e) {
             return new BenchmarkResult(app.id(), config.id(), rep, "ERROR", 0, 0, app.checks().size(), List.of(), 0,
                     io.renova.core.ai.AiUsage.NONE, 0, 0, 0, seconds(start), workspace.toString(),
-                    e.getMessage() == null ? e.toString() : e.getMessage());
+                    e.getMessage() == null ? e.toString() : e.getMessage(), null, 0);
         }
     }
 
@@ -214,28 +220,32 @@ final class BenchmarkCommand implements Callable<Integer> {
     static String scoreboard(BenchmarkSuite suite, List<BenchmarkResult> results) {
         StringBuilder md = new StringBuilder("# Renova benchmark" + (suite.id() == null ? "" : ": " + suite.id()) + "\n\n");
         md.append("## By configuration\n\n");
-        md.append("| Configuration | Runs passed | Builds pass | Checks passed | Repair rounds | AI requests | Input / output tokens | Time |\n");
-        md.append("|---|---|---|---|---|---|---|---|\n");
+        md.append("| Configuration | Runs passed | Builds pass | Checks passed | Same behaviour | Repair rounds | AI requests | Input / output tokens | Time |\n");
+        md.append("|---|---|---|---|---|---|---|---|---|\n");
         Map<String, List<BenchmarkResult>> byConfig = new LinkedHashMap<>();
         results.forEach(r -> byConfig.computeIfAbsent(r.configuration(), k -> new ArrayList<>()).add(r));
-        byConfig.forEach((config, rows) -> md.append(String.format(Locale.ROOT, "| %s | %d/%d | %d/%d | %d/%d | %d | %d | %d / %d | %.0fs |%n",
+        byConfig.forEach((config, rows) -> md.append(String.format(Locale.ROOT, "| %s | %d/%d | %d/%d | %d/%d | %s | %d | %d | %d / %d | %.0fs |%n",
                 config,
                 rows.stream().filter(BenchmarkResult::passed).count(), rows.size(),
                 rows.stream().filter(r -> r.build().equals("PASSES")).count(), rows.size(),
                 rows.stream().mapToInt(BenchmarkResult::checksPassed).sum(), rows.stream().mapToInt(BenchmarkResult::checksTotal).sum(),
+                behaviourSummary(rows),
                 rows.stream().mapToInt(BenchmarkResult::repairRounds).sum(),
                 rows.stream().mapToInt(r -> r.ai().requests()).sum(),
                 rows.stream().mapToLong(r -> r.ai().inputTokens()).sum(), rows.stream().mapToLong(r -> r.ai().outputTokens()).sum(),
                 rows.stream().mapToDouble(BenchmarkResult::seconds).sum())));
 
         md.append("\n## By run\n\n");
-        md.append("| App | Configuration | Build | Checks | Repair rounds | AI requests (changed / unchanged / declined) | Tokens in / out | Notes / reference files | Manual steps | Time |\n");
-        md.append("|---|---|---|---|---|---|---|---|---|---|\n");
+        md.append("| App | Configuration | Build | Checks | Behaviour | Repair rounds | AI requests (changed / unchanged / declined) | Tokens in / out | Notes / reference files | Manual steps | Time |\n");
+        md.append("|---|---|---|---|---|---|---|---|---|---|---|\n");
         for (BenchmarkResult r : results) {
-            md.append(String.format(Locale.ROOT, "| %s | %s | %s | %d/%d | %d | %d (%d / %d / %d) | %d / %d | %d / %d | %d | %.0fs |%n",
+            md.append(String.format(Locale.ROOT, "| %s | %s | %s | %d/%d | %s | %d | %d (%d / %d / %d) | %d / %d | %d / %d | %d | %.0fs |%n",
                     r.app() + (r.repetition() > 1 ? " #" + r.repetition() : ""), r.configuration(),
                     r.build().equals("FAILS") ? "FAILS (" + r.buildErrors() + ")" : r.build(),
-                    r.checksPassed(), r.checksTotal(), r.repairRounds(),
+                    r.checksPassed(), r.checksTotal(),
+                    r.behaviour() == null ? "–" : r.behaviour().equals("DIFFERENT") ? "DIFFERENT (" + r.behaviourDifferences() + ")"
+                            : r.behaviour(),
+                    r.repairRounds(),
                     r.ai().requests(), r.ai().changed(), r.ai().unchanged(), r.ai().declined(),
                     r.ai().inputTokens(), r.ai().outputTokens(), r.ai().knowledgeNotes(), r.ai().referenceFiles(),
                     r.manualSteps(), r.seconds()));
@@ -256,6 +266,13 @@ final class BenchmarkCommand implements Callable<Integer> {
             }
         }
         return md.toString();
+    }
+
+    /** "2/3" apps whose behaviour was the same, out of those where it ran; "–" when it ran nowhere. */
+    private static String behaviourSummary(List<BenchmarkResult> rows) {
+        List<BenchmarkResult> ran = rows.stream()
+                .filter(r -> r.behaviour() != null && !r.behaviour().equals("SKIPPED")).toList();
+        return ran.isEmpty() ? "–" : ran.stream().filter(r -> r.behaviour().equals("SAME")).count() + "/" + ran.size();
     }
 
     private static double seconds(long start) {

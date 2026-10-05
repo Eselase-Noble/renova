@@ -126,7 +126,33 @@ After a migration, `/path/to/migrated` contains:
 Verification runs the project's own tests, because code that compiles on the new JDK can still fail
 at runtime. A failed test is attributed to the project code that threw, so repairs target that code.
 
-`migrate` exits with `0` when the migrated build passes, `1` when it fails, and `2` on usage errors.
+`migrate` exits with `0` when the migrated build passes (and, with `--verify-behaviour`, the application
+behaves the same), `1` otherwise, and `2` on usage errors.
+
+### Verify behaviour
+
+A passing build and passing tests do not prove the application behaves the same. With
+`--verify-behaviour`, Renova runs the original and the migrated application side by side in Docker and
+compares their answers:
+
+```sh
+cli/bin/renova migrate /path/to/project --out /path/to/migrated --verify-behaviour
+cli/bin/renova verify-behaviour /path/to/migrated     # again, on an existing workspace
+```
+
+- The original is built from the workspace's baseline commit with the legacy JDK and runs on the legacy
+  container (Java 8, Tomcat 9); the migrated build runs on the target (Java 21, Tomcat 10.1). Images are set
+  in the playbook (`settings.behaviour`).
+- Both run on an internal Docker network with no outside access; the requests come from a probe container on
+  the same network.
+- Requests come from the code: Spring MVC routes (also with a trailing slash, which Spring 6 stopped
+  matching), `web.xml` servlets and JSP pages.
+- Status codes, redirects, `Content-Type` and bodies are compared, ignoring values that change on every
+  request (session ids, UUIDs, timestamps). Results: `.renova/behaviour.md` and `.renova/behaviour.json`.
+
+It needs Docker and currently runs single-WAR Maven applications on servlet containers. Applications that need
+a full Jakarta EE server are reported as skipped. See
+[docs/behavioural-verification-design.md](docs/behavioural-verification-design.md).
 
 To measure Renova itself across several apps and configurations (with and without AI or retrieval), use
 `cli/bin/renova benchmark`; see [`benchmark/README.md`](benchmark/README.md).
@@ -239,8 +265,9 @@ twenty lines and is a good starting point. See [`engine/README.md`](engine/READM
 
 1. **RAG:** phase 1 (structural code retrieval and curated knowledge, no key needed) is in and on by default.
    Next: lessons from accepted fixes, then optional embeddings on the customer's own key.
-2. **Behavioural verification:** run the original and migrated applications side by side and compare responses and data effects
-   (design: [docs/behavioural-verification-design.md](docs/behavioural-verification-design.md)).
+2. **Behavioural verification:** phase 1 (`--verify-behaviour`: HTTP answers of servlet-container apps) is in.
+   Next: scenario files and database effects, differences fed to AI repair, then JBoss/WildFly and Spring Boot
+   ([design](docs/behavioural-verification-design.md)).
 3. **Benchmark harness:** `renova benchmark` scores migrations of synthetic legacy apps (see
    [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.
 4. **Web console and REST API**, then the **desktop** and **IDE** products.

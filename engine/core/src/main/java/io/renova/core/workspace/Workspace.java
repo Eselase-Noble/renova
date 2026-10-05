@@ -62,6 +62,15 @@ public final class Workspace {
         return ws;
     }
 
+    /** An existing workspace made by {@link #create}, e.g. to verify it again. */
+    public static Workspace open(Path root) {
+        Path dir = root.toAbsolutePath().normalize();
+        if (!Files.isDirectory(dir.resolve(".renova"))) {
+            throw new IllegalArgumentException("Not a Renova workspace (no .renova directory): " + dir);
+        }
+        return new Workspace(dir, Files.isDirectory(dir.resolve(".git")));
+    }
+
     public Path root() {
         return root;
     }

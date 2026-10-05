@@ -2,7 +2,10 @@ package io.renova.core.engine;
 
 import io.renova.core.ai.AiFixer;
 import io.renova.core.ai.AiProviderException;
+import io.renova.core.ai.AiUsage;
 import io.renova.core.ai.MeteredAiProvider;
+import io.renova.core.behaviour.BehaviourReport;
+import io.renova.core.behaviour.BehaviourVerifier;
 import io.renova.core.model.ProjectModel;
 import io.renova.core.playbook.FixSpec;
 import io.renova.core.playbook.Playbook;
@@ -28,6 +31,8 @@ public final class Migrator {
     /** Deterministic before judgement: AI sees code that recipes have already modernised. */
     private static final List<String> STAGE_ORDER = List.of(FixSpec.RECIPE, FixSpec.REPLACE, FixSpec.AI);
     private static final int MAX_GUARD_PASSES = 3;
+    /** Tool option that turns on behavioural verification after a passing build. */
+    public static final String VERIFY_BEHAVIOUR = "verify.behaviour";
     /** A repair round that edited files and rebuilt, as {@link AiFixer#repair} logs it. */
     private static final Pattern REPAIR_ROUND = Pattern.compile("^round \\d+: edited ");
 
@@ -49,7 +54,7 @@ public final class Migrator {
             int rounds = (int) outcome.stages().stream().filter(s -> s.stage().equals("ai-repair"))
                     .flatMap(s -> s.details().stream()).filter(l -> REPAIR_ROUND.matcher(l).find()).count();
             return new MigrationOutcome(outcome.workspace(), outcome.stages(), outcome.verification(), outcome.manualSteps(),
-                    ai.usage(), rounds);
+                    ai.usage(), rounds, outcome.behaviour());
         }
     }
 
@@ -90,7 +95,20 @@ public final class Migrator {
                         verification.success() ? "build repaired" : "build still failing", log));
             }
         }
-        return new MigrationOutcome(workspace.root(), stages, verification, manual);
+        BehaviourReport behaviour = null;
+        if ("true".equals(options.toolOption(VERIFY_BEHAVIOUR)) && verification != null && verification.success()) {
+            progress.accept("Verifying behaviour: running the original and the migrated application side by side");
+            behaviour = BehaviourVerifier.verify(context, progress);
+            stages.add(new StageResult("behaviour", switch (behaviour.status()) {
+                case SAME -> StageResult.Status.APPLIED;
+                case DIFFERENT -> StageResult.Status.PARTIAL;
+                case SKIPPED -> StageResult.Status.SKIPPED;
+                case FAILED -> StageResult.Status.FAILED;
+            }, behaviour.summary(), behaviour.results().stream().filter(r -> !r.same())
+                    .map(r -> r.scenario().method() + " " + r.scenario().path() + ": " + String.join("; ", r.differences()))
+                    .toList()));
+        }
+        return new MigrationOutcome(workspace.root(), stages, verification, manual, AiUsage.NONE, 0, behaviour);
     }
 
     /** Runs each strategy's steps in stage order, committing after every stage. */

@@ -1,5 +1,6 @@
 package io.renova.java;
 
+import io.renova.core.behaviour.BehaviourRunner;
 import io.renova.core.model.Module;
 import io.renova.core.model.ProjectModel;
 import io.renova.core.scan.ScanContext;
@@ -8,6 +9,7 @@ import io.renova.core.spi.EcosystemPlugin;
 import io.renova.core.spi.Fixer;
 import io.renova.core.spi.RelatedFile;
 import io.renova.core.spi.Verifier;
+import io.renova.java.behaviour.JavaBehaviourRunner;
 import io.renova.java.detect.DependencyDetector;
 import io.renova.java.detect.DuplicateDependencyDetector;
 import io.renova.java.detect.ImportDependencyDetector;
@@ -168,6 +170,11 @@ public final class JavaPlugin implements EcosystemPlugin {
             return List.of(new RelatedFile(webXml, true, "web application descriptor of module " + owner.name()), buildFile);
         }
         return List.of(buildFile);
+    }
+
+    @Override
+    public Optional<BehaviourRunner> behaviourRunner() {
+        return Optional.of(new JavaBehaviourRunner());
     }
 
     @Override

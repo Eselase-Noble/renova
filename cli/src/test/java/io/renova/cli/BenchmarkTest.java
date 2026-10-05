@@ -59,12 +59,12 @@ class BenchmarkTest {
         BenchmarkSuite suite = new BenchmarkSuite("s", null, List.of(), List.of());
         List<BenchmarkResult> results = List.of(
                 new BenchmarkResult("a", "ai", 1, "PASSES", 0, 2, 2, List.of(), 1,
-                        new AiUsage(3, 2, 1, 0, 0, 1000, 200, 0, 0), 0, 0, 0.9, 12, "/w/a", null),
+                        new AiUsage(3, 2, 1, 0, 0, 1000, 200, 0, 0), 0, 0, 0.9, 12, "/w/a", null, "SAME", 0),
                 new BenchmarkResult("b", "ai", 1, "FAILS", 3, 1, 2, List.of("x.xml contains \"y\""), 3,
-                        new AiUsage(5, 4, 0, 1, 0, 3000, 900, 0, 0), 1, 1, 0.8, 30, "/w/b", null));
+                        new AiUsage(5, 4, 0, 1, 0, 3000, 900, 0, 0), 1, 1, 0.8, 30, "/w/b", null, "DIFFERENT", 2));
         assertThat(BenchmarkCommand.scoreboard(suite, results))
-                .contains("| ai | 1/2 | 1/2 | 3/4 | 4 | 8 | 4000 / 1100 | 42s |")
-                .contains("| b | ai | FAILS (3) | 1/2 | 3 | 5 (4 / 0 / 1) |")
+                .contains("| ai | 1/2 | 1/2 | 3/4 | 1/2 | 4 | 8 | 4000 / 1100 | 42s |")
+                .contains("| b | ai | FAILS (3) | 1/2 | DIFFERENT (2) | 3 | 5 (4 / 0 / 1) |")
                 .contains("- ai/b: check failed: x.xml contains \"y\"", "- ai/b: 1 AI edit(s) rejected");
     }
 

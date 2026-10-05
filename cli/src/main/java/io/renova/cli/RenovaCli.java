@@ -7,7 +7,7 @@ import picocli.CommandLine.Command;
         mixinStandardHelpOptions = true,
         version = "Renova 0.1.0",
         description = "Assess and migrate legacy systems with declarative playbooks.",
-        subcommands = {AnalyzeCommand.class, MigrateCommand.class, BenchmarkCommand.class, PlaybooksCommand.class, ConfigCommand.class,
+        subcommands = {AnalyzeCommand.class, MigrateCommand.class, VerifyBehaviourCommand.class, BenchmarkCommand.class, PlaybooksCommand.class, ConfigCommand.class,
                 CommandLine.HelpCommand.class})
 public final class RenovaCli {
 

@@ -28,6 +28,10 @@ settings:
     artifacts:
       - org.openrewrite.recipe:rewrite-migrate-java:3.42.1
       - org.openrewrite.recipe:rewrite-spring:6.37.1
+  # Behavioural verification (--verify-behaviour): where the original and the migrated app run side by side.
+  behaviour:
+    baseline: { build: "maven:3.9-eclipse-temurin-8", server: "tomcat:9.0-jdk8", platform: "Java 8, Tomcat 9" }
+    candidate: { server: "tomcat:10.1-jdk21", platform: "Java 21, Tomcat 10.1" }
 
 rules:
 
@@ -503,6 +507,32 @@ rules:
       declares the Jakarta EE 10 API. On WildFly/JBoss, packages bundled here may already be provided
       by the server; review the scope for those deployments.
 
+  - id: guard-jstl-jakarta
+    phase: guard
+    title: JSTL must be the Jakarta version on Jakarta EE containers
+    category: E
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates:
+        - "javax.servlet:jstl"
+        - "jstl:jstl"
+        - "taglibs:standard"
+        - "javax.servlet.jsp.jstl:*"
+        - "org.glassfish.web:javax.servlet.jsp.jstl"
+        - "org.apache.taglibs:taglibs-standard-*"
+    fix:
+      strategy: maven
+      params:
+        action: replaceDependency
+        with: "jakarta.servlet.jsp.jstl:jakarta.servlet.jsp.jstl-api:3.0.0"
+        alsoAdd: "org.glassfish.web:jakarta.servlet.jsp.jstl:3.0.1"
+    rationale: >
+      JSTL 1.x is built on javax.servlet.jsp. It compiles and deploys, but every JSP that uses a tag fails on
+      Tomcat 10.1+ with NoClassDefFoundError: javax/servlet/jsp/tagext/TagLibraryValidator. Tomcat does not
+      ship JSTL, so the Jakarta API and its implementation are bundled. Existing taglib URIs
+      (http://java.sun.com/jsp/jstl/core) keep working with JSTL 3.0. Found by behavioural verification.
+
   - id: guard-dependency-version
     phase: guard
     title: Dependencies without a version need one when nothing manages them
@@ -672,6 +702,16 @@ knowledge:
       target's API version with provided scope: jakarta.servlet:jakarta.servlet-api:6.0.0 for Tomcat 10.1 or
       jakarta.platform:jakarta.jakartaee-api:10.0.0 for a full Jakarta EE 10 server. Bundling the API in
       WEB-INF/lib causes class-loading conflicts.
+
+  - id: jstl-jakarta
+    title: JSTL on Jakarta EE containers
+    triggers: ["jstl", "TagLibraryValidator", "java.sun.com/jsp/jstl"]
+    body: |
+      JSTL 1.2 (javax.servlet:jstl, jstl:jstl, taglibs:standard) uses javax.servlet.jsp and fails at runtime on
+      Tomcat 10.1+ (NoClassDefFoundError: javax/servlet/jsp/tagext/TagLibraryValidator) although the build
+      passes. Use jakarta.servlet.jsp.jstl:jakarta.servlet.jsp.jstl-api:3.0.0 with the implementation
+      org.glassfish.web:jakarta.servlet.jsp.jstl:3.0.1; Tomcat does not ship JSTL, so bundle both. The old
+      taglib URIs (http://java.sun.com/jsp/jstl/core) still work; jakarta.tags.core is the new form.
 
   - id: tomcat10-sitemesh2-forward
     title: SiteMesh 2 pages render blank on Tomcat 10.1/11

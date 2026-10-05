@@ -154,6 +154,16 @@ public final class MarkdownReport {
                 md.append('\n');
             }
         }
+        if (outcome.behaviour() != null) {
+            var b = outcome.behaviour();
+            md.append("### Behaviour: ").append(b.status().name().toLowerCase(java.util.Locale.ROOT)).append("\n\n")
+                    .append(b.summary()).append(". Details: `.renova/behaviour.md`.\n\n");
+            b.results().stream().filter(r -> !r.same()).limit(20).forEach(r -> md.append("- `").append(r.scenario().method())
+                    .append(' ').append(r.scenario().path()).append("`: ").append(String.join("; ", r.differences())).append('\n'));
+            if (b.differing() > 0) {
+                md.append('\n');
+            }
+        }
         if (!outcome.manualSteps().isEmpty()) {
             md.append("### Manual follow-up\n\n");
             outcome.manualSteps().forEach(s -> md.append("- [ ] Step ").append(s.order()).append(": ")

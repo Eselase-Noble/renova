@@ -1,6 +1,6 @@
 # Behavioural verification design
 
-**Status:** proposal, not yet implemented
+**Status:** phase 1 implemented (`--verify-behaviour`, `renova verify-behaviour`); phases 2–4 proposed
 **Scope:** `engine/core` (contracts, comparison, report), ecosystem plugins (launching apps, finding endpoints), CLI and benchmark
 
 ## 1. Problem
@@ -140,3 +140,25 @@ starts, routes that disappeared, and pages that render differently.
 2. Where should baseline JDKs and server images come from in air-gapped customer networks: a
    customer registry mirror, or images Renova ships?
 3. Should scenario files generated with AI be marked as unreviewed until a person approves them?
+
+## 7. Phase 1 as built (2026-10-05)
+
+- Engine: `io.renova.core.behaviour` (`BehaviourVerifier`, `DockerSandbox`, `Probe`, `ResponseComparator`).
+  Java: `JavaBehaviourRunner` and `EndpointDiscovery`. Images come from the playbook's `settings.behaviour`.
+- The original is built in a `maven` Java 8 container from the workspace's baseline commit, as the current
+  user, with the user's `~/.m2` as cache. The migrated WAR is the one the verified build produced.
+- Both applications and the probe share an internal Docker network (`docker network create --internal`),
+  so neither application can reach outside the host. The probe is Renova's own jar or classes directory in a
+  JRE container and uses only the JDK.
+- The original is asked every request twice; a body that differs between those two answers is not compared.
+- Supported: one WAR module, Maven, servlet containers. Jakarta EE server apps and several WAR modules are
+  reported as skipped with the reason.
+
+First results on the test apps, using workspaces the benchmark had migrated with AI and RAG:
+
+| App | Found |
+|---|---|
+| `inventory-platform` | `GET /items` answered 200 before and 500 after: JSTL 1.2 (`javax.servlet:jstl`) was still bundled and fails on Tomcat 10.1 (`NoClassDefFoundError: javax/servlet/jsp/tagext/TagLibraryValidator`). The build and all tests passed. Fixed with the `guard-jstl-jakarta` guard; afterwards the page answers the same. |
+| `inventory-platform`, `claims-portal` | Trailing-slash URLs (`/items/`) answered 200 or 400 before and 404 after: Spring 6 no longer matches them. Left to a person (rule `spring-mvc-url-matching`); now visible per route. |
+| `acme-shop` | The test app itself did not compile on Java 8 (`javax.annotation.Nullable` without JSR-305); fixed in the app. |
+

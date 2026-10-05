@@ -97,6 +97,47 @@ final class PomEditor {
     }
 
     /**
+     * Replaces every dependency whose groupId and artifactId match (real or managed, outside plugins)
+     * with new coordinates. A declared version becomes {@code version}; a real dependency without one
+     * gets it, because nothing manages the new artifact yet. Scope, exclusions and the rest are kept.
+     */
+    static Result replaceDependency(String pom, BiPredicate<String, String> matches, String groupId, String artifactId,
+                                    String version) {
+        List<Span> plugins = spans(pom, "plugin");
+        List<Span> managed = spans(pom, "dependencyManagement");
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        int changes = 0;
+        Matcher block = Pattern.compile("(?s)<dependency>.*?</dependency>").matcher(pom);
+        while (block.find()) {
+            String text = block.group();
+            String own = text.replaceAll("(?s)<exclusions>.*?</exclusions>", "");
+            String g = tag(own, "groupId");
+            String a = tag(own, "artifactId");
+            if (inside(plugins, block.start()) || g == null || a == null || !matches.test(g, a)) {
+                continue;
+            }
+            int exclusions = text.indexOf("<exclusions>");
+            String head = exclusions < 0 ? text : text.substring(0, exclusions);
+            String tail = exclusions < 0 ? "" : text.substring(exclusions);
+            head = head.replaceFirst("<groupId>\\s*" + Pattern.quote(g) + "\\s*</groupId>", "<groupId>" + groupId + "</groupId>")
+                    .replaceFirst("<artifactId>\\s*" + Pattern.quote(a) + "\\s*</artifactId>", "<artifactId>" + artifactId + "</artifactId>");
+            if (tag(own, "version") != null) {
+                head = head.replaceFirst("<version>[^<]*</version>", "<version>" + version + "</version>");
+            } else if (!inside(managed, block.start())) {
+                int at = head.indexOf("</artifactId>") + "</artifactId>".length();
+                head = head.substring(0, at) + "\n" + indentOf(head, "<artifactId>") + "<version>" + version + "</version>"
+                        + head.substring(at);
+            }
+            out.append(pom, last, block.start()).append(head).append(tail);
+            last = block.end();
+            changes++;
+        }
+        out.append(pom.substring(last));
+        return new Result(out.toString(), changes);
+    }
+
+    /**
      * Removes real dependencies declared again with the same groupId, artifactId, type and
      * classifier, keeping the first declaration of each.
      */
@@ -136,6 +177,19 @@ final class PomEditor {
         }
         out.append(pom.substring(last));
         return new Result(out.toString(), changes);
+    }
+
+    /** Whether the project itself (not dependencyManagement, plugins or profiles) declares this dependency. */
+    static boolean hasRealDependency(String pom, String groupId, String artifactId) {
+        List<Span> excluded = realDependencyExclusions(pom);
+        Matcher block = Pattern.compile("(?s)<dependency>.*?</dependency>").matcher(pom);
+        while (block.find()) {
+            String own = block.group().replaceAll("(?s)<exclusions>.*?</exclusions>", "");
+            if (!inside(excluded, block.start()) && groupId.equals(tag(own, "groupId")) && artifactId.equals(tag(own, "artifactId"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Regions whose dependencies are not the project's own: dependencyManagement, plugins and profiles. */

@@ -56,8 +56,9 @@ record BenchmarkSuite(String id, String appsDir, List<App> apps, List<Configurat
      * @param rag       retrieval for AI requests
      * @param skip      strategies to skip, as {@code migrate --skip}
      * @param skipTests build without running the apps' tests
+     * @param behaviour after a passing build, run the original and migrated app side by side (Docker)
      */
-    record Configuration(String id, boolean ai, boolean rag, List<String> skip, boolean skipTests) {
+    record Configuration(String id, boolean ai, boolean rag, List<String> skip, boolean skipTests, boolean behaviour) {
         Configuration {
             skip = skip == null ? List.of() : List.copyOf(skip);
         }

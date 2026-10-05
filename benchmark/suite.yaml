@@ -8,13 +8,18 @@
 id: java-legacy-apps
 appsDir: ../../renova-test-apps
 
+# behaviour: after a passing build, run the original and the migrated app side by side in Docker and compare
+# their answers (servlet-container apps; others are reported as skipped).
 configurations:
   - id: deterministic           # recipes, text rules and guards only; free
+    behaviour: true
   - id: ai                      # plus the configured AI provider, on the user's own key
     ai: true
+    behaviour: true
   - id: ai-rag                  # plus retrieval (related project code, knowledge cards)
     ai: true
     rag: true
+    behaviour: true
 
 apps:
   - id: acme-shop

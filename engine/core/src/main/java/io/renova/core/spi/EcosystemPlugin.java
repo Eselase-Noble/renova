@@ -63,6 +63,11 @@ public interface EcosystemPlugin {
         return false;
     }
 
+    /** Runs the original and the migrated application side by side; empty when the ecosystem cannot. */
+    default Optional<io.renova.core.behaviour.BehaviourRunner> behaviourRunner() {
+        return Optional.empty();
+    }
+
     /** Classpath resources of the playbooks this plugin ships with. */
     default List<String> bundledPlaybooks() {
         return List.of();

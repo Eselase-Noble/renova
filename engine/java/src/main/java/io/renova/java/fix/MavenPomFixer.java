@@ -28,11 +28,22 @@ import java.util.regex.Pattern;
  *   <li>{@code action: setVersion}: adds the version each finding gives in its data (groupId,
  *       artifactId, version) to that dependency, where it declares none</li>
  *   <li>{@code action: removeDuplicates}: removes repeated declarations of a dependency, keeping the first</li>
+ *   <li>{@code action: replaceDependency, with: "g:a:v", alsoAdd?: "g:a:v"}: replaces the dependencies
+ *       matching the rule's detect coordinates, and adds {@code alsoAdd} (e.g. an implementation) where a
+ *       real dependency was replaced</li>
  * </ul>
  */
 public final class MavenPomFixer implements Fixer {
 
     public static final String STRATEGY = "maven";
+
+    private static String[] gav(String ruleId, String coordinates) {
+        String[] gav = coordinates.split(":");
+        if (gav.length != 3) {
+            throw new IllegalArgumentException("Rule '" + ruleId + "': " + coordinates + " must be groupId:artifactId:version");
+        }
+        return gav;
+    }
 
     @Override
     public String strategy() {
@@ -100,8 +111,24 @@ public final class MavenPomFixer implements Fixer {
                         yield new PomEditor.Result(content, changes);
                     }
                     case "removeDuplicates" -> PomEditor.removeDuplicateDependencies(before);
+                    case "replaceDependency" -> {
+                        List<Pattern> coordinates = step.rule().detectParams().requiredStrings("coordinates").stream()
+                                .map(DependencyDetector::glob).toList();
+                        String[] with = gav(ruleId, params.string("with"));
+                        boolean realBefore = PomEditor.hasRealDependency(before, with[0], with[1]);
+                        PomEditor.Result replaced = PomEditor.replaceDependency(before,
+                                (g, a) -> coordinates.stream().anyMatch(p -> p.matcher(g + ":" + a).matches()), with[0], with[1], with[2]);
+                        Optional<String> alsoAdd = params.optString("alsoAdd");
+                        if (alsoAdd.isEmpty() || replaced.changes() == 0
+                                || realBefore == PomEditor.hasRealDependency(replaced.content(), with[0], with[1])) {
+                            yield replaced;
+                        }
+                        String[] extra = gav(ruleId, alsoAdd.get());
+                        PomEditor.Result added = PomEditor.addDependency(replaced.content(), extra[0], extra[1], extra[2], null);
+                        yield new PomEditor.Result(added.content(), replaced.changes() + added.changes());
+                    }
                     default -> throw new IllegalArgumentException("Rule '" + ruleId + "': unknown maven action '" + action
-                            + "'; use setScope, setPluginVersion, setProperty, addDependency, setVersion or removeDuplicates");
+                            + "'; use setScope, setPluginVersion, setProperty, addDependency, setVersion, removeDuplicates or replaceDependency");
                 };
                 if (result.changes() > 0) {
                     Files.writeString(path, result.content(), StandardCharsets.UTF_8);

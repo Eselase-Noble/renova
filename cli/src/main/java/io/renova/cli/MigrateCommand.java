@@ -1,7 +1,9 @@
 package io.renova.cli;
 
+import io.renova.core.behaviour.BehaviourReport;
 import io.renova.core.engine.MigrationOptions;
 import io.renova.core.engine.MigrationOutcome;
+import io.renova.core.engine.Migrator;
 import io.renova.core.engine.PluginRegistry;
 import io.renova.core.engine.StageResult;
 import io.renova.core.rag.RagSettings;
@@ -38,6 +40,10 @@ final class MigrateCommand implements Callable<Integer> {
     @Option(names = "--skip-tests", description = "Build the migrated project without running its tests.")
     boolean skipTests;
 
+    @Option(names = "--verify-behaviour", description = "After a passing build, run the original and the migrated "
+            + "application side by side in Docker and compare their answers.")
+    boolean verifyBehaviour;
+
     @Option(names = "--skip", split = ",", paramLabel = "STRATEGY", description = "Strategies to skip, e.g. --skip recipe,ai.")
     List<String> skip = new ArrayList<>();
 
@@ -65,6 +71,9 @@ final class MigrateCommand implements Callable<Integer> {
         if (skipTests) {
             tools.put("verify.skipTests", "true");
         }
+        if (verifyBehaviour) {
+            tools.put(Migrator.VERIFY_BEHAVIOUR, "true");
+        }
         AiConfiguration aiConfig = AiConfiguration.load(registry, ai);
         RagSettings ragSettings = aiConfig.ragSettings(rag);
         System.err.println("AI: " + aiConfig.describe() + (ragSettings.enabled() ? "; RAG on" : ""));
@@ -89,6 +98,13 @@ final class MigrateCommand implements Callable<Integer> {
         }
         System.err.println("Workspace: " + outcome.workspace() + "  (git log for per-stage commits)");
         System.err.println("Report:    " + reportDir.resolve("report.md"));
-        return outcome.verification() == null || outcome.verification().success() ? 0 : 1;
+        if (outcome.behaviour() != null) {
+            System.err.println("  behaviour  " + outcome.behaviour().status() + ": " + outcome.behaviour().summary()
+                    + "  (" + reportDir.resolve("behaviour.md") + ")");
+        }
+        boolean buildOk = outcome.verification() == null || outcome.verification().success();
+        boolean behaviourOk = outcome.behaviour() == null || outcome.behaviour().status() == BehaviourReport.Status.SAME
+                || outcome.behaviour().status() == BehaviourReport.Status.SKIPPED;
+        return buildOk && behaviourOk ? 0 : 1;
     }
 }

@@ -262,6 +262,79 @@ class GuardRulesTest {
         assertThat(check.findings()).isEmpty();
     }
 
+    @Test
+    void javaxJstlIsReplacedWithJakartaJstlAndItsImplementation(@TempDir Path tmp) throws Exception {
+        // What behavioural verification found in inventory-platform: JSTL 1.2 still bundled, so every JSP with a
+        // tag failed on Tomcat 10.1 with NoClassDefFoundError although the build passed.
+        Path project = Files.createDirectories(tmp.resolve("project"));
+        Files.writeString(project.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>g</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>web</module>
+                    </modules>
+                    <properties>
+                        <maven.compiler.release>21</maven.compiler.release>
+                    </properties>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>javax.servlet</groupId>
+                                <artifactId>jstl</artifactId>
+                                <version>1.2</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        Files.createDirectories(project.resolve("web"));
+        Files.writeString(project.resolve("web/pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>g</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>web</artifactId>
+                    <packaging>jar</packaging>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.servlet</groupId>
+                            <artifactId>jstl</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+
+        PluginRegistry registry = PluginRegistry.load();
+        Playbook playbook = registry.defaultPlaybook(project);
+        AnalysisResult analysis = new Analyzer(registry).analyze(project, playbook);
+        Path out = tmp.resolve("out");
+        new Migrator(registry, m -> { }).migrate(analysis, new Planner().plan(analysis),
+                new MigrationOptions(out, AiSettings.NONE, 0, false, Map.of(), List.of("recipe", "ai")));
+
+        assertThat(Files.readString(out.resolve("web/pom.xml"))).contains("""
+                        <dependency>
+                            <groupId>jakarta.servlet.jsp.jstl</groupId>
+                            <artifactId>jakarta.servlet.jsp.jstl-api</artifactId>
+                            <version>3.0.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.glassfish.web</groupId>
+                            <artifactId>jakarta.servlet.jsp.jstl</artifactId>
+                            <version>3.0.1</version>
+                        </dependency>
+                """).doesNotContain("<artifactId>jstl</artifactId>");
+        // The parent's managed entry is renamed too, keeping its version element.
+        assertThat(Files.readString(out.resolve("pom.xml")))
+                .contains("<artifactId>jakarta.servlet.jsp.jstl-api</artifactId>\n                <version>3.0.0</version>");
+    }
+
     private static Path copyFixture(Path target) throws Exception {
         Path source = Path.of(GuardRulesTest.class.getResource("/fixtures/legacy-webapp").toURI());
         try (Stream<Path> files = Files.walk(source)) {
