@@ -1,0 +1,231 @@
+package io.renova.java.fix;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.BiPredicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Small, targeted edits to pom.xml text. Works on the text rather than a parsed document so that
+ * formatting, comments and element order are preserved exactly; only the edited lines change.
+ */
+final class PomEditor {
+
+    /** The edited content and how many places changed (0 means unchanged). */
+    record Result(String content, int changes) {
+    }
+
+    private record Span(int start, int end) {
+        boolean contains(int index) {
+            return index >= start && index < end;
+        }
+    }
+
+    private PomEditor() {
+    }
+
+    /**
+     * Sets the scope of every real dependency (not in dependencyManagement or a plugin) whose
+     * groupId and artifactId match.
+     */
+    static Result setDependencyScope(String pom, BiPredicate<String, String> matches, String scope) {
+        List<Span> excluded = spans(pom, "dependencyManagement");
+        excluded.addAll(spans(pom, "plugin"));
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        int changes = 0;
+        Matcher block = Pattern.compile("(?s)<dependency>.*?</dependency>").matcher(pom);
+        while (block.find()) {
+            if (inside(excluded, block.start())) {
+                continue;
+            }
+            String text = block.group();
+            String own = text.replaceAll("(?s)<exclusions>.*?</exclusions>", "");
+            String groupId = tag(own, "groupId");
+            String artifactId = tag(own, "artifactId");
+            if (groupId == null || artifactId == null || !matches.test(groupId, artifactId)) {
+                continue;
+            }
+            String current = tag(own, "scope");
+            String edited;
+            if (current == null) {
+                String anchor = own.contains("</version>") ? "</version>" : "</artifactId>";
+                int at = text.indexOf(anchor) + anchor.length();
+                edited = text.substring(0, at) + "\n" + indentOf(text, "<artifactId>") + "<scope>" + scope + "</scope>"
+                        + text.substring(at);
+            } else if (!current.equals(scope)) {
+                edited = text.replaceFirst("<scope>\\s*" + Pattern.quote(current) + "\\s*</scope>", "<scope>" + scope + "</scope>");
+            } else {
+                continue;
+            }
+            out.append(pom, last, block.start()).append(edited);
+            last = block.end();
+            changes++;
+        }
+        out.append(pom.substring(last));
+        return new Result(out.toString(), changes);
+    }
+
+    /**
+     * Sets a build plugin's version, updating every declaration of it, or adding the plugin to
+     * {@code <build><plugins>} when it is not declared.
+     */
+    static Result setPluginVersion(String pom, String groupId, String artifactId, String version) {
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        int changes = 0;
+        boolean declared = false;
+        Matcher block = Pattern.compile("(?s)<plugin>.*?</plugin>").matcher(pom);
+        while (block.find()) {
+            String text = block.group();
+            // The plugin's own coordinates come before its configuration, executions and dependencies.
+            int headEnd = firstIndex(text, "<configuration>", "<executions>", "<dependencies>", "<extensions>");
+            String head = text.substring(0, headEnd);
+            String pluginGroup = tag(head, "groupId");
+            if (!artifactId.equals(tag(head, "artifactId"))
+                    || !(pluginGroup == null ? "org.apache.maven.plugins" : pluginGroup).equals(groupId)) {
+                continue;
+            }
+            declared = true;
+            String current = tag(head, "version");
+            String newHead;
+            if (current == null) {
+                int at = head.indexOf("</artifactId>") + "</artifactId>".length();
+                newHead = head.substring(0, at) + "\n" + indentOf(head, "<artifactId>") + "<version>" + version + "</version>"
+                        + head.substring(at);
+            } else if (!current.equals(version)) {
+                newHead = head.replaceFirst("<version>\\s*" + Pattern.quote(current) + "\\s*</version>", "<version>" + version + "</version>");
+            } else {
+                continue;
+            }
+            out.append(pom, last, block.start()).append(newHead).append(text.substring(headEnd));
+            last = block.end();
+            changes++;
+        }
+        out.append(pom.substring(last));
+        if (declared) {
+            return new Result(out.toString(), changes);
+        }
+        return addPlugin(pom, groupId, artifactId, version);
+    }
+
+    /** Adds a project-level property unless it already exists. */
+    static Result setProperty(String pom, String name, String value) {
+        List<Span> profiles = spans(pom, "profiles");
+        Matcher props = Pattern.compile("(?s)<properties>(.*?)</properties>").matcher(pom);
+        while (props.find()) {
+            if (inside(profiles, props.start())) {
+                continue;
+            }
+            if (Pattern.compile("<" + Pattern.quote(name) + ">").matcher(props.group(1)).find()) {
+                return new Result(pom, 0);
+            }
+            String body = props.group(1);
+            Matcher lastLine = Pattern.compile("\\n([ \\t]*)<[^/][^>]*>[^\\n]*$").matcher(body.stripTrailing());
+            String indent = lastLine.find() ? lastLine.group(1) : indentUnit(pom).repeat(2);
+            int insertAt = props.start(1) + body.stripTrailing().length();
+            String line = "\n" + indent + "<" + name + ">" + value + "</" + name + ">";
+            return new Result(pom.substring(0, insertAt) + line + pom.substring(insertAt), 1);
+        }
+        String unit = indentUnit(pom);
+        String block = unit + "<properties>\n" + unit.repeat(2) + "<" + name + ">" + value + "</" + name + ">\n"
+                + unit + "</properties>\n\n";
+        return insertBeforeFirst(pom, block, profiles, "<dependencyManagement>", "<dependencies>", "<build>", "</project>");
+    }
+
+    private static Result addPlugin(String pom, String groupId, String artifactId, String version) {
+        String unit = indentUnit(pom);
+        String plugin = unit.repeat(3) + "<plugin>\n"
+                + unit.repeat(4) + "<groupId>" + groupId + "</groupId>\n"
+                + unit.repeat(4) + "<artifactId>" + artifactId + "</artifactId>\n"
+                + unit.repeat(4) + "<version>" + version + "</version>\n"
+                + unit.repeat(3) + "</plugin>\n";
+        List<Span> excluded = spans(pom, "pluginManagement");
+        excluded.addAll(spans(pom, "profiles"));
+        Span build = firstSpanOutside(pom, "build", spans(pom, "profiles"));
+        if (build != null) {
+            Span plugins = firstSpanOutside(pom.substring(0, build.end()), "plugins", excluded);
+            if (plugins != null && plugins.start() > build.start()) {
+                int close = pom.lastIndexOf("</plugins>", plugins.end());
+                int lineStart = pom.lastIndexOf('\n', close) + 1;
+                return new Result(pom.substring(0, lineStart) + plugin + pom.substring(lineStart), 1);
+            }
+            int close = pom.lastIndexOf("</build>", build.end());
+            int lineStart = pom.lastIndexOf('\n', close) + 1;
+            String block = unit.repeat(2) + "<plugins>\n" + plugin + unit.repeat(2) + "</plugins>\n";
+            return new Result(pom.substring(0, lineStart) + block + pom.substring(lineStart), 1);
+        }
+        int close = pom.lastIndexOf("</project>");
+        int lineStart = pom.lastIndexOf('\n', close) + 1;
+        String block = "\n" + unit + "<build>\n" + unit.repeat(2) + "<plugins>\n" + plugin + unit.repeat(2) + "</plugins>\n"
+                + unit + "</build>\n";
+        return new Result(pom.substring(0, lineStart) + block + pom.substring(lineStart), 1);
+    }
+
+    private static Result insertBeforeFirst(String pom, String block, List<Span> excluded, String... tags) {
+        int best = -1;
+        for (String tag : tags) {
+            int from = 0;
+            int at;
+            while ((at = pom.indexOf(tag, from)) >= 0 && inside(excluded, at)) {
+                from = at + 1;
+            }
+            if (at >= 0 && (best < 0 || at < best)) {
+                best = at;
+            }
+        }
+        if (best < 0) {
+            return new Result(pom, 0);
+        }
+        int lineStart = pom.lastIndexOf('\n', best) + 1;
+        return new Result(pom.substring(0, lineStart) + block + pom.substring(lineStart), 1);
+    }
+
+    private static List<Span> spans(String text, String tag) {
+        List<Span> spans = new ArrayList<>();
+        Matcher m = Pattern.compile("(?s)<" + tag + ">.*?</" + tag + ">").matcher(text);
+        while (m.find()) {
+            spans.add(new Span(m.start(), m.end()));
+        }
+        return spans;
+    }
+
+    private static Span firstSpanOutside(String text, String tag, List<Span> excluded) {
+        return spans(text, tag).stream().filter(s -> !inside(excluded, s.start())).findFirst().orElse(null);
+    }
+
+    private static boolean inside(List<Span> spans, int index) {
+        return spans.stream().anyMatch(s -> s.contains(index));
+    }
+
+    private static String tag(String text, String name) {
+        Matcher m = Pattern.compile("<" + name + ">\\s*([^<]*?)\\s*</" + name + ">").matcher(text);
+        return m.find() ? m.group(1) : null;
+    }
+
+    private static int firstIndex(String text, String... needles) {
+        int best = text.length();
+        for (String n : needles) {
+            int i = text.indexOf(n);
+            if (i >= 0 && i < best) {
+                best = i;
+            }
+        }
+        return best;
+    }
+
+    /** Leading whitespace of the line containing {@code needle}. */
+    private static String indentOf(String text, String needle) {
+        int at = text.indexOf(needle);
+        int lineStart = text.lastIndexOf('\n', at) + 1;
+        String prefix = text.substring(lineStart, at);
+        return prefix.isBlank() ? prefix : "";
+    }
+
+    /** The file's indentation step, from the first indented child of {@code <project>}. */
+    private static String indentUnit(String pom) {
+        Matcher m = Pattern.compile("\\n([ \\t]+)<(modelVersion|groupId|artifactId)>").matcher(pom);
+        return m.find() ? m.group(1) : "    ";
+    }
+}

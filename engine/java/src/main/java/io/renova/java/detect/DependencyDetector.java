@@ -18,9 +18,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * {@code type: dependency, coordinates: ["javax.servlet:*", "org.springframework:spring-*"], versionBelow?: "6"}
- * — one finding per declared dependency in any Maven pom (including variants such as pom.jboss.xml)
- * or Gradle build file. Coordinates are {@code groupId:artifactId} globs.
+ * {@code type: dependency, coordinates: ["javax.servlet:*", "org.springframework:spring-*"], versionBelow?: "6",
+ * scopeNot?: provided, packaging?: war} — one finding per declared dependency in any Maven pom
+ * (including variants such as pom.jboss.xml) or Gradle build file. Coordinates are
+ * {@code groupId:artifactId} globs. {@code scopeNot} reports only real (not managed) dependencies
+ * whose scope differs (no scope counts as compile); {@code packaging} limits the check to modules of
+ * that packaging. Both apply to Maven only.
  */
 public final class DependencyDetector implements DetectorFactory {
 
@@ -36,15 +39,28 @@ public final class DependencyDetector implements DetectorFactory {
         Params params = rule.detectParams();
         List<Pattern> coordinates = params.requiredStrings("coordinates").stream().map(DependencyDetector::glob).toList();
         String versionBelow = params.optString("versionBelow").orElse(null);
+        String scopeNot = params.optString("scopeNot").orElse(null);
+        String packaging = params.optString("packaging").orElse(null);
+        boolean mavenOnly = scopeNot != null || packaging != null;
         return ctx -> {
             List<Finding> findings = new ArrayList<>();
             for (Path pom : ctx.files("**/pom*.xml")) {
-                for (PomReader.Dependency d : readPom(ctx, pom)) {
+                PomReader.Pom read = readPom(ctx, pom);
+                if (packaging != null && !packaging.equals(read.packaging())) {
+                    continue;
+                }
+                for (PomReader.Dependency d : read.dependencies()) {
+                    if (scopeNot != null && (d.managed() || scopeNot.equals(d.scope() == null ? "compile" : d.scope()))) {
+                        continue;
+                    }
                     if (matches(coordinates, versionBelow, d.groupId(), d.artifactId(), d.version())) {
                         findings.add(ctx.finding(rule, pom, lineOf(ctx, pom, "<artifactId>" + d.artifactId() + "</artifactId>"),
-                                d.coordinates()));
+                                d.coordinates() + (scopeNot == null ? "" : " scope " + (d.scope() == null ? "compile" : d.scope()))));
                     }
                 }
+            }
+            if (mavenOnly) {
+                return findings;
             }
             for (Path gradle : ctx.files(List.of("**/build.gradle", "**/build.gradle.kts"))) {
                 List<String> lines = ctx.lines(gradle);
@@ -73,15 +89,15 @@ public final class DependencyDetector implements DetectorFactory {
         return version == null || version.contains("${") || Versions.isBelow(version, versionBelow);
     }
 
-    private static List<PomReader.Dependency> readPom(ScanContext ctx, Path pom) {
+    static PomReader.Pom readPom(ScanContext ctx, Path pom) {
         try {
-            return PomReader.read(ctx.root().resolve(pom)).dependencies();
+            return PomReader.read(ctx.root().resolve(pom));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    private static int lineOf(ScanContext ctx, Path file, String needle) {
+    static int lineOf(ScanContext ctx, Path file, String needle) {
         List<String> lines = ctx.lines(file);
         for (int i = 0; i < lines.size(); i++) {
             if (lines.get(i).contains(needle)) {
@@ -91,7 +107,8 @@ public final class DependencyDetector implements DetectorFactory {
         return 0;
     }
 
-    static Pattern glob(String coordinateGlob) {
+    /** {@code groupId:artifactId} glob ({@code *} wildcard) to a regex. */
+    public static Pattern glob(String coordinateGlob) {
         StringBuilder regex = new StringBuilder();
         for (char c : coordinateGlob.toCharArray()) {
             regex.append(c == '*' ? ".*" : Pattern.quote(String.valueOf(c)));

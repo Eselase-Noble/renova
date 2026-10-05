@@ -54,6 +54,10 @@ public final class MarkdownReport {
         md.append("| Automated (recipe + replace) | ").append(percent(plan.automationRate())).append(" of findings |\n");
         plan.occurrencesByStrategy().forEach((strategy, n) ->
                 md.append("| Strategy `").append(strategy).append("` | ").append(n).append(" finding(s) |\n"));
+        long guards = plan.playbook().rules().stream().filter(io.renova.core.playbook.Rule::guard).count();
+        if (guards > 0) {
+            md.append("| Guard rules checked after migration | ").append(guards).append(" |\n");
+        }
         md.append('\n');
 
         md.append("| Category | Meaning | Findings |\n|---|---|---|\n");

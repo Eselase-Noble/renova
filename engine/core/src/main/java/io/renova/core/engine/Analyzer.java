@@ -25,18 +25,23 @@ public final class Analyzer {
         this.registry = registry;
     }
 
+    /** Runs the playbook's migration rules against the original project. Guard rules run later. */
     public AnalysisResult analyze(Path root, Playbook playbook) throws IOException {
         EcosystemPlugin plugin = registry.plugin(playbook.ecosystem());
         if (!plugin.supports(root)) {
             throw new IllegalArgumentException(root + " is not a " + plugin.displayName() + " project");
         }
-        ProjectModel model = plugin.model(root);
+        return check(plugin.model(root), playbook, playbook.rules().stream().filter(r -> !r.guard()).toList());
+    }
+
+    /** Runs the given rules against a project model, e.g. guard rules against a migrated workspace. */
+    public AnalysisResult check(ProjectModel model, Playbook playbook, List<Rule> rules) throws IOException {
         ScanContext context = ScanContext.of(model);
 
         // Build every detector first so a broken playbook fails before any scanning.
         Map<Rule, Detector> detectors = new LinkedHashMap<>();
         List<String> warnings = new ArrayList<>();
-        for (Rule rule : playbook.rules()) {
+        for (Rule rule : rules) {
             DetectorFactory factory = registry.detectorFactory(rule.detectorType()).orElse(null);
             if (factory == null) {
                 warnings.add("Rule '" + rule.id() + "' skipped: no detector of type '" + rule.detectorType() + "'");

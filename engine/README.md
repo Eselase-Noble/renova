@@ -26,8 +26,9 @@ The engine is a library. The products in this repository (`cli`, `web`, `desktop
 |---|---|---|
 | **Playbook** | YAML: target platform plus rules. New migration paths are data, not code | `java/src/main/resources/playbooks/` |
 | **Rule** | `detect` (what to find) + `fix` (who resolves it) + category A–E + severity | in a playbook |
-| **Detector** | A `detect.type`. Core: `fileExists`, `fileContains`. Java: `import`, `dependency`, `javaVersionBelow` | `DetectorFactory` SPI |
-| **Fix strategy** | `recipe` (OpenRewrite), `replace` (text, for JSP/TLD/config), `ai`, `manual` | `Fixer` SPI |
+| **Detector** | A `detect.type`. Core: `fileExists`, `fileContains`. Java: `import`, `dependency`, `javaVersionBelow`, `mavenPluginBelow`, `pomProperty` | `DetectorFactory` SPI |
+| **Fix strategy** | `recipe` (OpenRewrite), `replace` (text, for JSP/TLD/config), `maven` (pom.xml edits), `ai`, `manual` | `Fixer` SPI |
+| **Guard** | A rule with `phase: guard`, checked on the migrated code before verification | in a playbook |
 | **Ecosystem plugin** | Project model, detectors, fixers, verifier and bundled playbooks for one stack | `EcosystemPlugin` SPI (ServiceLoader) |
 | **AI provider** | Any model (hosted or on-prem) that proposes whole-file edits, created from the caller's own settings | `AiProviderFactory` SPI (ServiceLoader) |
 | **Verifier** | Builds the workspace and turns failures into structured errors for the repair loop | `Verifier` SPI |
@@ -59,7 +60,7 @@ with a Claude provider, and Markdown/JSON reports.
 
 Next:
 1. **More AI providers**: an on-premises option.
-2. **Post-migration guard rules**: checks that run on the migrated code, e.g. the servlet API must stay `provided` scope (the Jakarta recipe currently changes it to `compile`).
+2. **More guard rules**, e.g. dependencies imported by the migrated code but not declared.
 3. **Behavioural verification**: run the old and new apps side by side and diff HTTP responses and DB effects.
 4. **Benchmark harness**: score the tool against public legacy projects with known migrated versions.
 5. **Category E detector**: classes used in code but only available through transitive dependencies.

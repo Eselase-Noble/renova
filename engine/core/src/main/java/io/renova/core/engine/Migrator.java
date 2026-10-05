@@ -3,7 +3,10 @@ package io.renova.core.engine;
 import io.renova.core.ai.AiFixer;
 import io.renova.core.ai.AiProvider;
 import io.renova.core.ai.AiProviderException;
+import io.renova.core.model.ProjectModel;
 import io.renova.core.playbook.FixSpec;
+import io.renova.core.playbook.Playbook;
+import io.renova.core.playbook.Rule;
 import io.renova.core.spi.Fixer;
 import io.renova.core.spi.Verifier;
 import io.renova.core.workspace.Workspace;
@@ -47,36 +50,10 @@ public final class Migrator {
         MigrationOptions options = context.options();
         Workspace workspace = context.workspace();
 
-        Set<String> strategies = new LinkedHashSet<>(STAGE_ORDER);
-        plan.steps().forEach(s -> strategies.add(s.strategy()));
-        strategies.remove(FixSpec.MANUAL);
-
         List<StageResult> stages = new ArrayList<>();
-        for (String strategy : strategies) {
-            List<PlanStep> steps = plan.steps(strategy);
-            if (steps.isEmpty()) {
-                continue;
-            }
-            if (options.skipStrategies().contains(strategy)) {
-                stages.add(StageResult.skipped(strategy, "skipped by option"));
-                continue;
-            }
-            Optional<Fixer> fixer = registry.fixer(ecosystem, strategy);
-            if (fixer.isEmpty()) {
-                stages.add(StageResult.skipped(strategy, "no fixer installed for strategy '" + strategy + "'"));
-                continue;
-            }
-            progress.accept("Stage " + strategy + ": " + steps.size() + " step(s)");
-            StageResult result;
-            try {
-                result = fixer.get().apply(context, steps);
-            } catch (Exception e) {
-                result = new StageResult(strategy, StageResult.Status.FAILED,
-                        e.getMessage() == null ? e.toString() : e.getMessage(), List.of());
-            }
-            workspace.commitAll("renova: " + strategy + " stage: " + result.summary());
-            stages.add(result);
-        }
+        applyPlan(context, plan, "", stages);
+        List<PlanStep> manual = new ArrayList<>(plan.steps(FixSpec.MANUAL));
+        manual.addAll(runGuards(context, stages));
 
         VerifyResult verification = null;
         Optional<Verifier> verifier = registry.plugin(ecosystem).verifier();
@@ -96,6 +73,74 @@ public final class Migrator {
                         verification.success() ? "build repaired" : "build still failing", log));
             }
         }
-        return new MigrationOutcome(workspace.root(), stages, verification, plan.steps(FixSpec.MANUAL));
+        return new MigrationOutcome(workspace.root(), stages, verification, manual);
+    }
+
+    /** Runs each strategy's steps in stage order, committing after every stage. */
+    private void applyPlan(MigrationContext context, MigrationPlan plan, String stagePrefix, List<StageResult> stages)
+            throws Exception {
+        String ecosystem = plan.playbook().ecosystem();
+        Set<String> strategies = new LinkedHashSet<>(STAGE_ORDER);
+        plan.steps().forEach(s -> strategies.add(s.strategy()));
+        strategies.remove(FixSpec.MANUAL);
+
+        for (String strategy : strategies) {
+            List<PlanStep> steps = plan.steps(strategy);
+            if (steps.isEmpty()) {
+                continue;
+            }
+            String stage = stagePrefix + strategy;
+            if (context.options().skipStrategies().contains(strategy)) {
+                stages.add(StageResult.skipped(stage, "skipped by option"));
+                continue;
+            }
+            Optional<Fixer> fixer = registry.fixer(ecosystem, strategy);
+            if (fixer.isEmpty()) {
+                stages.add(StageResult.skipped(stage, "no fixer installed for strategy '" + strategy + "'"));
+                continue;
+            }
+            progress.accept("Stage " + stage + ": " + steps.size() + " step(s)");
+            StageResult result;
+            try {
+                result = fixer.get().apply(context, steps);
+            } catch (Exception e) {
+                result = new StageResult(strategy, StageResult.Status.FAILED,
+                        e.getMessage() == null ? e.toString() : e.getMessage(), List.of());
+            }
+            result = new StageResult(stage, result.status(), result.summary(), result.details());
+            context.workspace().commitAll("renova: " + stage + " stage: " + result.summary());
+            stages.add(result);
+        }
+    }
+
+    /**
+     * Checks the playbook's guard rules against the migrated workspace and fixes what they find, so
+     * problems introduced by recipes or AI edits are caught before the build is verified.
+     *
+     * @return guard steps left for a person
+     */
+    private List<PlanStep> runGuards(MigrationContext context, List<StageResult> stages) throws Exception {
+        Playbook playbook = context.playbook();
+        List<Rule> guards = playbook.rules().stream().filter(Rule::guard).toList();
+        if (guards.isEmpty()) {
+            return List.of();
+        }
+        progress.accept("Checking " + guards.size() + " guard rule(s) on the migrated code");
+        ProjectModel migrated = context.plugin().model(context.workspace().root());
+        AnalysisResult check = new Analyzer(registry).check(migrated, playbook, guards);
+        MigrationPlan guardPlan = new Planner().plan(check);
+
+        List<String> details = new ArrayList<>(check.warnings());
+        check.findings().forEach(f -> details.add(f.ruleId() + ": " + f.file() + (f.line() > 0 ? ":" + f.line() : "")
+                + (f.evidence() == null ? "" : " (" + f.evidence() + ")")));
+        if (guardPlan.steps().isEmpty()) {
+            stages.add(new StageResult("guard", StageResult.Status.APPLIED,
+                    "all " + guards.size() + " guard rule(s) passed", details));
+            return List.of();
+        }
+        stages.add(new StageResult("guard", StageResult.Status.PARTIAL, guardPlan.steps().size() + " of "
+                + guards.size() + " guard rule(s) found problems (" + check.findings().size() + " finding(s))", details));
+        applyPlan(context, guardPlan, "guard ", stages);
+        return guardPlan.steps(FixSpec.MANUAL);
     }
 }

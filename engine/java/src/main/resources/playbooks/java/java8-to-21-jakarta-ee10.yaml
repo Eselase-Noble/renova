@@ -339,3 +339,65 @@ rules:
     fix:
       strategy: manual
       hint: Behaviour that relied on a SecurityManager must be enforced another way.
+
+  # ---------------------------------------------------------------- Guards: checked on the migrated code
+  # Guards run after the recipe, replace and AI stages and before the build is verified. They catch
+  # problems those stages introduce or leave behind, and fix them deterministically where possible.
+
+  - id: guard-container-apis-provided
+    phase: guard
+    title: Container-supplied Jakarta APIs must not be bundled in the WAR
+    category: E
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates:
+        - "jakarta.servlet:jakarta.servlet-api"
+        - "jakarta.servlet.jsp:jakarta.servlet.jsp-api"
+        - "jakarta.el:jakarta.el-api"
+        - "jakarta.websocket:*"
+        - "jakarta.annotation:jakarta.annotation-api"
+        - "jakarta.platform:*"
+      scopeNot: provided
+      packaging: war
+    fix:
+      strategy: maven
+      params: { action: setScope, scope: provided }
+    rationale: >
+      Tomcat and JBoss/WildFly supply these APIs. A second copy in WEB-INF/lib can cause class-loading
+      conflicts. Automated dependency upgrades sometimes drop the original provided scope.
+
+  - id: guard-war-plugin-java17
+    phase: guard
+    title: maven-war-plugin must be 3.3.2 or newer to run on Java 17+
+    category: A
+    severity: BLOCKER
+    detect:
+      type: mavenPluginBelow
+      plugin: maven-war-plugin
+      version: "3.3.2"
+      packaging: war
+      whenUndeclared: true
+    fix:
+      strategy: maven
+      params: { action: setPluginVersion, plugin: maven-war-plugin, version: "3.4.0" }
+    rationale: >
+      Older versions, including the default Maven 3 picks when none is declared, fail on Java 17+
+      because they reflect into JDK internals. Declaring the version also makes builds reproducible.
+
+  - id: guard-compiler-target
+    phase: guard
+    title: Compiler target level must match the source level
+    category: A
+    severity: BLOCKER
+    detect:
+      type: pomProperty
+      missing: maven.compiler.target
+      requires: maven.compiler.source
+      unless: [maven.compiler.release]
+    fix:
+      strategy: maven
+      params: { action: setProperty, name: maven.compiler.target, value: "${maven.compiler.source}" }
+    rationale: >
+      With only the source level raised, older compiler plugins keep a lower default target and the
+      build fails ("source release 21 requires target release 21").

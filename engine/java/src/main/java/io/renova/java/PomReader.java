@@ -25,14 +25,20 @@ public final class PomReader {
 
     private static final Pattern EXPRESSION = Pattern.compile("\\$\\{([^}]+)}");
 
-    public record Dependency(String groupId, String artifactId, String version, String scope) {
+    /** @param managed declared in dependencyManagement, so it sets defaults rather than adding the dependency */
+    public record Dependency(String groupId, String artifactId, String version, String scope, boolean managed) {
         public String coordinates() {
             return groupId + ":" + artifactId + (version == null ? "" : ":" + version);
         }
     }
 
+    /** @param managed declared in pluginManagement */
+    public record Plugin(String groupId, String artifactId, String version, boolean managed) {
+    }
+
     public record Pom(String groupId, String artifactId, String version, String packaging, String javaVersion,
-                      List<String> modules, List<Dependency> dependencies, Map<String, String> properties) {
+                      List<String> modules, List<Dependency> dependencies, List<Plugin> plugins,
+                      Map<String, String> properties) {
     }
 
     private PomReader() {
@@ -57,10 +63,19 @@ public final class PomReader {
         props.values().removeIf(v -> v == null);
 
         List<Dependency> deps = new ArrayList<>();
-        collectDependencies(child(project, "dependencies"), props, deps);
+        collectDependencies(child(project, "dependencies"), props, deps, false);
         Element management = child(project, "dependencyManagement");
         if (management != null) {
-            collectDependencies(child(management, "dependencies"), props, deps);
+            collectDependencies(child(management, "dependencies"), props, deps, true);
+        }
+        List<Plugin> plugins = new ArrayList<>();
+        Element build = child(project, "build");
+        if (build != null) {
+            collectPlugins(child(build, "plugins"), props, plugins, false);
+            Element pluginManagement = child(build, "pluginManagement");
+            if (pluginManagement != null) {
+                collectPlugins(child(pluginManagement, "plugins"), props, plugins, true);
+            }
         }
 
         List<String> modules = new ArrayList<>();
@@ -71,7 +86,7 @@ public final class PomReader {
 
         return new Pom(interpolate(groupId, props), artifactId, interpolate(version, props),
                 firstNonNull(text(project, "packaging"), "jar"), javaVersion(project, props),
-                modules, deps, props);
+                modules, deps, plugins, props);
     }
 
     /** "1.8" → "8"; checks the usual properties, then the compiler plugin configuration. */
@@ -116,14 +131,28 @@ public final class PomReader {
         return null;
     }
 
-    private static void collectDependencies(Element dependencies, Map<String, String> props, List<Dependency> out) {
+    private static void collectDependencies(Element dependencies, Map<String, String> props, List<Dependency> out,
+                                            boolean managed) {
         if (dependencies == null) {
             return;
         }
         for (Element d : children(dependencies)) {
             if (d.getTagName().equals("dependency")) {
                 out.add(new Dependency(interpolate(text(d, "groupId"), props), interpolate(text(d, "artifactId"), props),
-                        interpolate(text(d, "version"), props), text(d, "scope")));
+                        interpolate(text(d, "version"), props), text(d, "scope"), managed));
+            }
+        }
+    }
+
+    private static void collectPlugins(Element plugins, Map<String, String> props, List<Plugin> out, boolean managed) {
+        if (plugins == null) {
+            return;
+        }
+        for (Element p : children(plugins)) {
+            if (p.getTagName().equals("plugin")) {
+                String groupId = text(p, "groupId");
+                out.add(new Plugin(groupId == null ? "org.apache.maven.plugins" : interpolate(groupId, props),
+                        interpolate(text(p, "artifactId"), props), interpolate(text(p, "version"), props), managed));
             }
         }
     }
