@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Runs the Renova CLI from a source checkout (build first with "mvn package" from the repository root).
+set -e
+DIR=$(cd "$(dirname "$0")/.." && pwd)
+exec java ${RENOVA_JAVA_OPTS:-} -jar "$DIR/target/renova.jar" "$@"
