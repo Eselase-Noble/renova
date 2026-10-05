@@ -1,0 +1,89 @@
+/* Renova desktop: additions to the AtlantaFX Primer theme. Colours come from the theme's variables, so they
+   follow light and dark mode. */
+
+.sidebar {
+    -fx-background-color: -color-bg-subtle;
+    -fx-border-color: transparent -color-border-muted transparent transparent;
+    -fx-padding: 16 12 16 12;
+    -fx-spacing: 4;
+    -fx-min-width: 220;
+    -fx-pref-width: 220;
+}
+
+.brand-mark {
+    -fx-background-color: -color-fg-default;
+    -fx-text-fill: -color-bg-default;
+    -fx-font-weight: bold;
+    -fx-background-radius: 6;
+    -fx-min-width: 26;
+    -fx-min-height: 26;
+    -fx-alignment: center;
+}
+
+.nav-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -color-fg-muted;
+    -fx-alignment: center-left;
+    -fx-max-width: infinity;
+    -fx-padding: 6 10 6 10;
+    -fx-background-radius: 6;
+}
+
+.nav-button:hover, .nav-button.active {
+    -fx-background-color: -color-bg-neutral-muted;
+    -fx-text-fill: -color-fg-default;
+}
+
+.nav-caption {
+    -fx-text-fill: -color-fg-subtle;
+    -fx-font-size: 0.85em;
+    -fx-padding: 12 10 2 10;
+}
+
+.badge {
+    -fx-padding: 2 8 2 8;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+    -fx-border-width: 1;
+    -fx-font-size: 0.85em;
+}
+
+.badge-good { -fx-background-color: -color-success-subtle; -fx-text-fill: -color-success-fg; -fx-border-color: -color-success-muted; }
+.badge-bad { -fx-background-color: -color-danger-subtle; -fx-text-fill: -color-danger-fg; -fx-border-color: -color-danger-muted; }
+.badge-warn { -fx-background-color: -color-warning-subtle; -fx-text-fill: -color-warning-fg; -fx-border-color: -color-warning-muted; }
+.badge-info { -fx-background-color: -color-accent-subtle; -fx-text-fill: -color-accent-fg; -fx-border-color: -color-accent-muted; }
+.badge-muted { -fx-background-color: -color-bg-subtle; -fx-text-fill: -color-fg-muted; -fx-border-color: -color-border-default; }
+
+.category-bar .bar {
+    -fx-background-color: -color-accent-emphasis;
+}
+
+.mono, .log, .diff {
+    -fx-font-family: "JetBrains Mono", "DejaVu Sans Mono", "Monospaced";
+    -fx-font-size: 0.9em;
+}
+
+.diff .list-cell {
+    -fx-padding: 0 8 0 8;
+}
+
+.diff .list-cell.added { -fx-background-color: -color-success-subtle; -fx-text-fill: -color-success-fg; }
+.diff .list-cell.removed { -fx-background-color: -color-danger-subtle; -fx-text-fill: -color-danger-fg; }
+.diff .list-cell.hunk { -fx-background-color: -color-accent-subtle; -fx-text-fill: -color-accent-fg; }
+.diff .list-cell.file {
+    -fx-background-color: -color-bg-neutral-muted;
+    -fx-font-weight: bold;
+}
+
+.recent-tile {
+    -fx-background-color: -color-bg-default;
+    -fx-border-color: -color-border-default;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 12;
+    -fx-cursor: hand;
+}
+
+.recent-tile:hover {
+    -fx-border-color: -color-accent-emphasis;
+}

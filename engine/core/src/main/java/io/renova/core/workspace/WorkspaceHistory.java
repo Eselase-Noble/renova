@@ -1,4 +1,4 @@
-package io.renova.web.migration;
+package io.renova.core.workspace;
 
 import io.renova.core.behaviour.DockerSandbox;
 

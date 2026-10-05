@@ -1,7 +1,7 @@
 package io.renova.web.api;
 
 import io.renova.web.account.Access;
-import io.renova.web.migration.WorkspaceHistory;
+import io.renova.core.workspace.WorkspaceHistory;
 import io.renova.web.store.DataStore;
 import io.renova.web.store.MigrationRecord;
 import jakarta.servlet.http.HttpServletRequest;
