@@ -19,11 +19,12 @@ import java.util.regex.Pattern;
 
 /**
  * {@code type: dependency, coordinates: ["javax.servlet:*", "org.springframework:spring-*"], versionBelow?: "6",
- * scopeNot?: provided, packaging?: war} — one finding per declared dependency in any Maven pom
+ * scopeNot?: provided, packaging?: war, whenDeclared?: "jakarta.platform:*"} — one finding per declared dependency in any Maven pom
  * (including variants such as pom.jboss.xml) or Gradle build file. Coordinates are
  * {@code groupId:artifactId} globs. {@code scopeNot} reports only real (not managed) dependencies
  * whose scope differs (no scope counts as compile); {@code packaging} limits the check to modules of
- * that packaging. Both apply to Maven only.
+ * that packaging; {@code whenDeclared} to poms that also declare a real dependency matching that glob.
+ * These apply to Maven only.
  */
 public final class DependencyDetector implements DetectorFactory {
 
@@ -41,12 +42,17 @@ public final class DependencyDetector implements DetectorFactory {
         String versionBelow = params.optString("versionBelow").orElse(null);
         String scopeNot = params.optString("scopeNot").orElse(null);
         String packaging = params.optString("packaging").orElse(null);
-        boolean mavenOnly = scopeNot != null || packaging != null;
+        Pattern whenDeclared = params.optString("whenDeclared").map(DependencyDetector::glob).orElse(null);
+        boolean mavenOnly = scopeNot != null || packaging != null || whenDeclared != null;
         return ctx -> {
             List<Finding> findings = new ArrayList<>();
             for (Path pom : ctx.files("**/pom*.xml")) {
                 PomReader.Pom read = readPom(ctx, pom);
                 if (packaging != null && !packaging.equals(read.packaging())) {
+                    continue;
+                }
+                if (whenDeclared != null && read.dependencies().stream()
+                        .noneMatch(d -> !d.managed() && whenDeclared.matcher(d.groupId() + ":" + d.artifactId()).matches())) {
                     continue;
                 }
                 for (PomReader.Dependency d : read.dependencies()) {

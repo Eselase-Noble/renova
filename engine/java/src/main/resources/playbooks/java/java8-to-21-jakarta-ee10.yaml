@@ -367,6 +367,38 @@ rules:
       Tomcat and JBoss/WildFly supply these APIs. A second copy in WEB-INF/lib can cause class-loading
       conflicts. Automated dependency upgrades sometimes drop the original provided scope.
 
+  - id: guard-platform-apis-provided
+    phase: guard
+    title: With the full Jakarta EE platform API provided, the APIs it contains must not be bundled
+    category: E
+    severity: BLOCKER
+    detect:
+      type: dependency
+      whenDeclared: "jakarta.platform:jakarta.jakartaee-api"
+      scopeNot: provided
+      coordinates:
+        - "jakarta.ejb:jakarta.ejb-api"
+        - "jakarta.enterprise:jakarta.enterprise.cdi-api"
+        - "jakarta.inject:jakarta.inject-api"
+        - "jakarta.persistence:jakarta.persistence-api"
+        - "jakarta.validation:jakarta.validation-api"
+        - "jakarta.ws.rs:jakarta.ws.rs-api"
+        - "jakarta.json:jakarta.json-api"
+        - "jakarta.json.bind:jakarta.json.bind-api"
+        - "jakarta.transaction:jakarta.transaction-api"
+        - "jakarta.interceptor:jakarta.interceptor-api"
+        - "jakarta.faces:jakarta.faces-api"
+        - "jakarta.jms:jakarta.jms-api"
+    fix:
+      strategy: maven
+      params: { action: setScope, scope: provided }
+    rationale: >
+      Declaring jakarta.jakartaee-api as provided means the application runs on a full Jakarta EE server
+      (for example WildFly or JBoss EAP 8), which supplies these APIs. Recipes that split the old javaee-api
+      umbrella into individual artifacts may add them with compile scope; bundled copies in WEB-INF/lib can
+      cause class-loading conflicts. XML Binding is left out on purpose: whether the server supplies it
+      depends on the container, so review jakarta.xml.bind-api and jaxb-runtime scopes for the target server.
+
   - id: guard-war-plugin-java17
     phase: guard
     title: maven-war-plugin must be 3.3.2 or newer to run on Java 17+

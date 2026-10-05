@@ -69,7 +69,7 @@ class GuardRulesTest {
 
         assertThat(outcome.stages()).extracting(StageResult::stage).contains("guard", "guard maven");
         assertThat(outcome.stages()).filteredOn(s -> s.stage().equals("guard")).singleElement()
-                .satisfies(s -> assertThat(s.summary()).startsWith("4 of 4 guard rule(s) found problems"));
+                .satisfies(s -> assertThat(s.summary()).startsWith("4 of 5 guard rule(s) found problems"));
     }
 
     private static Path copyFixture(Path target) throws Exception {
