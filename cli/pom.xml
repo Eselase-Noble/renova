@@ -38,7 +38,6 @@
     </dependencies>
 
     <build>
-        <finalName>renova</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -51,6 +50,8 @@
                         </goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <!-- Separate file: shading over the thin jar would reuse stale classes on incremental builds. -->
+                            <outputFile>${project.build.directory}/renova.jar</outputFile>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
