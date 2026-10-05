@@ -1,0 +1,341 @@
+# Java 8 / Java EE (javax) web applications → Java 21, Jakarta EE 10, Spring 6.
+#
+# Rules are data: detectors find work, fix strategies say who does it.
+#   recipe  – deterministic OpenRewrite recipe (AST-aware, type-attributed)
+#   replace – deterministic text replacement for files no parser handles (JSP, TLD)
+#   ai      – context-dependent edit, proposed by the AI provider and checked by the build
+#   manual  – reported for a person, with guidance
+#
+# Categories: A build/descriptors, B namespace renames, C API changes, D runtime behaviour, E dependencies.
+
+id: java8-to-21-jakarta-ee10
+name: "Java 8 → Java 21 + Jakarta EE 10 + Spring 6"
+ecosystem: java
+version: 0.1.0
+description: >
+  Moves a Java 8 / Java EE 8 (javax) web application to Java 21 and Jakarta EE 10, ready for
+  Tomcat 10.1/11 and WildFly 27+ / JBoss EAP 8. Covers build, namespace, Spring 6 API and
+  servlet-container behaviour changes.
+targets:
+  java: "21"
+  jakartaEE: "10 (Servlet 6.0)"
+  spring: "6.2"
+  containers: "Tomcat 10.1/11, WildFly 27+ / JBoss EAP 8"
+
+settings:
+  openrewrite:
+    plugin: org.openrewrite.maven:rewrite-maven-plugin:6.46.1
+    artifacts:
+      - org.openrewrite.recipe:rewrite-migrate-java:3.42.1
+      - org.openrewrite.recipe:rewrite-spring:6.37.1
+
+rules:
+
+  # ---------------------------------------------------------------- A: build and descriptors
+
+  - id: java-level
+    title: Raise the Java language level to 21
+    category: A
+    severity: BLOCKER
+    detect: { type: javaVersionBelow, version: 21 }
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.migrate.UpgradeToJava21]
+    rationale: The build must compile for the target JDK; the recipe also replaces APIs removed between 8 and 21.
+
+  - id: javax-ee-dependencies
+    title: Replace javax Java EE dependencies with Jakarta EE 10
+    category: A
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates:
+        - "javax.servlet:*"
+        - "javax.servlet.jsp:*"
+        - "javax.servlet.jsp.jstl:*"
+        - "jstl:jstl"
+        - "javax.annotation:javax.annotation-api"
+        - "javax.xml.bind:*"
+        - "javax.xml.ws:*"
+        - "javax.persistence:*"
+        - "javax.validation:*"
+        - "javax.ws.rs:*"
+        - "javax.mail:*"
+        - "javax.inject:*"
+        - "javax.el:*"
+        - "javax.activation:*"
+        - "javax:javaee-api"
+        - "javax:javaee-web-api"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.migrate.jakarta.JakartaEE10]
+
+  - id: web-xml-schema
+    title: Update web.xml to the Jakarta EE 10 / Servlet 6.0 schema
+    category: A
+    severity: WARNING
+    detect:
+      type: fileContains
+      include: ["**/WEB-INF/web.xml"]
+      pattern: "java\\.sun\\.com/(xml/ns|dtd)|xmlns\\.jcp\\.org/xml/ns"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.migrate.jakarta.JakartaWebXml6]
+
+  - id: maven-variant-poms
+    title: Bring alternative build files (e.g. pom.jboss.xml) in line with the migrated pom.xml
+    category: A
+    severity: WARNING
+    detect: { type: fileExists, include: ["**/pom.*.xml"] }
+    fix:
+      strategy: ai
+      hint: >
+        Regenerate the variant from the migrated pom.xml and re-apply only its intended differences
+        (e.g. logging backend, container-specific resources). Compare the two files afterwards to
+        confirm no other differences exist.
+
+  # ---------------------------------------------------------------- B: namespace renames
+
+  - id: javax-ee-imports
+    title: Rename javax.* Java EE packages to jakarta.*
+    category: B
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes:
+        - javax.servlet
+        - javax.annotation
+        - javax.persistence
+        - javax.xml.bind
+        - javax.xml.ws
+        - javax.xml.soap
+        - javax.ws.rs
+        - javax.validation
+        - javax.ejb
+        - javax.inject
+        - javax.enterprise
+        - javax.interceptor
+        - javax.jms
+        - javax.mail
+        - javax.faces
+        - javax.el
+        - javax.websocket
+        - javax.transaction
+        - javax.activation
+        - javax.json
+      exclude:
+        # Still in the JDK, or not Java EE at all (JSR-305).
+        - javax.annotation.processing
+        - javax.annotation.Nonnull
+        - javax.annotation.Nullable
+        - javax.annotation.CheckForNull
+        - javax.annotation.CheckReturnValue
+        - javax.annotation.ParametersAreNonnullByDefault
+        - javax.annotation.concurrent
+        - javax.annotation.meta
+        - javax.transaction.xa
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.migrate.jakarta.JakartaEE10]
+
+  - id: javax-in-jsp
+    title: Rename javax.servlet references in JSP pages and tag files
+    category: B
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.jsp", "**/*.jspf", "**/*.tag", "**/*.tagx"]
+      pattern: "javax\\.servlet"
+    fix:
+      strategy: replace
+      include: "**/*.{jsp,jspf,tag,tagx}"
+      find: "javax.servlet"
+      replace: "jakarta.servlet"
+
+  - id: javax-in-tld
+    title: Rename javax.servlet classes in tag library descriptors
+    category: B
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.tld"]
+      pattern: "javax\\.servlet"
+    fix:
+      strategy: replace
+      include: "**/*.tld"
+      find: "javax.servlet"
+      replace: "jakarta.servlet"
+
+  # ---------------------------------------------------------------- C: removed or changed APIs
+
+  - id: spring-framework-6
+    title: Upgrade Spring Framework to 6.x
+    category: C
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates: ["org.springframework:spring-*"]
+      versionBelow: "6"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.framework.UpgradeSpringFramework_6_2]
+    rationale: Spring 5 and earlier only support javax; Jakarta EE 10 needs Spring 6.
+
+  - id: spring-assert-without-message
+    title: Add messages to Spring Assert calls (message-less overloads removed)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.java"]
+      pattern: "\\bAssert\\.(notNull|isNull|isTrue|hasText|hasLength|notEmpty|state|noNullElements|isInstanceOf)\\(\\s*[^,()]+(\\([^()]*\\))?\\s*\\)\\s*;"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.framework.MigrateSpringAssert]
+
+  - id: handler-interceptor-adapter
+    title: Replace HandlerInterceptorAdapter (removed in Spring 6)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [org.springframework.web.servlet.handler.HandlerInterceptorAdapter]
+    fix:
+      strategy: ai
+      hint: >
+        Change "extends HandlerInterceptorAdapter" to "implements AsyncHandlerInterceptor". The adapter
+        was an empty implementation of that interface, so behaviour is unchanged.
+
+  - id: commons-multipart-resolver
+    title: Replace CommonsMultipartResolver with StandardServletMultipartResolver
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.java", "**/*.xml"]
+      pattern: "CommonsMultipartResolver"
+    fix:
+      strategy: ai
+      hint: >
+        Keep the same bean id and aliases. Move maxUploadSize / maxInMemorySize to <multipart-config>
+        on the DispatcherServlet in web.xml (max-file-size, max-request-size, file-size-threshold)
+        with identical values, so upload limits do not change.
+
+  - id: commons-fileupload-1
+    title: Move commons-fileupload 1.x code to fileupload2 (Jakarta)
+    category: C
+    severity: WARNING
+    detect:
+      type: import
+      prefixes: [org.apache.commons.fileupload]
+    fix:
+      strategy: ai
+      hint: >
+        Use org.apache.commons.fileupload2.jakarta. fileupload2 lowered the default per-part header
+        limit from 10240 to 512 bytes: set 10240 explicitly so long file names are not rejected. Keep
+        the default charset (ISO-8859-1) if existing code re-decodes form fields.
+
+  - id: spring-orm-ibatis
+    title: Replace Spring's iBATIS 2 support (removed in Spring 4)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [org.springframework.orm.ibatis]
+    fix:
+      strategy: manual
+      hint: >
+        Either vendor an Apache-2.0 bridge (e.g. mybatis-2-spring) under its original package so
+        callers do not change, or migrate the SQL maps to MyBatis 3 (much larger change).
+
+  - id: cglib
+    title: Remove direct cglib dependency
+    category: C
+    severity: WARNING
+    detect: { type: dependency, coordinates: ["cglib:*"] }
+    fix:
+      strategy: manual
+      hint: >
+        cglib does not work on Java 17+ without --add-opens. Spring 6 repackages its own copy. If
+        iBATIS 2 is used, cglib is only needed for nested-select lazy loading; when no SQL map uses
+        it, removing cglib makes iBATIS fall back to reflection with identical results.
+
+  - id: sun-misc-base64
+    title: Replace sun.misc.BASE64Encoder/Decoder (removed in Java 9)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [sun.misc.BASE64Encoder, sun.misc.BASE64Decoder]
+    fix:
+      strategy: ai
+      hint: >
+        Use java.util.Base64. The sun decoder ignored line breaks and other non-alphabet characters;
+        use Base64.getMimeDecoder() where input may contain them, otherwise getDecoder() throws.
+        The sun encoder wrapped lines at 76 characters; use getMimeEncoder() only if callers rely on it.
+
+  - id: jdk-internal-apis
+    title: Remove other JDK-internal APIs (strongly encapsulated since Java 17)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: ["sun.", "com.sun.image.codec", "com.sun.org.apache"]
+      exclude: [sun.misc.BASE64Encoder, sun.misc.BASE64Decoder]
+    fix:
+      strategy: ai
+      hint: Replace with the supported public API; do not add --add-opens unless no replacement exists.
+
+  # ---------------------------------------------------------------- D: runtime and container behaviour
+
+  - id: spring-mvc-url-matching
+    title: Preserve Spring MVC URL matching (suffix and mid-path ** patterns)
+    category: D
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates: ["org.springframework:spring-webmvc"]
+      versionBelow: "6"
+    fix:
+      strategy: manual
+      hint: >
+        Spring 6 removed suffix matching ("/foo" no longer answers "/foo.do") and its PathPatternParser
+        rejects "**" in the middle of a pattern, which stops startup. To keep the old behaviour,
+        register an AntPathMatcher and <mvc:path-matching suffix-pattern="true" trailing-slash="true"
+        path-matcher="pathMatcher"/>, then list ".do" forms explicitly where callers use them.
+
+  - id: sitemesh2-tomcat10
+    title: SiteMesh 2 decorated pages render blank on Tomcat 10.1/11
+    category: D
+    severity: BLOCKER
+    detect: { type: dependency, coordinates: ["opensymphony:sitemesh"] }
+    fix:
+      strategy: manual
+      hint: >
+        Use the Jakarta build of SiteMesh 2 (opensymphony:sitemesh 2.6.0+). Tomcat 10.1/11 finishes the
+        response after a forward (suspendWrappedResponseAfterForward), discarding SiteMesh's buffered
+        output. Add <Context suspendWrappedResponseAfterForward="false" /> to
+        src/main/webapp/META-INF/context.xml.
+
+  - id: jboss-deployment-structure
+    title: Review JBoss module dependencies for EAP 8 / WildFly 27+
+    category: D
+    severity: WARNING
+    detect: { type: fileExists, include: ["**/jboss-deployment-structure.xml"] }
+    fix:
+      strategy: ai
+      hint: >
+        javax.* modules are renamed jakarta.* in EAP 8 / WildFly 27+. Update module names in
+        exclusions and dependencies, and re-check every excluded subsystem still exists.
+
+  - id: security-manager
+    title: SecurityManager use (deprecated for removal, disabled by default since Java 18)
+    category: D
+    severity: WARNING
+    detect:
+      type: fileContains
+      include: ["**/*.java"]
+      pattern: "System\\.(get|set)SecurityManager|AccessController\\.doPrivileged"
+    fix:
+      strategy: manual
+      hint: Behaviour that relied on a SecurityManager must be enforced another way.
