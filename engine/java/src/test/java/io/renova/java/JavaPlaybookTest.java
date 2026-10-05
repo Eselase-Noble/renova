@@ -106,5 +106,9 @@ class JavaPlaybookTest {
                     assertThat(r.editable()).isFalse();
                 });
         assertThat(plugin.relatedFiles(analysis.project(), "pom.xml")).isEmpty();
+        assertThat(plugin.relatedFiles(analysis.project(), "src/main/webapp/WEB-INF/jboss-deployment-structure.xml"))
+                .extracting(r -> r.path()).containsExactly("src/main/webapp/WEB-INF/web.xml", "pom.xml");
+        assertThat(plugin.relatedFiles(analysis.project(), "src/main/webapp/WEB-INF/web.xml"))
+                .extracting(r -> r.path()).containsExactly("pom.xml");
     }
 }

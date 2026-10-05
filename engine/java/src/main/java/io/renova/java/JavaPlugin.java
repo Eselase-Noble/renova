@@ -134,7 +134,8 @@ public final class JavaPlugin implements EcosystemPlugin {
      * A source file's related file is the build file of the module that owns it (editable, so a
      * missing dependency can be added in the same edit). A module's build file is related to its
      * parent's build file (editable: versions are often managed there). A variant such as
-     * pom.jboss.xml gets the module's pom.xml as a read-only reference to align with.
+     * pom.jboss.xml gets the module's pom.xml as a read-only reference to align with. Files under
+     * WEB-INF also get the module's web.xml (editable), where container settings live.
      */
     @Override
     public List<RelatedFile> relatedFiles(ProjectModel model, String file) {
@@ -155,7 +156,15 @@ public final class JavaPlugin implements EcosystemPlugin {
             return List.of(new RelatedFile(owner.buildFile(), false,
                     "main build file of module " + owner.name() + ", already migrated; align the variant with it"));
         }
-        return List.of(new RelatedFile(owner.buildFile(), true, "build file of module " + owner.name()));
+        RelatedFile buildFile = new RelatedFile(owner.buildFile(), true, "build file of module " + owner.name());
+        int webInf = file.indexOf("/WEB-INF/");
+        String webXml = webInf < 0 ? null : file.substring(0, webInf) + "/WEB-INF/web.xml";
+        if (webXml != null && !webXml.equals(file)) {
+            // Container settings referenced from Spring or other WEB-INF descriptors often move to
+            // web.xml (for example multipart limits), so offer it alongside the build file.
+            return List.of(new RelatedFile(webXml, true, "web application descriptor of module " + owner.name()), buildFile);
+        }
+        return List.of(buildFile);
     }
 
     /** The module with the longest path containing {@code file}; with {@code strict}, excluding a module at exactly that path. */
