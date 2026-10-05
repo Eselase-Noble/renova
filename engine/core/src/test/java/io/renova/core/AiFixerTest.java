@@ -134,4 +134,30 @@ class AiFixerTest {
         assertThat(Files.readString(root.resolve("variant.txt"))).contains("lib");
         assertThat(Files.readString(root.resolve("build.txt"))).isEqualTo("deps:\n");
     }
+
+    @Test
+    void keepsRepairingWhenTheSameBuildFileNeedsAnotherEditNextRound(@TempDir Path tmp) throws Exception {
+        // Round 1 fixes the build settings, round 2 adds the dependency: both edit build.txt.
+        ScriptedAi ai = new ScriptedAi(request -> {
+            String build = request.files().stream().filter(f -> f.path().equals("build.txt"))
+                    .findFirst().orElseThrow().content();
+            return Map.of("build.txt", build.contains("target") ? build + "  lib\n" : build + "  target\n");
+        });
+        MigrationContext ctx = context(tmp, ai);
+        Path root = ctx.workspace().root();
+        Verifier build = c -> {
+            String b = Files.readString(root.resolve("build.txt"));
+            if (!b.contains("target")) {
+                return new VerifyResult(false, List.of(new BuildError("build.txt", 0, "target missing")), "");
+            }
+            return b.contains("lib") ? new VerifyResult(true, List.of(), "")
+                    : new VerifyResult(false, List.of(new BuildError("src/A.java", 1, "package lib does not exist")), "");
+        };
+        List<String> log = new ArrayList<>();
+        VerifyResult result = new AiFixer().repair(ctx, build, build.verify(ctx), 3, log);
+
+        assertThat(result.success()).isTrue();
+        assertThat(ai.requests).hasSize(2);
+        assertThat(log).contains("round 1: edited build.txt; build still fails", "round 2: edited build.txt; build passes");
+    }
 }

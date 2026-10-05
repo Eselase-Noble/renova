@@ -78,14 +78,14 @@ public final class AiFixer implements Fixer {
                 log.add("round " + round + ": build failed without file-level errors; stopping");
                 break;
             }
-            Set<String> changedBefore = new LinkedHashSet<>(tally.filesChanged);
+            tally.writtenThisRound.clear();
             for (Group group : groups) {
                 send(context, group.targets, List.of(), group.errors, tally);
             }
             log.addAll(tally.log);
             tally.log.clear();
-            Set<String> changedThisRound = new LinkedHashSet<>(tally.filesChanged);
-            changedThisRound.removeAll(changedBefore);
+            // Counted per round: the same file (often the build file) may need edits in several rounds.
+            Set<String> changedThisRound = new LinkedHashSet<>(tally.writtenThisRound);
             if (changedThisRound.isEmpty()) {
                 log.add("round " + round + ": no edits proposed; stopping");
                 break;
@@ -200,6 +200,7 @@ public final class AiFixer implements Fixer {
                 Files.writeString(target, edit.getValue(), StandardCharsets.UTF_8);
                 written.add(path);
                 tally.filesChanged.add(path);
+                tally.writtenThisRound.add(path);
             }
         }
         if (written.isEmpty()) {
@@ -249,6 +250,7 @@ public final class AiFixer implements Fixer {
         int requestsChanged;
         int requestsUnchanged;
         final Set<String> filesChanged = new LinkedHashSet<>();
+        final List<String> writtenThisRound = new ArrayList<>();
         long inputTokens;
         long outputTokens;
         final List<String> log = new ArrayList<>();
