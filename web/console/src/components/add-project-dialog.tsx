@@ -40,8 +40,8 @@ export function AddProjectDialog({ open, onOpenChange }: { open: boolean; onOpen
           <DialogHeader>
             <DialogTitle>Add a project</DialogTitle>
             <DialogDescription>
-              A directory on the Renova server that holds the project. Renova reads it and migrates a copy; the
-              original is never changed.
+              A directory on the Renova server that holds the project, under the folders the server allows. Renova
+              reads it and migrates a copy; the original is never changed.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">

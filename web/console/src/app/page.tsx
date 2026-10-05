@@ -9,9 +9,11 @@ import { Empty, ErrorState, LoadingRows, PageHeader, Stat } from "@/components/p
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { tokens } from "@/lib/format";
 
 export default function Dashboard() {
+  const auth = useAuth();
   const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects });
   const migrations = useQuery({
     queryKey: ["migrations"],
@@ -32,11 +34,13 @@ export default function Dashboard() {
     <>
       <PageHeader
         title="Dashboard"
-        description="Legacy projects, their assessments and migrations."
+        description={`Legacy projects, their assessments and migrations in ${auth.data?.organisation?.name ?? "your organisation"}.`}
         actions={
-          <Link href="/projects?add=1" className={buttonVariants()}>
-            <Plus /> Add project
-          </Link>
+          auth.can("ADMIN") && (
+            <Link href="/projects?add=1" className={buttonVariants()}>
+              <Plus /> Add project
+            </Link>
+          )
         }
       />
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">

@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { ago } from "@/lib/format";
 
 export default function ProjectsPage() {
@@ -25,7 +26,9 @@ export default function ProjectsPage() {
 
 function Projects() {
   const router = useRouter();
-  const adding = useSearchParams().get("add") === "1";
+  const canAdd = useAuth().can("ADMIN");
+  const addRequested = useSearchParams().get("add") === "1";
+  const adding = canAdd && addRequested;
   const setAdding = (open: boolean) => router.replace(open ? "/projects?add=1" : "/projects");
   const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects });
   const migrations = useQuery({ queryKey: ["migrations"], queryFn: api.migrations });
@@ -36,9 +39,11 @@ function Projects() {
         title="Projects"
         description="Legacy projects Renova can assess and migrate."
         actions={
-          <Button onClick={() => setAdding(true)}>
-            <Plus /> Add project
-          </Button>
+          canAdd && (
+            <Button onClick={() => setAdding(true)}>
+              <Plus /> Add project
+            </Button>
+          )
         }
       />
       {projects.error ? (
@@ -46,7 +51,9 @@ function Projects() {
       ) : projects.isPending ? (
         <LoadingRows />
       ) : projects.data.length === 0 ? (
-        <Empty title="No projects yet">Add the directory of a legacy project to see its assessment.</Empty>
+        <Empty title="No projects yet">
+          {canAdd ? "Add the directory of a legacy project to see its assessment." : "An admin of your organisation can add projects."}
+        </Empty>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {projects.data.map((p) => {

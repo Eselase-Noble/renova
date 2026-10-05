@@ -1,12 +1,7 @@
 import type { NextConfig } from "next";
 
-// The console talks to the Renova web API through this rewrite, so the browser only ever sees one origin.
-const apiUrl = process.env.RENOVA_API_URL ?? "http://127.0.0.1:8787";
-
-const nextConfig: NextConfig = {
-  async rewrites() {
-    return [{ source: "/api/:path*", destination: `${apiUrl}/api/:path*` }];
-  },
-};
+// Calls to /api/* are forwarded to the Renova web API by src/app/api/[...path]/route.ts, which reads
+// RENOVA_API_URL when the console runs.
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

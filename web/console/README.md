@@ -1,8 +1,8 @@
 # Renova console
 
 The Renova web console: Next.js 16 (App Router, TypeScript), Tailwind CSS 4, shadcn/ui (Base UI), TanStack Query.
-It calls the Renova web API through a rewrite of `/api/*` (see `next.config.ts`; `RENOVA_API_URL`, default
-`http://127.0.0.1:8787`).
+It forwards `/api/*` to the Renova web API (`src/app/api/[...path]/route.ts`), at `RENOVA_API_URL` (default
+`http://127.0.0.1:8787`), read when the console starts serving, so one build works in every environment.
 
 ```sh
 npm install

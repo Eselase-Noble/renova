@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -25,6 +26,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     queryFn: () => api.projectMigrations(id),
     refetchInterval: (q) => (q.state.data?.some((m) => m.status === "RUNNING" || m.status === "QUEUED") ? 3000 : false),
   });
+  const auth = useAuth();
   const [migrating, setMigrating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const router = useRouter();
@@ -51,12 +53,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         description={<span className="font-mono text-xs">{p.path}</span>}
         actions={
           <>
-            <Button variant="outline" onClick={() => setDeleting(true)} aria-label="Remove project">
-              <Trash2 />
-            </Button>
-            <Button onClick={() => setMigrating(true)}>
-              <Play /> Migrate
-            </Button>
+            {auth.can("ADMIN") && (
+              <Button variant="outline" onClick={() => setDeleting(true)} aria-label="Remove project">
+                <Trash2 />
+              </Button>
+            )}
+            {auth.can("MEMBER") && (
+              <Button onClick={() => setMigrating(true)}>
+                <Play /> Migrate
+              </Button>
+            )}
           </>
         }
       />

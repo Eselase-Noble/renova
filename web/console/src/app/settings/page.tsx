@@ -14,32 +14,42 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { api, type ProviderSettings, type Settings } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 const EFFORTS: Record<string, string> = { default: "Provider default", low: "Low", medium: "Medium", high: "High", xhigh: "Extra high", max: "Max" };
 
 export default function SettingsPage() {
   const settings = useQuery({ queryKey: ["settings"], queryFn: api.settings });
+  const auth = useAuth();
+  const canEdit = auth.can("ADMIN");
   return (
     <>
       <PageHeader
         title="Settings"
-        description="AI runs on your own provider account. Renova never supplies, pools or shares keys."
+        description={`AI for ${auth.data?.organisation?.name ?? "your organisation"} runs on its own provider account. Renova never supplies, pools or shares keys.`}
       />
+      {!canEdit && (
+        <p className="-mt-3 mb-4 text-sm text-muted-foreground">Only admins can change these settings.</p>
+      )}
       {settings.error ? (
         <ErrorState error={settings.error} />
       ) : !settings.data ? (
         <LoadingRows rows={4} />
       ) : (
         <div className="space-y-6">
-          <ProviderForm key={JSON.stringify([settings.data.provider, settings.data.model, settings.data.effort, settings.data.rag])} settings={settings.data} />
+          <ProviderForm
+            key={JSON.stringify([settings.data.provider, settings.data.model, settings.data.effort, settings.data.rag])}
+            settings={settings.data}
+            canEdit={canEdit}
+            canCheck={auth.can("MEMBER")}
+          />
           <div className="grid gap-4 md:grid-cols-2">
             {settings.data.providers.map((p) => (
-              <KeyCard key={p.name} provider={p} />
+              <KeyCard key={`${p.name}-${p.baseUrl}`} provider={p} canEdit={canEdit} />
             ))}
           </div>
           <p className="text-xs text-muted-foreground">
-            Stored in <span className="font-mono">{settings.data.configFile}</span> on the Renova server, readable only by the
-            account it runs as. Environment variables on the server (such as ANTHROPIC_API_KEY) take precedence.
+            Keys are encrypted on the Renova server and only ever shown masked. Each organisation has its own.
           </p>
         </div>
       )}
@@ -47,7 +57,7 @@ export default function SettingsPage() {
   );
 }
 
-function ProviderForm({ settings }: { settings: Settings }) {
+function ProviderForm({ settings, canEdit, canCheck }: { settings: Settings; canEdit: boolean; canCheck: boolean }) {
   const [provider, setProvider] = useState(settings.provider);
   const [model, setModel] = useState(settings.model ?? "");
   const [effort, setEffort] = useState(settings.effort ?? "default");
@@ -86,7 +96,7 @@ function ProviderForm({ settings }: { settings: Settings }) {
       <CardContent className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label>Provider</Label>
-          <Select value={provider} onValueChange={(v) => v && setProvider(v)} items={providers}>
+          <Select value={provider} onValueChange={(v) => v && setProvider(v)} items={providers} disabled={!canEdit}>
             <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
@@ -106,13 +116,13 @@ function ProviderForm({ settings }: { settings: Settings }) {
             value={model}
             onChange={(e) => setModel(e.target.value)}
             placeholder={defaultModel ? `Default: ${defaultModel}` : "Provider default"}
-            disabled={provider === "none"}
+            disabled={provider === "none" || !canEdit}
             className="font-mono"
           />
         </div>
         <div className="space-y-2">
           <Label>Effort</Label>
-          <Select value={effort} onValueChange={(v) => v && setEffort(v)} items={EFFORTS} disabled={provider === "none"}>
+          <Select value={effort} onValueChange={(v) => v && setEffort(v)} items={EFFORTS} disabled={provider === "none" || !canEdit}>
             <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
@@ -130,14 +140,14 @@ function ProviderForm({ settings }: { settings: Settings }) {
             <Label htmlFor="rag">Retrieve context (RAG)</Label>
             <p className="text-xs text-muted-foreground">Related code, tests and migration notes in each request. No extra key.</p>
           </div>
-          <Switch id="rag" checked={rag} onCheckedChange={(c) => setRag(c)} />
+          <Switch id="rag" checked={rag} onCheckedChange={(c) => setRag(c)} disabled={!canEdit} />
         </div>
       </CardContent>
       <CardFooter className="gap-2">
-        <Button onClick={() => save.mutate()} disabled={save.isPending}>
+        <Button onClick={() => save.mutate()} disabled={save.isPending || !canEdit}>
           Save
         </Button>
-        <Button variant="outline" onClick={() => check.mutate()} disabled={check.isPending || settings.provider === "none"}>
+        <Button variant="outline" onClick={() => check.mutate()} disabled={check.isPending || settings.provider === "none" || !canCheck}>
           <ShieldCheck /> {check.isPending ? "Checking…" : "Check key and model"}
         </Button>
       </CardFooter>
@@ -145,8 +155,9 @@ function ProviderForm({ settings }: { settings: Settings }) {
   );
 }
 
-function KeyCard({ provider }: { provider: ProviderSettings }) {
+function KeyCard({ provider, canEdit }: { provider: ProviderSettings; canEdit: boolean }) {
   const [key, setKey] = useState("");
+  const [baseUrl, setBaseUrl] = useState(provider.baseUrl ?? "");
   const queryClient = useQueryClient();
   const save = useMutation({
     mutationFn: () => api.setKey(provider.name, key),
@@ -165,7 +176,14 @@ function KeyCard({ provider }: { provider: ProviderSettings }) {
     },
     onError: (e) => toast.error(e.message),
   });
-  const fromConfig = provider.keySource?.startsWith("user config");
+  const saveUrl = useMutation({
+    mutationFn: () => api.updateSettings({ [`${provider.name}.baseUrl`]: baseUrl }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["settings"], data);
+      toast.success("Endpoint saved");
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   return (
     <Card>
@@ -179,21 +197,14 @@ function KeyCard({ provider }: { provider: ProviderSettings }) {
             <>
               <ToneBadge tone="good">Key set</ToneBadge>
               <span className="font-mono">{provider.key}</span>
-              <span>from {fromConfig ? "Renova settings" : provider.keySource}</span>
             </>
           ) : (
             <ToneBadge tone="muted">No key</ToneBadge>
           )}
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            save.mutate();
-          }}
-        >
+      <CardContent className="space-y-3">
+        <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); save.mutate(); }}>
           <Input
             type="password"
             autoComplete="off"
@@ -201,15 +212,29 @@ function KeyCard({ provider }: { provider: ProviderSettings }) {
             value={key}
             onChange={(e) => setKey(e.target.value)}
             aria-label={`${provider.displayName} API key`}
+            disabled={!canEdit}
           />
-          <Button type="submit" variant="secondary" disabled={!key || save.isPending}>
+          <Button type="submit" variant="secondary" disabled={!key || save.isPending || !canEdit}>
             Save
           </Button>
-          {provider.keyConfigured && fromConfig && (
+          {provider.keyConfigured && canEdit && (
             <Button type="button" variant="ghost" onClick={() => remove.mutate()} disabled={remove.isPending}>
               Remove
             </Button>
           )}
+        </form>
+        <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); saveUrl.mutate(); }}>
+          <Input
+            placeholder="Endpoint (optional), e.g. an on-premises server"
+            value={baseUrl}
+            onChange={(e) => setBaseUrl(e.target.value)}
+            className="font-mono text-xs"
+            aria-label={`${provider.displayName} endpoint`}
+            disabled={!canEdit}
+          />
+          <Button type="submit" variant="ghost" disabled={saveUrl.isPending || !canEdit || baseUrl === (provider.baseUrl ?? "")}>
+            Save
+          </Button>
         </form>
       </CardContent>
     </Card>

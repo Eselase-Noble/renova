@@ -5,7 +5,13 @@ package io.renova.web.store;
  *
  * @param path      directory on the server that holds the project; never modified
  * @param playbook  the playbook used by default (detected when the project is added)
- * @param createdAt ISO-8601 instant
+ * @param createdAt      ISO-8601 instant
+ * @param organisationId the organisation it belongs to
  */
-public record Project(String id, String name, String path, String ecosystem, String playbook, String createdAt) {
+public record Project(String id, String name, String path, String ecosystem, String playbook, String createdAt,
+                      String organisationId) {
+
+    public Project withOrganisation(String id) {
+        return new Project(this.id, name, path, ecosystem, playbook, createdAt, id);
+    }
 }

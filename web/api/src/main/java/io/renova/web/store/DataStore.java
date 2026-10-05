@@ -69,6 +69,18 @@ public class DataStore {
         return removed;
     }
 
+    /** Gives projects and migrations from before accounts existed to the first organisation. */
+    public synchronized void adoptUnowned(String organisationId) {
+        List<Project> projects = projects().stream()
+                .map(p -> p.organisationId() == null ? p.withOrganisation(organisationId) : p).toList();
+        write(dataDir.resolve("projects.json"), projects);
+        for (MigrationRecord m : migrations()) {
+            if (m.organisationId() == null) {
+                saveMigration(m.withOrganisation(organisationId));
+            }
+        }
+    }
+
     public synchronized List<MigrationRecord> migrations() {
         try (Stream<Path> files = Files.list(dataDir.resolve("migrations"))) {
             List<MigrationRecord> all = new ArrayList<>();

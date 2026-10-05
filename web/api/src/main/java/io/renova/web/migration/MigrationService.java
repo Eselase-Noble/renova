@@ -74,16 +74,18 @@ public class MigrationService {
         return JsonReport.render(analysis, new Planner().plan(analysis), null);
     }
 
-    public MigrationRecord start(Project project, String playbookRef, MigrationRecord.Options options) throws Exception {
-        if (options.ai() && ai.aiSettings().equals(AiSettings.NONE)) {
-            throw new IllegalArgumentException("No AI provider is configured. Choose one and add your key in Settings, "
-                    + "or start the migration without AI.");
+    public MigrationRecord start(Project project, String playbookRef, MigrationRecord.Options options, String userId)
+            throws Exception {
+        if (options.ai() && ai.aiSettings(project.organisationId()).equals(AiSettings.NONE)) {
+            throw new IllegalArgumentException("No AI provider is configured for this organisation. An admin can choose one "
+                    + "and add your organisation's key in Settings, or start the migration without AI.");
         }
         Playbook playbook = playbook(project, playbookRef);
         String id = LocalDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + "-"
                 + UUID.randomUUID().toString().substring(0, 6);
         MigrationRecord record = new MigrationRecord(id, project.id(), project.name(), playbook.id(), options,
-                MigrationRecord.Status.QUEUED, now(), null, null, store.workspaceFor(id).toString(), null, null);
+                MigrationRecord.Status.QUEUED, now(), null, null, store.workspaceFor(id).toString(), null, null,
+                project.organisationId(), userId);
         store.saveMigration(record);
         store.appendProgress(id, "Queued");
         executor.submit(() -> run(record, project, playbook));
@@ -103,8 +105,9 @@ public class MigrationService {
             if (o.verifyBehaviour()) {
                 tools.put(Migrator.VERIFY_BEHAVIOUR, "true");
             }
-            RagSettings rag = o.rag() ? new RagSettings(true, ai.ragSettings().budget()) : RagSettings.OFF;
-            MigrationOptions options = new MigrationOptions(Path.of(queued.workspace()), o.ai() ? ai.aiSettings() : AiSettings.NONE,
+            String org = project.organisationId();
+            RagSettings rag = o.rag() ? new RagSettings(true, ai.ragSettings(org).budget()) : RagSettings.OFF;
+            MigrationOptions options = new MigrationOptions(Path.of(queued.workspace()), o.ai() ? ai.aiSettings(org) : AiSettings.NONE,
                     o.maxAiIterations(), true, tools, List.of(), rag);
 
             AnalysisResult analysis = new Analyzer(registry).analyze(Path.of(project.path()), playbook);

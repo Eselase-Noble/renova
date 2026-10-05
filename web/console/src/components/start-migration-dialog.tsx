@@ -71,8 +71,9 @@ export function StartMigrationDialog({
                 <>For judgement calls and build repair, with {settings.data?.provider} on your own key.</>
               ) : (
                 <>
-                  No AI provider with a key is set up. <Link className="underline" href="/settings">Add your key</Link>, or
-                  migrate without AI: those steps are then listed for a person.
+                  Your organisation has no AI provider with a key yet. An admin can{" "}
+                  <Link className="underline" href="/settings">add one in Settings</Link>, or migrate without AI: those
+                  steps are then listed for a person.
                 </>
               )
             }

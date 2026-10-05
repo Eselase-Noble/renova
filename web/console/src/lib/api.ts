@@ -164,7 +164,7 @@ export interface ProviderSettings {
   defaultModel: string;
   keyConfigured: boolean;
   key: string | null;
-  keySource: string | null;
+  baseUrl: string | null;
 }
 
 export interface Settings {
@@ -173,7 +173,62 @@ export interface Settings {
   effort: string | null;
   rag: boolean;
   providers: ProviderSettings[];
-  configFile: string;
+}
+
+export type Role = "VIEWER" | "MEMBER" | "ADMIN" | "OWNER";
+const RANK: Record<Role, number> = { VIEWER: 0, MEMBER: 1, ADMIN: 2, OWNER: 3 };
+export const atLeast = (role: Role | undefined, needed: Role) => !!role && RANK[role] >= RANK[needed];
+
+export interface UserView {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export interface Membership {
+  id: string;
+  name: string;
+  role: Role;
+}
+
+export interface AuthState {
+  setupRequired: boolean;
+  user: UserView | null;
+  organisation: Membership | null;
+  organisations: Membership[];
+}
+
+export interface Member {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  joinedAt: string;
+}
+
+export interface OrganisationView {
+  id: string;
+  name: string;
+  yourRole: Role;
+  members: Member[];
+}
+
+export interface Invitation {
+  id: string;
+  email: string;
+  role: Role;
+  createdAt: string;
+  expiresAt: string;
+  /** Only when just created. */
+  token: string | null;
+}
+
+export interface InvitationDetails {
+  organisation: string;
+  email: string;
+  role: Role;
+  accountExists: boolean;
+  expiresAt: string;
 }
 
 export class ApiError extends Error {
@@ -185,12 +240,29 @@ export class ApiError extends Error {
   }
 }
 
+/** The CSRF token the API sets as a cookie; it must come back in a header on every change. */
+function csrfToken(): string | undefined {
+  return document.cookie
+    .split("; ")
+    .find((c) => c.startsWith("XSRF-TOKEN="))
+    ?.slice("XSRF-TOKEN=".length);
+}
+
 async function request<T>(path: string, init?: RequestInit, as: "json" | "text" = "json"): Promise<T> {
-  const response = await fetch(`/api${path}`, {
-    ...init,
-    headers: init?.body ? { "Content-Type": "application/json", ...init.headers } : init?.headers,
-    cache: "no-store",
-  });
+  const method = (init?.method ?? "GET").toUpperCase();
+  const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) };
+  if (init?.body) headers["Content-Type"] = "application/json";
+  if (method !== "GET" && method !== "HEAD") {
+    if (!csrfToken()) await fetch("/api/auth/state", { cache: "no-store" }); // obtains the cookie
+    const token = csrfToken();
+    if (token) headers["X-XSRF-TOKEN"] = decodeURIComponent(token);
+  }
+  const response = await fetch(`/api${path}`, { ...init, headers, cache: "no-store" });
+  if (response.status === 401 && typeof window !== "undefined" && !path.startsWith("/auth/")) {
+    // The session ended: a full page load to the sign-in page also drops every cached response.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+  }
   if (!response.ok) {
     let message = `${response.status} ${response.statusText}`;
     try {
@@ -208,6 +280,33 @@ async function request<T>(path: string, init?: RequestInit, as: "json" | "text" 
 }
 
 export const api = {
+  authState: () => request<AuthState>("/auth/state"),
+  setup: (body: { organisation: string; name: string; email: string; password: string }) =>
+    request<AuthState>("/auth/setup", { method: "POST", body: JSON.stringify(body) }),
+  login: (email: string, password: string) =>
+    request<AuthState>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+  logout: () => request<void>("/auth/logout", { method: "POST" }),
+  switchOrganisation: (organisationId: string) =>
+    request<AuthState>("/auth/organisation", { method: "POST", body: JSON.stringify({ organisationId }) }),
+  changePassword: (current: string, replacement: string) =>
+    request<void>("/auth/password", { method: "POST", body: JSON.stringify({ current, replacement }) }),
+  invitationDetails: (token: string) => request<InvitationDetails>(`/auth/invitations/${encodeURIComponent(token)}`),
+  acceptInvitation: (token: string, name: string, password: string) =>
+    request<AuthState>(`/auth/invitations/${encodeURIComponent(token)}/accept`, {
+      method: "POST",
+      body: JSON.stringify({ name, password }),
+    }),
+
+  organisation: () => request<OrganisationView>("/org"),
+  createOrganisation: (name: string) => request<OrganisationView>("/orgs", { method: "POST", body: JSON.stringify({ name }) }),
+  changeRole: (userId: string, role: Role) =>
+    request<OrganisationView>(`/org/members/${userId}`, { method: "PATCH", body: JSON.stringify({ role }) }),
+  removeMember: (userId: string) => request<OrganisationView | null>(`/org/members/${userId}`, { method: "DELETE" }),
+  invitations: () => request<Invitation[]>("/org/invitations"),
+  invite: (email: string, role: Role) =>
+    request<Invitation>("/org/invitations", { method: "POST", body: JSON.stringify({ email, role }) }),
+  revokeInvitation: (id: string) => request<void>(`/org/invitations/${id}`, { method: "DELETE" }),
+
   projects: () => request<Project[]>("/projects"),
   project: (id: string) => request<Project>(`/projects/${id}`),
   addProject: (body: { name?: string; path: string }) =>
