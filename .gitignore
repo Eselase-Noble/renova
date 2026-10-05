@@ -1,0 +1,23 @@
+# Build output
+target/
+build/
+dist/
+out/
+
+# Dependencies
+node_modules/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+.DS_Store
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Renova workspace metadata
+.renova/
