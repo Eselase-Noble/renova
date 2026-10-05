@@ -20,6 +20,9 @@ public final class MavenVerifier implements Verifier {
     private static final Pattern COMPILER_ERROR = Pattern.compile("^\\[ERROR\\] (.+?\\.(?:java|kt|groovy)):\\[(\\d+)(?:,\\d+)?\\] (.*)$");
     /** Plugin failures (bad build configuration, missing dependency): attributed to the build file. */
     private static final Pattern GOAL_FAILURE = Pattern.compile("^\\[ERROR\\] Failed to execute goal .*? on project [^:]+: (.*?)(?: -> \\[Help \\d+])?$");
+    /** Project-model errors: "The project g:a:v (/path/pom.xml) has 1 error", then the errors with "@ line N". */
+    private static final Pattern MODEL_PROJECT = Pattern.compile("^\\[ERROR\\]\\s+The project \\S+ \\((.+?pom[^)]*\\.xml)\\) has \\d+ errors?");
+    private static final Pattern MODEL_ERROR = Pattern.compile("^\\[ERROR\\]\\s+(.+?) @ (?:.*?, )?line (\\d+), column \\d+");
     private static final Duration TIMEOUT = Duration.ofMinutes(60);
 
     @Override
@@ -45,7 +48,21 @@ public final class MavenVerifier implements Verifier {
 
     static List<BuildError> parse(String output, Path workspace, Path buildRoot) {
         List<BuildError> errors = new ArrayList<>();
+        String modelPom = null;
         for (String line : output.lines().toList()) {
+            Matcher project = MODEL_PROJECT.matcher(line);
+            if (project.find()) {
+                modelPom = relative(Path.of(project.group(1)), workspace);
+                continue;
+            }
+            Matcher model = MODEL_ERROR.matcher(line);
+            if (modelPom != null && model.find()) {
+                BuildError error = new BuildError(modelPom, Integer.parseInt(model.group(2)), model.group(1).strip());
+                if (!errors.contains(error)) {
+                    errors.add(error);
+                }
+                continue;
+            }
             Matcher goal = GOAL_FAILURE.matcher(line);
             if (goal.matches()) {
                 // Compilation failures repeat the per-file errors already collected; keep the rest.
@@ -57,15 +74,18 @@ public final class MavenVerifier implements Verifier {
             }
             Matcher m = COMPILER_ERROR.matcher(line);
             if (m.matches()) {
-                Path file = Path.of(m.group(1));
-                String relative = file.isAbsolute() && file.startsWith(workspace)
-                        ? workspace.relativize(file).toString().replace('\\', '/') : m.group(1);
-                BuildError error = new BuildError(relative, Integer.parseInt(m.group(2)), m.group(3).strip());
+                BuildError error = new BuildError(relative(Path.of(m.group(1)), workspace), Integer.parseInt(m.group(2)),
+                        m.group(3).strip());
                 if (!errors.contains(error)) {
                     errors.add(error);
                 }
             }
         }
         return errors;
+    }
+
+    private static String relative(Path file, Path workspace) {
+        return file.isAbsolute() && file.startsWith(workspace)
+                ? workspace.relativize(file).toString().replace('\\', '/') : file.toString().replace('\\', '/');
     }
 }

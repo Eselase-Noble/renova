@@ -132,20 +132,21 @@ public final class JavaPlugin implements EcosystemPlugin {
 
     /**
      * A source file's related file is the build file of the module that owns it (editable, so a
-     * missing dependency can be added in the same edit). A variant such as pom.jboss.xml gets the
-     * module's pom.xml as a read-only reference to align with.
+     * missing dependency can be added in the same edit). A module's build file is related to its
+     * parent's build file (editable: versions are often managed there). A variant such as
+     * pom.jboss.xml gets the module's pom.xml as a read-only reference to align with.
      */
     @Override
     public List<RelatedFile> relatedFiles(ProjectModel model, String file) {
-        Module owner = null;
-        for (Module m : model.modules()) {
-            boolean contains = m.path().equals(".") || file.startsWith(m.path() + "/");
-            if (contains && (owner == null || m.path().length() > owner.path().length())) {
-                owner = m;
-            }
-        }
-        if (owner == null || owner.buildFile().equals(file)) {
+        Module owner = owner(model, file, false);
+        if (owner == null) {
             return List.of();
+        }
+        if (owner.buildFile().equals(file)) {
+            Module parent = owner.path().equals(".") ? null : owner(model, owner.path(), true);
+            return parent == null || !"maven".equals(parent.fact("buildTool")) ? List.of()
+                    : List.of(new RelatedFile(parent.buildFile(), true,
+                            "parent build file of module " + owner.name() + " (dependency and plugin versions may be managed here)"));
         }
         String dir = owner.path().equals(".") ? "" : owner.path() + "/";
         String name = file.substring(file.lastIndexOf('/') + 1);
@@ -155,6 +156,19 @@ public final class JavaPlugin implements EcosystemPlugin {
                     "main build file of module " + owner.name() + ", already migrated; align the variant with it"));
         }
         return List.of(new RelatedFile(owner.buildFile(), true, "build file of module " + owner.name()));
+    }
+
+    /** The module with the longest path containing {@code file}; with {@code strict}, excluding a module at exactly that path. */
+    private static Module owner(ProjectModel model, String file, boolean strict) {
+        Module owner = null;
+        for (Module m : model.modules()) {
+            boolean contains = m.path().equals(".") ? !(strict && file.equals("."))
+                    : file.startsWith(m.path() + "/") || (!strict && file.equals(m.path()));
+            if (contains && (owner == null || m.path().length() > owner.path().length())) {
+                owner = m;
+            }
+        }
+        return owner;
     }
 
     @Override

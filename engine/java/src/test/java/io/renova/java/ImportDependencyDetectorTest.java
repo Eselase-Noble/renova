@@ -106,4 +106,21 @@ class ImportDependencyDetectorTest {
             assertThat(f.data().get("artifactId")).isEqualTo("jakarta.servlet-api");
         });
     }
+
+    @Test
+    void moduleBuildFilesRelateToTheirParentBuildFile(@TempDir Path root) throws Exception {
+        Files.writeString(root.resolve("pom.xml"), pom("parent", "<packaging>pom</packaging><modules><module>web</module></modules>", ""));
+        Path web = Files.createDirectories(root.resolve("web"));
+        Files.writeString(web.resolve("pom.xml"), pom("web", "", ""));
+        JavaPlugin plugin = new JavaPlugin();
+        var model = plugin.model(root);
+
+        assertThat(plugin.relatedFiles(model, "web/pom.xml")).singleElement().satisfies(r -> {
+            assertThat(r.path()).isEqualTo("pom.xml");
+            assertThat(r.editable()).isTrue();
+        });
+        assertThat(plugin.relatedFiles(model, "web/src/main/java/x/A.java")).singleElement()
+                .satisfies(r -> assertThat(r.path()).isEqualTo("web/pom.xml"));
+        assertThat(plugin.relatedFiles(model, "pom.xml")).isEmpty();
+    }
 }

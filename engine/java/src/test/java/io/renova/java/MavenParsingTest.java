@@ -61,4 +61,19 @@ class MavenParsingTest {
         assertThat(MavenVerifierAccess.parse(output, ws, ws.resolve("app"))).containsExactly(new BuildError(
                 "app/pom.xml", 0, "Fatal error compiling: warning: source release 21 requires target release 21"));
     }
+
+    @Test
+    void attributesProjectModelErrorsToTheModulePomAndLine() {
+        Path ws = Path.of("/work/ws");
+        String output = """
+                [ERROR] [ERROR] Some problems were encountered while processing the POMs:
+                [ERROR] 'dependencies.dependency.version' for org.example:lib:jar is missing. @ line 39, column 21
+                [ERROR] The build could not read 1 project -> [Help 1]
+                [ERROR]  \s
+                [ERROR]   The project g:web:1.0 (/work/ws/web/pom.xml) has 1 error
+                [ERROR]     'dependencies.dependency.version' for org.example:lib:jar is missing. @ line 39, column 21
+                """;
+        assertThat(MavenVerifierAccess.parse(output, ws, ws)).containsExactly(new BuildError("web/pom.xml", 39,
+                "'dependencies.dependency.version' for org.example:lib:jar is missing."));
+    }
 }
