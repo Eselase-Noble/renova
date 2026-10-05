@@ -22,8 +22,10 @@ java -jar desktop/target/renova-desktop-0.1.0-SNAPSHOT.jar            # or: mvn 
 java -jar desktop/target/renova-desktop-0.1.0-SNAPSHOT.jar --open=/path/to/project
 ```
 
-Development aids: `--snapshot-dir=DIR` saves a PNG of each screen shortly after it appears, and `--migrate` (with
-`--open`) starts a migration with the default options and no AI once the project is assessed.
+Options: `--open=DIR` opens a project, `--show=settings` opens Settings, `--theme=light|dark` picks the theme (and
+remembers it). Development aids for checking screens: `--snapshot-dir=DIR` saves a PNG of each screen shortly after it
+appears, `--migrate` (with `--open`) starts a migration with the default options and no AI, and `--tab=NAME` opens that
+tab of the finished migration.
 
 ## Package
 

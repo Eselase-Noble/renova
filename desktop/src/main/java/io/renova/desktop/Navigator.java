@@ -23,6 +23,9 @@ public interface Navigator {
 
     void snapshot(String name, double delaySeconds);
 
+    /** The tab a finished migration opens on (--tab), or null for the first. */
+    String startTab();
+
     /** Whether to start a migration (default options, no AI) as soon as a project is assessed: --migrate. */
     boolean autoMigrate();
 }

@@ -63,8 +63,9 @@
     -fx-font-size: 0.9em;
 }
 
-.diff .list-cell {
+.diff .list-cell, .log .list-cell {
     -fx-padding: 0 8 0 8;
+    -fx-font-family: "JetBrains Mono", "DejaVu Sans Mono", "Monospaced";
 }
 
 .diff .list-cell.added { -fx-background-color: -color-success-subtle; -fx-text-fill: -color-success-fg; }

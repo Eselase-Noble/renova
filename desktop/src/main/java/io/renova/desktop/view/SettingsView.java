@@ -45,12 +45,18 @@ public final class SettingsView {
         provider.getItems().setAll(names);
         provider.setValue(view.provider());
         provider.setMaxWidth(Double.MAX_VALUE);
+        java.util.Map<String, String> labels = new java.util.HashMap<>();
+        labels.put(NoAiProvider.NAME, "No AI (AI steps are listed for a person)");
+        view.providers().forEach(p -> labels.put(p.name(), p.displayName()));
+        provider.setConverter(converter(labels));
         TextField model = new TextField(view.model() == null ? "" : view.model());
         model.setPromptText("Provider default");
         ComboBox<String> effort = new ComboBox<>();
         effort.getItems().setAll(EFFORTS);
         effort.setValue(view.effort() == null ? "" : view.effort());
         effort.setMaxWidth(Double.MAX_VALUE);
+        effort.setConverter(converter(java.util.Map.of("", "Provider default", "low", "Low", "medium", "Medium",
+                "high", "High", "xhigh", "Extra high", "max", "Max")));
         CheckBox rag = new CheckBox("Retrieve context (RAG): related code, tests and migration notes in each request");
         rag.setSelected(view.rag());
 
@@ -85,6 +91,21 @@ public final class SettingsView {
                 Ui.section("AI provider", "Used for judgement calls, build repair and behaviour repair.", form),
                 Ui.section("API keys", "Saved in " + view.configFile() + ", readable only by you. "
                         + "Environment variables such as ANTHROPIC_API_KEY take precedence.", keys));
+    }
+
+    private static javafx.util.StringConverter<String> converter(java.util.Map<String, String> labels) {
+        return new javafx.util.StringConverter<>() {
+            @Override
+            public String toString(String value) {
+                return value == null ? "" : labels.getOrDefault(value, value);
+            }
+
+            @Override
+            public String fromString(String label) {
+                return labels.entrySet().stream().filter(e -> e.getValue().equals(label)).map(java.util.Map.Entry::getKey)
+                        .findFirst().orElse(label);
+            }
+        };
     }
 
     private Node keyRow(AiPreferences.Provider p) {

@@ -42,9 +42,10 @@ import java.util.prefs.Preferences;
  * The Renova desktop app: assess and migrate legacy projects on this machine. Everything runs in this process;
  * only AI requests leave the machine, on the user's own key.
  *
- * <p>Options: {@code --open=DIR} opens a project at start. Development aids: {@code --snapshot-dir=DIR} saves a
- * PNG of each screen shortly after it is shown; {@code --migrate} (with {@code --open}) starts a migration with the
- * default options and no AI once the project is assessed.
+ * <p>Options: {@code --open=DIR} opens a project at start; {@code --show=settings} opens Settings;
+ * {@code --theme=light|dark} chooses the theme (and remembers it). Development aids: {@code --snapshot-dir=DIR} saves
+ * a PNG of each screen shortly after it is shown; {@code --migrate} (with {@code --open}) starts a migration with the
+ * default options and no AI once the project is assessed; {@code --tab=NAME} opens that tab of a finished migration.
  */
 public final class RenovaApp extends Application implements Navigator {
 
@@ -65,6 +66,10 @@ public final class RenovaApp extends Application implements Navigator {
         engine = new Engine();
         ai = new AiPreferences(engine.registry());
         recent = new RecentProjects();
+        String theme = getParameters().getNamed().get("theme");
+        if (theme != null) {
+            prefs.putBoolean("dark", theme.equalsIgnoreCase("dark"));
+        }
         applyTheme(prefs.getBoolean("dark", false));
 
         root = new BorderPane();
@@ -82,6 +87,8 @@ public final class RenovaApp extends Application implements Navigator {
         String open = getParameters().getNamed().get("open");
         if (open != null) {
             openProject(Path.of(open));
+        } else if ("settings".equals(getParameters().getNamed().get("show"))) {
+            settings();
         } else {
             home();
         }
@@ -118,6 +125,7 @@ public final class RenovaApp extends Application implements Navigator {
     private Button navButton(String text, javafx.event.EventHandler<javafx.event.ActionEvent> action) {
         Button b = new Button(text);
         b.getStyleClass().add("nav-button");
+        b.setWrapText(true);
         b.setOnAction(action);
         return b;
     }
@@ -125,8 +133,8 @@ public final class RenovaApp extends Application implements Navigator {
     private void refreshRuns() {
         runList.getChildren().clear();
         for (MigrationRun run : runs) {
-            Button b = navButton(run.projectName() + "  ·  " + stateText(run.state().get()), e -> showRun(run));
-            run.state().addListener((obs, old, now) -> b.setText(run.projectName() + "  ·  " + stateText(now)));
+            Button b = navButton(run.projectName() + "\n" + stateText(run.state().get()), e -> showRun(run));
+            run.state().addListener((obs, old, now) -> b.setText(run.projectName() + "\n" + stateText(now)));
             runList.getChildren().add(b);
         }
     }
@@ -220,6 +228,11 @@ public final class RenovaApp extends Application implements Navigator {
             }
         });
         wait.play();
+    }
+
+    @Override
+    public String startTab() {
+        return getParameters().getNamed().get("tab");
     }
 
     @Override

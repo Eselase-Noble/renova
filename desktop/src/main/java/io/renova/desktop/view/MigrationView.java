@@ -91,6 +91,9 @@ public final class MigrationView {
                 tabs.getTabs().add(new Tab("Behaviour", behaviour(o.behaviour())));
             }
             tabs.getTabs().addAll(new Tab("Changes", changes()), logTab);
+            String wanted = nav.startTab();
+            tabs.getTabs().stream().filter(t -> t.getText().equalsIgnoreCase(String.valueOf(wanted))).findFirst()
+                    .ifPresent(t -> tabs.getSelectionModel().select(t));
         }
         page.getChildren().add(tabs);
     }
