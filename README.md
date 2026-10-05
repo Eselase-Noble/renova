@@ -239,7 +239,8 @@ twenty lines and is a good starting point. See [`engine/README.md`](engine/READM
 
 1. **RAG:** phase 1 (structural code retrieval and curated knowledge, no key needed) is in, behind `--rag`.
    Next: lessons from accepted fixes, then optional embeddings on the customer's own key.
-2. **Behavioural verification:** run the original and migrated applications side by side and compare responses and data effects.
+2. **Behavioural verification:** run the original and migrated applications side by side and compare responses and data effects
+   (design: [docs/behavioural-verification-design.md](docs/behavioural-verification-design.md)).
 3. **Benchmark harness:** `renova benchmark` scores migrations of synthetic legacy apps (see
    [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.
 4. **Web console and REST API**, then the **desktop** and **IDE** products.
