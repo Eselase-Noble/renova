@@ -401,3 +401,33 @@ rules:
     rationale: >
       With only the source level raised, older compiler plugins keep a lower default target and the
       build fails ("source release 21 requires target release 21").
+
+  - id: guard-imported-apis-declared
+    phase: guard
+    title: Jakarta APIs the code imports must be declared as dependencies
+    category: E
+    severity: BLOCKER
+    detect:
+      type: importWithoutDependency
+      # Umbrella APIs that supply every package below.
+      providedByAny: ["jakarta.platform:*"]
+      provides:
+        # Supplied by Tomcat 10.1/11 and WildFly/JBoss EAP: compile against them, do not bundle.
+        - { package: jakarta.servlet.jsp, dependency: "jakarta.servlet.jsp:jakarta.servlet.jsp-api:3.1.1", scope: provided }
+        - { package: jakarta.servlet, dependency: "jakarta.servlet:jakarta.servlet-api:6.0.0", scope: provided }
+        - { package: jakarta.el, dependency: "jakarta.el:jakarta.el-api:5.0.1", scope: provided }
+        - { package: jakarta.websocket, dependency: "jakarta.websocket:jakarta.websocket-api:2.1.1", scope: provided }
+        - { package: jakarta.annotation, dependency: "jakarta.annotation:jakarta.annotation-api:2.1.1", scope: provided }
+        # Not supplied by Tomcat: bundled with the application (an implementation is also needed at runtime).
+        - { package: jakarta.xml.bind, dependency: "jakarta.xml.bind:jakarta.xml.bind-api:4.0.2" }
+        - { package: jakarta.validation, dependency: "jakarta.validation:jakarta.validation-api:3.0.2" }
+        - { package: jakarta.persistence, dependency: "jakarta.persistence:jakarta.persistence-api:3.1.0" }
+        - { package: jakarta.inject, dependency: "jakarta.inject:jakarta.inject-api:2.0.1" }
+    fix:
+      strategy: maven
+      params: { action: addDependency }
+    rationale: >
+      Java 8 itself supplied some javax packages (javax.annotation, javax.xml.bind), so legacy builds
+      never declared them. After the rename to jakarta.*, nothing supplies them until the build
+      declares the Jakarta EE 10 API. On WildFly/JBoss, packages bundled here may already be provided
+      by the server; review the scope for those deployments.

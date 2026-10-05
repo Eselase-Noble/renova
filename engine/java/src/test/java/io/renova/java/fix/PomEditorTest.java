@@ -117,4 +117,26 @@ class PomEditorTest {
                 + "  </properties>");
         assertThat(PomEditor.setProperty(r.content(), "maven.compiler.target", "x").changes()).isZero();
     }
+
+    @Test
+    void addsADependencyNextToItsSiblingsOnlyOnce() {
+        PomEditor.Result r = PomEditor.addDependency(POM, "jakarta.el", "jakarta.el-api", "5.0.1", "provided");
+        assertThat(r.changes()).isEqualTo(1);
+        assertThat(r.content()).contains("      <version>6.2.19</version>\n    </dependency>\n"
+                + "    <dependency>\n      <groupId>jakarta.el</groupId>\n      <artifactId>jakarta.el-api</artifactId>\n"
+                + "      <version>5.0.1</version>\n      <scope>provided</scope>\n    </dependency>\n  </dependencies>");
+        // Already declared (also when only the dependencyManagement copy differs): no change.
+        assertThat(PomEditor.addDependency(r.content(), "jakarta.el", "jakarta.el-api", "5.0.1", "provided").changes()).isZero();
+        assertThat(PomEditor.addDependency(POM, "jakarta.servlet", "jakarta.servlet-api", "6.0.0", null).changes()).isZero();
+    }
+
+    @Test
+    void createsTheDependenciesSectionWhenMissing() {
+        String pom = "<project>\n    <modelVersion>4.0.0</modelVersion>\n    <artifactId>a</artifactId>\n\n"
+                + "    <build>\n    </build>\n</project>\n";
+        PomEditor.Result r = PomEditor.addDependency(pom, "g", "a", "1", "compile");
+        assertThat(r.content()).isEqualTo("<project>\n    <modelVersion>4.0.0</modelVersion>\n    <artifactId>a</artifactId>\n\n"
+                + "    <dependencies>\n        <dependency>\n            <groupId>g</groupId>\n            <artifactId>a</artifactId>\n"
+                + "            <version>1</version>\n        </dependency>\n    </dependencies>\n\n    <build>\n    </build>\n</project>\n");
+    }
 }

@@ -110,6 +110,48 @@ final class PomEditor {
         return addPlugin(pom, groupId, artifactId, version);
     }
 
+    /**
+     * Adds a dependency to the project's {@code <dependencies>} (creating the section if needed),
+     * unless a real dependency with the same groupId and artifactId is already declared.
+     */
+    static Result addDependency(String pom, String groupId, String artifactId, String version, String scope) {
+        List<Span> excluded = spans(pom, "dependencyManagement");
+        excluded.addAll(spans(pom, "plugin"));
+        excluded.addAll(spans(pom, "profiles"));
+        Matcher existing = Pattern.compile("(?s)<dependency>.*?</dependency>").matcher(pom);
+        while (existing.find()) {
+            String own = existing.group().replaceAll("(?s)<exclusions>.*?</exclusions>", "");
+            if (!inside(excluded, existing.start()) && groupId.equals(tag(own, "groupId"))
+                    && artifactId.equals(tag(own, "artifactId"))) {
+                return new Result(pom, 0);
+            }
+        }
+        String unit = indentUnit(pom);
+        Span dependencies = firstSpanOutside(pom, "dependencies", excluded);
+        if (dependencies != null) {
+            int close = pom.lastIndexOf("</dependencies>", dependencies.end());
+            Matcher sibling = Pattern.compile("\\n([ \\t]*)<dependency>").matcher(pom.substring(dependencies.start(), close));
+            String indent = sibling.find() ? sibling.group(1) : unit.repeat(2);
+            int lineStart = pom.lastIndexOf('\n', close) + 1;
+            return new Result(pom.substring(0, lineStart) + dependencyXml(indent, unit, groupId, artifactId, version, scope)
+                    + pom.substring(lineStart), 1);
+        }
+        String block = unit + "<dependencies>\n" + dependencyXml(unit.repeat(2), unit, groupId, artifactId, version, scope)
+                + unit + "</dependencies>\n\n";
+        return insertBeforeFirst(pom, block, spans(pom, "profiles"), "<build>", "<profiles>", "</project>");
+    }
+
+    private static String dependencyXml(String indent, String unit, String groupId, String artifactId, String version,
+                                        String scope) {
+        String inner = indent + unit;
+        return indent + "<dependency>\n"
+                + inner + "<groupId>" + groupId + "</groupId>\n"
+                + inner + "<artifactId>" + artifactId + "</artifactId>\n"
+                + inner + "<version>" + version + "</version>\n"
+                + (scope == null || scope.equals("compile") ? "" : inner + "<scope>" + scope + "</scope>\n")
+                + indent + "</dependency>\n";
+    }
+
     /** Adds a project-level property unless it already exists. */
     static Result setProperty(String pom, String name, String value) {
         List<Span> profiles = spans(pom, "profiles");

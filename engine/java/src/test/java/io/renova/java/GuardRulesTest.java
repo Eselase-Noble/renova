@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GuardRulesTest {
 
     @Test
-    void guardsFixScopePluginAndCompilerTargetBeforeVerification(@TempDir Path tmp) throws Exception {
+    void guardsFixScopePluginCompilerTargetAndMissingDependencyBeforeVerification(@TempDir Path tmp) throws Exception {
         Path project = copyFixture(tmp.resolve("project"));
         Path pom = project.resolve("pom.xml");
         // What the Jakarta recipe produced in the demo: the API moved to compile scope.
@@ -37,6 +37,9 @@ class GuardRulesTest {
                 .replace("<groupId>javax.servlet</groupId>", "<groupId>jakarta.servlet</groupId>")
                 .replace("<artifactId>javax.servlet-api</artifactId>", "<artifactId>jakarta.servlet-api</artifactId>")
                 .replace("<scope>provided</scope>", "<scope>compile</scope>"));
+        // What the Jakarta recipe produced in the code: javax.annotation (from the JDK) renamed.
+        Path controller = project.resolve("src/main/java/com/acme/web/OrderController.java");
+        Files.writeString(controller, Files.readString(controller).replace("javax.annotation.", "jakarta.annotation."));
 
         PluginRegistry registry = PluginRegistry.load();
         Playbook playbook = registry.defaultPlaybook(project);
@@ -51,14 +54,22 @@ class GuardRulesTest {
         assertThat(migrated)
                 .contains("<artifactId>jakarta.servlet-api</artifactId>\n            <version>3.1.0</version>\n            <scope>provided</scope>")
                 .contains("<artifactId>maven-war-plugin</artifactId>\n                <version>3.4.0</version>")
-                .contains("<maven.compiler.target>${maven.compiler.source}</maven.compiler.target>");
+                .contains("<maven.compiler.target>${maven.compiler.source}</maven.compiler.target>")
+                .contains("        <dependency>\n"
+                        + "            <groupId>jakarta.annotation</groupId>\n"
+                        + "            <artifactId>jakarta.annotation-api</artifactId>\n"
+                        + "            <version>2.1.1</version>\n"
+                        + "            <scope>provided</scope>\n"
+                        + "        </dependency>\n"
+                        + "    </dependencies>");
         // The JBoss variant gets the same build fixes (its servlet API was never touched, so stays provided).
-        assertThat(Files.readString(out.resolve("pom.jboss.xml"))).contains("maven-war-plugin", "<maven.compiler.target>");
+        assertThat(Files.readString(out.resolve("pom.jboss.xml")))
+                .contains("maven-war-plugin", "<maven.compiler.target>", "jakarta.annotation-api");
         assertThat(Files.readString(pom)).doesNotContain("maven-war-plugin");
 
         assertThat(outcome.stages()).extracting(StageResult::stage).contains("guard", "guard maven");
         assertThat(outcome.stages()).filteredOn(s -> s.stage().equals("guard")).singleElement()
-                .satisfies(s -> assertThat(s.summary()).startsWith("3 of 3 guard rule(s) found problems"));
+                .satisfies(s -> assertThat(s.summary()).startsWith("4 of 4 guard rule(s) found problems"));
     }
 
     private static Path copyFixture(Path target) throws Exception {

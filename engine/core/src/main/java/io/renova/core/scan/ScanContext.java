@@ -103,8 +103,12 @@ public final class ScanContext {
     }
 
     public Finding finding(Rule rule, String projectPath, int line, String evidence) {
+        return finding(rule, projectPath, line, evidence, Map.of());
+    }
+
+    public Finding finding(Rule rule, String projectPath, int line, String evidence, Map<String, String> data) {
         return new Finding(rule.id(), rule.category(), rule.severity(), rule.title(), projectPath, line,
-                evidence == null ? null : evidence.strip());
+                evidence == null ? null : evidence.strip(), data);
     }
 
     public static String toProjectPath(Path relative) {

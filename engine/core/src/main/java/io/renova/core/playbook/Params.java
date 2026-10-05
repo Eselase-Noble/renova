@@ -45,6 +45,19 @@ public final class Params {
         return values;
     }
 
+    /** A list of nested maps, e.g. {@code provides: [{package: x, dependency: y}]}. */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> maps(String key) {
+        Object value = raw.get(key);
+        if (value == null) {
+            return List.of();
+        }
+        if (!(value instanceof Collection<?> c) || !c.stream().allMatch(e -> e instanceof Map<?, ?>)) {
+            throw new IllegalArgumentException("Rule '" + ruleId + "': " + key + " must be a list of maps");
+        }
+        return c.stream().map(e -> (Map<String, Object>) e).toList();
+    }
+
     public int intValue(String key) {
         Object value = raw.get(key);
         if (value == null) {

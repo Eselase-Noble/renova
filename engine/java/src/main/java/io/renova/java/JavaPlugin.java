@@ -9,6 +9,7 @@ import io.renova.core.spi.Fixer;
 import io.renova.core.spi.RelatedFile;
 import io.renova.core.spi.Verifier;
 import io.renova.java.detect.DependencyDetector;
+import io.renova.java.detect.ImportDependencyDetector;
 import io.renova.java.detect.ImportDetector;
 import io.renova.java.detect.JavaVersionDetector;
 import io.renova.java.detect.MavenPluginDetector;
@@ -116,7 +117,7 @@ public final class JavaPlugin implements EcosystemPlugin {
     @Override
     public List<DetectorFactory> detectors() {
         return List.of(new ImportDetector(), new DependencyDetector(), new JavaVersionDetector(),
-                new MavenPluginDetector(), new PomPropertyDetector());
+                new MavenPluginDetector(), new PomPropertyDetector(), new ImportDependencyDetector());
     }
 
     @Override

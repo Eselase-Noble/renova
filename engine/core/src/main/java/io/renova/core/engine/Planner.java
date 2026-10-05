@@ -34,7 +34,7 @@ public final class Planner {
             List<String> files = new ArrayList<>(findings.stream()
                     .map(Finding::file)
                     .collect(Collectors.toCollection(LinkedHashSet::new)));
-            steps.add(new PlanStep(steps.size() + 1, rule, findings.size(), files));
+            steps.add(new PlanStep(steps.size() + 1, rule, findings.size(), files, findings));
         }
         return new MigrationPlan(analysis.playbook(), steps);
     }

@@ -56,8 +56,8 @@ most of the effort. Renova treats the two differently:
 
 **Guards** are playbook rules with `phase: guard`. They run on the migrated code before the build is
 verified and catch what earlier stages introduced or left behind, for example a container API moved to
-`compile` scope, a build plugin too old for the new JDK, or a compiler target that no longer matches
-the source level.
+`compile` scope, a build plugin too old for the new JDK, a compiler target that no longer matches the
+source level, or a package the code imports that no declared dependency supplies.
 
 Every finding belongs to a change category, and plan steps run in the order A → E → B → C → D:
 
@@ -189,7 +189,7 @@ rules:
 |---|---|
 | `recipe` | An ecosystem rewrite tool (OpenRewrite for Java), deterministic and type-aware |
 | `replace` | Text replacement driven by the playbook, for files without a parser |
-| `maven` | Format-preserving pom.xml edits: `setScope`, `setPluginVersion`, `setProperty` |
+| `maven` | Format-preserving pom.xml edits: `setScope`, `setPluginVersion`, `setProperty`, `addDependency` |
 | `ai` | The configured AI provider. The build verifies the result |
 | `manual` | A person, guided by the rule's `hint` in the report |
 
@@ -216,7 +216,7 @@ twenty lines and is a good starting point. See [`engine/README.md`](engine/READM
 ## Roadmap
 
 1. **RAG:** retrieve related code and past migration knowledge for AI requests, on the customer's own keys.
-2. **More guard rules:** for example, dependencies the migrated code imports but the build does not declare.
+2. **Guards after AI repair:** re-check guards on edits made by the repair loop.
 3. **Behavioural verification:** run the original and migrated applications side by side and compare responses and data effects.
 4. **Benchmark harness:** measure Renova against public legacy projects with known migrated versions.
 5. **Web console and REST API**, then the **desktop** and **IDE** products.

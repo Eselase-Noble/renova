@@ -49,7 +49,7 @@ public final class ImportDetector implements DetectorFactory {
         };
     }
 
-    static List<String> imports(String line, boolean jsp) {
+    public static List<String> imports(String line, boolean jsp) {
         if (!jsp) {
             Matcher m = JAVA_IMPORT.matcher(line);
             return m.find() ? List.of(m.group(1)) : List.of();
