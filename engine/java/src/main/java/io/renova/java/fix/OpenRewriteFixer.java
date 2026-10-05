@@ -51,6 +51,14 @@ public final class OpenRewriteFixer implements Fixer {
                 cmd.add("-Drewrite.recipeArtifactCoordinates=" + String.join(",", artifacts));
             }
             cmd.add("-Drewrite.exportDatatables=false");
+            if (isReactor(context, root)) {
+                // runNoFork runs no build phases, so a module cannot resolve a sibling it depends on
+                // and Maven fails the run. Including the compile phase lets Maven resolve siblings
+                // from their output directories; maven.main.skip keeps it from compiling legacy code
+                // that does not build on the target JDK until the recipes have run.
+                cmd.add("-Dmaven.main.skip=true");
+                cmd.add("compile");
+            }
             cmd.add(plugin + ":" + goal);
             Proc.Result result = Proc.run(cmd, root, TIMEOUT);
             String name = context.workspace().root().relativize(root).toString();
@@ -64,6 +72,13 @@ public final class OpenRewriteFixer implements Fixer {
                 : succeeded == 0 ? StageResult.Status.FAILED : StageResult.Status.PARTIAL;
         return new StageResult("recipe", status, recipes.size() + " recipe(s) on " + succeeded + "/" + roots.size()
                 + " build root(s)", details);
+    }
+
+    private static boolean isReactor(MigrationContext context, Path buildRoot) {
+        String path = context.workspace().root().relativize(buildRoot).toString().replace('\\', '/');
+        String modulePath = path.isEmpty() ? "." : path;
+        return context.project().modules().stream()
+                .anyMatch(m -> m.path().equals(modulePath) && m.fact("modules") != null);
     }
 
     private static String setting(MigrationContext context, String key, String fallback) {
