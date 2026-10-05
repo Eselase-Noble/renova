@@ -72,12 +72,12 @@ class BehaviourComparisonTest {
         String body = Base64.getEncoder().encodeToString("<p>hi</p>".getBytes());
         DockerSandbox.Run run = DockerSandbox.parse(List.of(
                 "@@READY baseline ok 4", "@@READY candidate ok 6",
-                "@@ s1 baseline 1 200", "H Content-Type: text/html", "B " + body,
-                "@@ s1 candidate 1 -1", "E Connection refused",
-                "@@ s1 baseline 2 200", "H Content-Type: text/html", "B " + body));
+                "@@ s1:0 baseline 1 200", "H Content-Type: text/html", "B " + body,
+                "@@ s1:0 candidate 1 -1", "E Connection refused",
+                "@@ s1:0 baseline 2 200", "H Content-Type: text/html", "B " + body));
         assertThat(run.baselineReady()).isTrue();
         assertThat(run.candidateReady()).isTrue();
-        DockerSandbox.Answers answers = run.answers().get("s1");
+        DockerSandbox.Answers answers = run.answers().get("s1:0");
         assertThat(answers.baseline().text()).isEqualTo("<p>hi</p>");
         assertThat(answers.baseline().header("Content-Type")).isEqualTo("text/html");
         assertThat(answers.baselineAgain().status()).isEqualTo(200);

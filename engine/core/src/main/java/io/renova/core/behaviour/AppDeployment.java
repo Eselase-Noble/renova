@@ -11,11 +11,24 @@ import java.util.Map;
  * @param port        the port the application listens on inside the container
  * @param contextPath where the application is served, "" for the root
  * @param platform    short description for reports, e.g. "Java 8, Tomcat 9"
+ * @param environment environment variables for the container
  */
-public record AppDeployment(String image, Map<Path, String> mounts, int port, String contextPath, String platform) {
+public record AppDeployment(String image, Map<Path, String> mounts, int port, String contextPath, String platform,
+                            Map<String, String> environment) {
 
     public AppDeployment {
         mounts = Map.copyOf(mounts);
         contextPath = contextPath == null ? "" : contextPath;
+        environment = environment == null ? Map.of() : Map.copyOf(environment);
+    }
+
+    public AppDeployment(String image, Map<Path, String> mounts, int port, String contextPath, String platform) {
+        this(image, mounts, port, contextPath, platform, Map.of());
+    }
+
+    public AppDeployment withEnvironment(Map<String, String> more) {
+        Map<String, String> env = new java.util.LinkedHashMap<>(environment);
+        env.putAll(more);
+        return new AppDeployment(image, mounts, port, contextPath, platform, env);
     }
 }

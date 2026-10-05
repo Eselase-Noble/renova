@@ -158,8 +158,10 @@ public final class MarkdownReport {
             var b = outcome.behaviour();
             md.append("### Behaviour: ").append(b.status().name().toLowerCase(java.util.Locale.ROOT)).append("\n\n")
                     .append(b.summary()).append(". Details: `.renova/behaviour.md`.\n\n");
-            b.results().stream().filter(r -> !r.same()).limit(20).forEach(r -> md.append("- `").append(r.scenario().method())
-                    .append(' ').append(r.scenario().path()).append("`: ").append(String.join("; ", r.differences())).append('\n'));
+            b.results().stream().filter(r -> !r.same()).limit(20).forEach(r -> md.append("- `").append(r.label())
+                    .append("`: ").append(String.join("; ", r.differences())).append('\n'));
+            b.databases().forEach((id, diffs) -> diffs.forEach(d -> md.append("- `").append(id).append("` database: ")
+                    .append(d).append('\n')));
             if (b.differing() > 0) {
                 md.append('\n');
             }

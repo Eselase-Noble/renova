@@ -150,6 +150,27 @@ cli/bin/renova verify-behaviour /path/to/migrated     # again, on an existing wo
 - Status codes, redirects, `Content-Type` and bodies are compared, ignoring values that change on every
   request (session ids, UUIDs, timestamps). Results: `.renova/behaviour.md` and `.renova/behaviour.json`.
 
+For real coverage, add `renova-scenarios.yaml` to the project: multi-step scenarios with forms, JSON or file
+uploads, values captured from one answer for the next request, and sessions kept per run. It can also give each
+version its own PostgreSQL database from the same seed; Renova then compares the rows each version adds and
+removes in every scenario:
+
+```yaml
+database:
+  init: db/schema.sql                      # seed; each version gets a fresh copy
+  ignoreColumns: [filed_at]
+  app: { claims.db.url: "jdbc:postgresql://${host}:5432/app", claims.db.user: renova, claims.db.password: renova }
+scenarios:
+  - id: file-and-read-a-claim
+    steps:
+      - { method: POST, path: /claims, form: { holder: Ama Mensah, amount: "1520.75" },
+          capture: { claim: 'header:Location:/claims/(\d+)' } }
+      - { path: "/claims/${claim}" }
+  - id: import-stock-file
+    steps:
+      - { method: POST, path: /items/import, multipart: { file: { filename: stock.csv, content: "sku,qty\nA-1,4\n" } } }
+```
+
 It needs Docker and currently runs single-WAR Maven applications on servlet containers. Applications that need
 a full Jakarta EE server are reported as skipped. See
 [docs/behavioural-verification-design.md](docs/behavioural-verification-design.md).
@@ -265,8 +286,8 @@ twenty lines and is a good starting point. See [`engine/README.md`](engine/READM
 
 1. **RAG:** phase 1 (structural code retrieval and curated knowledge, no key needed) is in and on by default.
    Next: lessons from accepted fixes, then optional embeddings on the customer's own key.
-2. **Behavioural verification:** phase 1 (`--verify-behaviour`: HTTP answers of servlet-container apps) is in.
-   Next: scenario files and database effects, differences fed to AI repair, then JBoss/WildFly and Spring Boot
+2. **Behavioural verification:** phases 1 and 2 (`--verify-behaviour`: HTTP answers, scenario files, database
+   changes) are in. Next: differences fed to AI repair, then JBoss/WildFly and Spring Boot
    ([design](docs/behavioural-verification-design.md)).
 3. **Benchmark harness:** `renova benchmark` scores migrations of synthetic legacy apps (see
    [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.

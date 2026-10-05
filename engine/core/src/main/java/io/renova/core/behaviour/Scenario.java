@@ -1,17 +1,29 @@
 package io.renova.core.behaviour;
 
+import java.util.List;
+
 /**
- * One request sent to both the original and the migrated application.
+ * Requests sent in order to both the original and the migrated application, each run with its own
+ * cookies (so sessions carry over between steps) and its own captured values.
  *
- * @param path request path and query, relative to the application root, e.g. "/orders/1"
- * @param why  where the scenario comes from, e.g. "OrderController#show (Spring @RequestMapping)"
+ * @param why where the scenario comes from, e.g. "OrderController#show (Spring @RequestMapping)" or
+ *            "renova-scenarios.yaml"
  */
-public record Scenario(String id, String method, String path, String why) {
+public record Scenario(String id, String why, List<Step> steps) {
 
     public Scenario {
-        if (path == null || !path.startsWith("/")) {
-            throw new IllegalArgumentException("Scenario path must start with '/': " + path);
+        if (steps == null || steps.isEmpty()) {
+            throw new IllegalArgumentException("Scenario " + id + " has no steps");
         }
-        method = method == null ? "GET" : method;
+        steps = List.copyOf(steps);
+    }
+
+    /** A single request, as found from an application's entry points. */
+    public Scenario(String id, String method, String path, String why) {
+        this(id, why, List.of(new Step(method, path, null, null, false, null, null)));
+    }
+
+    public boolean mutating() {
+        return steps.stream().anyMatch(Step::mutating);
     }
 }

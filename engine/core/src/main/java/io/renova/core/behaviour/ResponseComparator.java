@@ -13,16 +13,16 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Decides whether the migrated application answered a scenario the same way as the original.
+ * Decides whether the migrated application answered a step the same way as the original.
  *
  * <ul>
  *   <li>Status codes must match. Error statuses are compared by code only: their bodies are the
  *       servlet container's own error pages, which differ between container versions by design.</li>
  *   <li>Redirects must point to the same place (host, port and session ids ignored).</li>
  *   <li>The media type and charset of {@code Content-Type} must match.</li>
- *   <li>Bodies must match after normalising values that differ on every request (session ids, UUIDs,
- *       timestamps, whitespace). JSON is compared structurally. When the original's own two answers
- *       differ even after normalising, its body is not compared.</li>
+ *   <li>Bodies must match after removing the step's {@code ignore} patterns and normalising values
+ *       that differ on every request (session ids, UUIDs, timestamps, whitespace). JSON is compared
+ *       structurally. When the original's own two answers differ even so, its body is not compared.</li>
  * </ul>
  */
 public final class ResponseComparator {
@@ -39,49 +39,59 @@ public final class ResponseComparator {
     private ResponseComparator() {
     }
 
+    /** Compares a single-request scenario. */
     public static ScenarioResult compare(Scenario scenario, Exchange baseline, Exchange baselineAgain, Exchange candidate) {
+        return compare(scenario, 0, baseline, baselineAgain, candidate);
+    }
+
+    public static ScenarioResult compare(Scenario scenario, int step, Exchange baseline, Exchange baselineAgain, Exchange candidate) {
+        List<Pattern> ignore = scenario.steps().get(step).ignore().stream().map(Pattern::compile).toList();
         List<String> differences = new ArrayList<>();
         List<String> notes = new ArrayList<>();
         if (!baseline.responded()) {
             notes.add("the original application did not answer (" + baseline.error() + "); not compared");
-            return new ScenarioResult(scenario, baseline, candidate, differences, notes);
-        }
-        if (!candidate.responded()) {
+        } else if (!candidate.responded()) {
             differences.add("the migrated application did not answer: " + candidate.error());
-            return new ScenarioResult(scenario, baseline, candidate, differences, notes);
-        }
-        if (baseline.status() != candidate.status()) {
+        } else if (baseline.status() != candidate.status()) {
             differences.add("status " + baseline.status() + " became " + candidate.status());
-            return new ScenarioResult(scenario, baseline, candidate, differences, notes);
-        }
-        if (baseline.status() >= 300 && baseline.status() < 400) {
+        } else if (baseline.status() >= 300 && baseline.status() < 400) {
             String before = location(baseline);
             String after = location(candidate);
             if (!before.equals(after)) {
                 differences.add("redirect to " + before + " became " + after);
             }
-            return new ScenarioResult(scenario, baseline, candidate, differences, notes);
+        } else if (baseline.status() < 400) {
+            String typeBefore = contentType(baseline);
+            String typeAfter = contentType(candidate);
+            if (!typeBefore.equals(typeAfter)) {
+                differences.add("Content-Type " + quoted(typeBefore) + " became " + quoted(typeAfter));
+            }
+            String before = strip(baseline.text(), ignore);
+            if (baselineAgain != null && baselineAgain.responded()
+                    && !sameBody(before, strip(baselineAgain.text(), ignore), baseline, baselineAgain, typeBefore)) {
+                notes.add("the original's body changes between identical requests; body not compared");
+            } else {
+                String after = strip(candidate.text(), ignore);
+                if (!sameBody(before, after, baseline, candidate, typeBefore)) {
+                    differences.add(bodyDifference(before, after));
+                }
+            }
         }
-        if (baseline.status() >= 400) {
-            return new ScenarioResult(scenario, baseline, candidate, differences, notes);
-        }
-        String typeBefore = contentType(baseline);
-        String typeAfter = contentType(candidate);
-        if (!typeBefore.equals(typeAfter)) {
-            differences.add("Content-Type " + quoted(typeBefore) + " became " + quoted(typeAfter));
-        }
-        if (baselineAgain != null && baselineAgain.responded() && !sameBody(baseline, baselineAgain, typeBefore)) {
-            notes.add("the original's body changes between identical requests; body not compared");
-        } else if (!sameBody(baseline, candidate, typeBefore)) {
-            differences.add(bodyDifference(baseline, candidate));
-        }
-        return new ScenarioResult(scenario, baseline, candidate, differences, notes);
+        return new ScenarioResult(scenario, step, baseline, candidate, differences, notes);
     }
 
-    private static boolean sameBody(Exchange a, Exchange b, String contentType) {
+    private static String strip(String text, List<Pattern> ignore) {
+        String result = text;
+        for (Pattern p : ignore) {
+            result = p.matcher(result).replaceAll("<ignored>");
+        }
+        return result;
+    }
+
+    private static boolean sameBody(String aText, String bText, Exchange a, Exchange b, String contentType) {
         if (contentType.contains("json")) {
             try {
-                return normalise(JSON.readTree(a.text())).equals(normalise(JSON.readTree(b.text())));
+                return normalise(JSON.readTree(aText)).equals(normalise(JSON.readTree(bText)));
             } catch (Exception e) {
                 // Not valid JSON on one side: compare as text.
             }
@@ -89,12 +99,12 @@ public final class ResponseComparator {
         if (!isText(contentType)) {
             return Arrays.equals(a.body(), b.body());
         }
-        return normalise(a.text()).equals(normalise(b.text()));
+        return normalise(aText).equals(normalise(bText));
     }
 
-    private static String bodyDifference(Exchange baseline, Exchange candidate) {
-        String a = normalise(baseline.text());
-        String b = normalise(candidate.text());
+    private static String bodyDifference(String baselineText, String candidateText) {
+        String a = normalise(baselineText);
+        String b = normalise(candidateText);
         int i = 0;
         while (i < a.length() && i < b.length() && a.charAt(i) == b.charAt(i)) {
             i++;
@@ -113,6 +123,20 @@ public final class ResponseComparator {
             result = n.getKey().matcher(result).replaceAll(n.getValue());
         }
         return result.strip();
+    }
+
+    /**
+     * Only the values that change on every request (session ids, UUIDs, timestamps), keeping whitespace:
+     * for stored data, where "  Ama " and "Ama" are different values.
+     */
+    static String normaliseValue(String text) {
+        String result = text;
+        for (Map.Entry<Pattern, String> n : NORMALISERS) {
+            if (!n.getKey().pattern().equals("\\s+")) {
+                result = n.getKey().matcher(result).replaceAll(n.getValue());
+            }
+        }
+        return result;
     }
 
     private static JsonNode normalise(JsonNode node) {

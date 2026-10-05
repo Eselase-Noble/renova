@@ -105,8 +105,7 @@ public final class Migrator {
                 case SKIPPED -> StageResult.Status.SKIPPED;
                 case FAILED -> StageResult.Status.FAILED;
             }, behaviour.summary(), behaviour.results().stream().filter(r -> !r.same())
-                    .map(r -> r.scenario().method() + " " + r.scenario().path() + ": " + String.join("; ", r.differences()))
-                    .toList()));
+                    .map(r -> r.label() + ": " + String.join("; ", r.differences())).toList()));
         }
         return new MigrationOutcome(workspace.root(), stages, verification, manual, AiUsage.NONE, 0, behaviour);
     }

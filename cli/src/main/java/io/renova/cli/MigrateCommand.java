@@ -1,6 +1,7 @@
 package io.renova.cli;
 
 import io.renova.core.behaviour.BehaviourReport;
+import io.renova.core.behaviour.BehaviourVerifier;
 import io.renova.core.engine.MigrationOptions;
 import io.renova.core.engine.MigrationOutcome;
 import io.renova.core.engine.Migrator;
@@ -44,6 +45,10 @@ final class MigrateCommand implements Callable<Integer> {
             + "application side by side in Docker and compare their answers.")
     boolean verifyBehaviour;
 
+    @Option(names = "--scenarios", paramLabel = "FILE", description = "Scenario file for --verify-behaviour. "
+            + "Default: renova-scenarios.yaml in the project, if present.")
+    Path scenarios;
+
     @Option(names = "--skip", split = ",", paramLabel = "STRATEGY", description = "Strategies to skip, e.g. --skip recipe,ai.")
     List<String> skip = new ArrayList<>();
 
@@ -73,6 +78,9 @@ final class MigrateCommand implements Callable<Integer> {
         }
         if (verifyBehaviour) {
             tools.put(Migrator.VERIFY_BEHAVIOUR, "true");
+        }
+        if (scenarios != null) {
+            tools.put(BehaviourVerifier.SCENARIOS_OPTION, scenarios.toAbsolutePath().toString());
         }
         AiConfiguration aiConfig = AiConfiguration.load(registry, ai);
         RagSettings ragSettings = aiConfig.ragSettings(rag);

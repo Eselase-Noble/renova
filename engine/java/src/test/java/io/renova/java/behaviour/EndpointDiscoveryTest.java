@@ -49,7 +49,7 @@ class EndpointDiscoveryTest {
 
         JavaBehaviourRunner runner = new JavaBehaviourRunner();
         assertThat(runner.unsupported(model)).isEmpty();
-        assertThat(runner.discover(model, root)).extracting(Scenario::path, Scenario::why).containsExactly(
+        assertThat(runner.discover(model, root)).extracting(s -> s.steps().getFirst().path(), Scenario::why).containsExactly(
                 tuple("/", "the application root"),
                 tuple("/health", "web.xml servlet health"),
                 tuple("/app/orders", "OrderController#list (Spring @RequestMapping)"),

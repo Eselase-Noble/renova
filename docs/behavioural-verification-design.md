@@ -1,6 +1,6 @@
 # Behavioural verification design
 
-**Status:** phase 1 implemented (`--verify-behaviour`, `renova verify-behaviour`); phases 2–4 proposed
+**Status:** phases 1 and 2 implemented (`--verify-behaviour`, `renova verify-behaviour`); phases 3–4 proposed
 **Scope:** `engine/core` (contracts, comparison, report), ecosystem plugins (launching apps, finding endpoints), CLI and benchmark
 
 ## 1. Problem
@@ -161,4 +161,40 @@ First results on the test apps, using workspaces the benchmark had migrated with
 | `inventory-platform` | `GET /items` answered 200 before and 500 after: JSTL 1.2 (`javax.servlet:jstl`) was still bundled and fails on Tomcat 10.1 (`NoClassDefFoundError: javax/servlet/jsp/tagext/TagLibraryValidator`). The build and all tests passed. Fixed with the `guard-jstl-jakarta` guard; afterwards the page answers the same. |
 | `inventory-platform`, `claims-portal` | Trailing-slash URLs (`/items/`) answered 200 or 400 before and 404 after: Spring 6 no longer matches them. Left to a person (rule `spring-mvc-url-matching`); now visible per route. |
 | `acme-shop` | The test app itself did not compile on Java 8 (`javax.annotation.Nullable` without JSR-305); fixed in the app. |
+
+## 8. Phase 2 as built (2026-10-05)
+
+- **Scenario files** (`renova-scenarios.yaml` in the project, or `--scenarios FILE`): ordered steps with
+  `form`, `json`, `body` or `multipart` bodies, headers, `capture` (`body:REGEX` or `header:NAME:REGEX`; reused
+  as `${name}` in later paths, headers and bodies) and per-step `ignore` patterns. Bodies are encoded by the
+  engine, so both versions receive identical bytes. Each run of a scenario has its own cookies, so sessions
+  carry over between steps.
+- **Database effects**: with `database:`, each version gets its own PostgreSQL container from the same seed,
+  and the application settings in `app:` (with `${host}` set to that version's database) are passed to it,
+  for Java as system properties in `CATALINA_OPTS`. Before and after every scenario that changes state, both
+  databases are read (`row_to_json` per table); the rows each version added and removed are compared.
+  Stored values are compared exactly, apart from UUIDs and timestamps and the columns in `ignoreColumns`.
+- Scenarios that change state run once per version; read-only ones run twice on the original to detect values
+  that change on every request.
+- Routes, the scenario file and the original build all come from the workspace's baseline commit, so they
+  match what was migrated even if the project changed since.
+
+Checked against a migrated `claims-portal` (form, captured id, session, database) and `inventory-platform`
+(file upload). A planted change (a name no longer trimmed before saving) was reported in both the response
+and the stored row.
+
+### Benchmark with behaviour, 2026-10-05 (`--configs ai,ai-rag`, once each)
+
+| Configuration | Runs passed | Same behaviour | Input / output tokens |
+|---|---|---|---|
+| ai | 3/4 | 0/2 | 16.6K / 7.9K |
+| ai-rag | 4/4 | 0/3 | 23.4K / 8.5K |
+
+No app behaved the same after migration, although every check passed:
+
+- `inventory-platform` and `claims-portal`: URLs with a trailing slash answered 404 instead of 200 or 400 (Spring
+  6 no longer matches them). Rule `spring-mvc-url-matching` leaves this decision to a person.
+- `acme-shop`: `/orders.jsp` is now sent as `text/html;charset=utf-8` instead of `iso-8859-1`; pages with
+  non-ASCII text would change.
+- The JSTL guard fixed the 500 on `inventory-platform`'s item list found in phase 1.
 

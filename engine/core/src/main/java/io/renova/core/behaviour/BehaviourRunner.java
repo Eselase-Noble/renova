@@ -5,6 +5,7 @@ import io.renova.core.model.ProjectModel;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -22,10 +23,18 @@ public interface BehaviourRunner {
     List<Scenario> discover(ProjectModel model, Path root);
 
     /**
-     * Builds what both versions need and says how to run them: the original from the workspace's
-     * baseline commit on its legacy platform, the migrated workspace on the target platform.
+     * Builds what both versions need and says how to run them: the original from {@code originalSource}
+     * (the workspace's baseline commit) on its legacy platform, the migrated workspace on the target platform.
      */
-    Deployments prepare(MigrationContext context, Path workDir, Consumer<String> progress) throws Exception;
+    Deployments prepare(MigrationContext context, Path originalSource, Path workDir, Consumer<String> progress) throws Exception;
+
+    /**
+     * Environment variables that give the application these settings, e.g. for Java the JVM system
+     * properties in {@code CATALINA_OPTS}. Used to point each application at its own sandbox database.
+     */
+    default Map<String, String> environment(Map<String, String> settings) {
+        return Map.of();
+    }
 
     record Deployments(AppDeployment baseline, AppDeployment candidate) {
     }

@@ -21,8 +21,8 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 /**
- * Runs a Maven web application (one WAR module) on a servlet container: the original built from the
- * workspace's baseline commit with the legacy JDK and deployed on the legacy container, the migrated
+ * Runs a Maven web application (one WAR module) on a servlet container: the original built from its
+ * sources (the workspace's baseline commit) with the legacy JDK and deployed on the legacy container, the migrated
  * WAR from the verified build on the target container. Images come from the playbook's
  * {@code settings.behaviour}, so other targets need no code change.
  */
@@ -66,22 +66,17 @@ public final class JavaBehaviourRunner implements BehaviourRunner {
     }
 
     @Override
-    public Deployments prepare(MigrationContext context, Path workDir, Consumer<String> progress) throws Exception {
+    public Deployments prepare(MigrationContext context, Path originalSource, Path workDir, Consumer<String> progress)
+            throws Exception {
         Module war = warModules(context.project()).getFirst();
         Path workspace = context.workspace().root();
         Files.createDirectories(workDir);
         Playbook playbook = context.playbook();
 
-        // The original: the workspace's first commit is an unmodified copy of the project.
-        Path baselineSource = workDir.resolve("baseline-src");
+        // Built in a copy, so the exported sources stay as they were.
+        Path baselineSource = workDir.resolve("original-build");
         deleteRecursively(baselineSource);
-        Files.createDirectories(baselineSource);
-        String baselineCommit = run(List.of("git", "rev-list", "--max-parents=0", "HEAD"), workspace, 60, "find the baseline commit")
-                .strip().lines().reduce((a, b) -> b).orElseThrow();
-        Path tar = workDir.resolve("baseline.tar");
-        run(List.of("git", "archive", "-o", tar.toString(), baselineCommit), workspace, 120, "export the original sources");
-        run(List.of("tar", "-xf", tar.toString(), "-C", baselineSource.toString()), workDir, 120, "unpack the original sources");
-        Files.delete(tar);
+        copyTree(originalSource, baselineSource);
 
         String buildImage = setting(playbook, "behaviour.baseline.build", DEFAULT_BASELINE_BUILD);
         progress.accept("Building the original application with " + buildImage);
@@ -112,6 +107,22 @@ public final class JavaBehaviourRunner implements BehaviourRunner {
                 new AppDeployment(setting(playbook, "behaviour.candidate.server", DEFAULT_CANDIDATE_SERVER),
                         Map.of(candidateWar, appPath), 8080, "",
                         setting(playbook, "behaviour.candidate.platform", "Java 21, Tomcat 10.1")));
+    }
+
+    /** JVM system properties for Tomcat, in {@code CATALINA_OPTS}. */
+    @Override
+    public Map<String, String> environment(Map<String, String> settings) {
+        if (settings.isEmpty()) {
+            return Map.of();
+        }
+        StringBuilder opts = new StringBuilder();
+        settings.forEach((k, v) -> {
+            if (k.contains(" ") || v.contains(" ")) {
+                throw new IllegalArgumentException("Application settings for the sandbox cannot contain spaces: " + k + "=" + v);
+            }
+            opts.append(opts.isEmpty() ? "" : " ").append("-D").append(k).append('=').append(v);
+        });
+        return Map.of("CATALINA_OPTS", opts.toString());
     }
 
     static List<Module> warModules(ProjectModel model) {
@@ -150,6 +161,19 @@ public final class JavaBehaviourRunner implements BehaviourRunner {
             throw new IOException("Could not " + what + ": " + (out.length() > 1500 ? "…" + out.substring(out.length() - 1500) : out));
         }
         return result.output();
+    }
+
+    private static void copyTree(Path source, Path target) throws IOException {
+        try (Stream<Path> files = Files.walk(source)) {
+            for (Path p : files.toList()) {
+                Path dest = target.resolve(source.relativize(p).toString());
+                if (Files.isDirectory(p)) {
+                    Files.createDirectories(dest);
+                } else {
+                    Files.copy(p, dest, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
     }
 
     private static void deleteRecursively(Path dir) throws IOException {

@@ -37,6 +37,9 @@ final class VerifyBehaviourCommand implements Callable<Integer> {
     @Option(names = "--offline", description = "Build the original offline.")
     boolean offline;
 
+    @Option(names = "--scenarios", paramLabel = "FILE", description = "Scenario file. Default: renova-scenarios.yaml in the workspace, if present.")
+    Path scenarios;
+
     @Override
     public Integer call() throws Exception {
         PluginRegistry registry = PluginRegistry.load();
@@ -50,6 +53,9 @@ final class VerifyBehaviourCommand implements Callable<Integer> {
         }
         if (offline) {
             tools.put("maven.offline", "true");
+        }
+        if (scenarios != null) {
+            tools.put(BehaviourVerifier.SCENARIOS_OPTION, scenarios.toAbsolutePath().toString());
         }
         MigrationOptions options = new MigrationOptions(workspace.root(), null, 0, false, tools, List.of());
         BehaviourReport report = BehaviourVerifier.verify(new MigrationContext(workspace, model, playbook, options,
