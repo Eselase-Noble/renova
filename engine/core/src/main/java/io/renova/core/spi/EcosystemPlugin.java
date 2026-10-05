@@ -43,6 +43,18 @@ public interface EcosystemPlugin {
         return List.of();
     }
 
+    /**
+     * Project files that help an AI understand {@code file} but are not changed with it: for Java,
+     * the project types it extends or imports and the configuration files that name it. Used by
+     * retrieval (RAG); every result is sent as reference only, whatever its {@code editable} flag.
+     *
+     * @param root the directory to read, normally the migration workspace, so results reflect
+     *             code as already migrated
+     */
+    default List<RelatedFile> referencedFiles(ProjectModel model, Path root, String file) {
+        return List.of();
+    }
+
     /** Classpath resources of the playbooks this plugin ships with. */
     default List<String> bundledPlaybooks() {
         return List.of();

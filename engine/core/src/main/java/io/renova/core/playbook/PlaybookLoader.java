@@ -54,6 +54,12 @@ public final class PlaybookLoader {
     }
 
     private static void validate(Playbook playbook, String source) {
+        Set<String> cards = new HashSet<>();
+        for (KnowledgeCard card : playbook.knowledge()) {
+            if (!cards.add(card.id())) {
+                throw new IllegalArgumentException("duplicate knowledge card id '" + card.id() + "' in " + source);
+            }
+        }
         Set<String> ids = new HashSet<>();
         for (Rule rule : playbook.rules()) {
             if (!ids.add(rule.id())) {

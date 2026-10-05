@@ -33,7 +33,7 @@ final class ConfigCommand {
             System.out.println("User config file: " + config.userConfig().file());
             System.out.println();
             List<String> keys = new ArrayList<>(List.of(AiConfiguration.PROVIDER, AiConfiguration.MODEL,
-                    AiConfiguration.EFFORT, AiConfiguration.FALLBACKS));
+                    AiConfiguration.EFFORT, AiConfiguration.FALLBACKS, AiConfiguration.RAG, AiConfiguration.RAG_BUDGET));
             for (AiProviderFactory f : config.registry().aiProviders()) {
                 keys.add(AiConfiguration.apiKeyKey(f.name()));
                 keys.add(AiConfiguration.baseUrlKey(f.name()));

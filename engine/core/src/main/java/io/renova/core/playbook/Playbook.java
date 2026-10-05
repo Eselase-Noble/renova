@@ -9,10 +9,12 @@ import java.util.Map;
  * A declarative migration: which rules to look for and how each one is fixed. Playbooks are data
  * (YAML), so new migration paths ship without changing the engine.
  *
- * @param settings free-form, ecosystem-specific configuration (e.g. OpenRewrite coordinates)
+ * @param settings  free-form, ecosystem-specific configuration (e.g. OpenRewrite coordinates)
+ * @param knowledge curated notes retrieved for AI requests when RAG is enabled
  */
 public record Playbook(String id, String name, String description, String ecosystem, String version,
-                       Map<String, String> targets, Map<String, Object> settings, List<Rule> rules) {
+                       Map<String, String> targets, Map<String, Object> settings, List<Rule> rules,
+                       List<KnowledgeCard> knowledge) {
 
     public Playbook {
         if (id == null || id.isBlank()) {
@@ -24,6 +26,12 @@ public record Playbook(String id, String name, String description, String ecosys
         targets = targets == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(targets));
         settings = settings == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(settings));
         rules = rules == null ? List.of() : List.copyOf(rules);
+        knowledge = knowledge == null ? List.of() : List.copyOf(knowledge);
+    }
+
+    public Playbook(String id, String name, String description, String ecosystem, String version,
+                    Map<String, String> targets, Map<String, Object> settings, List<Rule> rules) {
+        this(id, name, description, ecosystem, version, targets, settings, rules, null);
     }
 
     /** Looks up a nested setting by dotted path, e.g. {@code "openrewrite.plugin"}. */

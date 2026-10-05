@@ -9,6 +9,7 @@ import io.renova.core.engine.Migrator;
 import io.renova.core.engine.Planner;
 import io.renova.core.engine.PluginRegistry;
 import io.renova.core.engine.StageResult;
+import io.renova.core.rag.RagSettings;
 import io.renova.core.report.JsonReport;
 import io.renova.core.report.MarkdownReport;
 import picocli.CommandLine.Command;
@@ -48,6 +49,11 @@ final class MigrateCommand implements Callable<Integer> {
     @Option(names = "--skip", split = ",", paramLabel = "STRATEGY", description = "Strategies to skip, e.g. --skip recipe,ai.")
     List<String> skip = new ArrayList<>();
 
+    @Option(names = "--rag", negatable = true,
+            description = "Add retrieved context (related project code, curated migration knowledge) to AI requests. "
+                    + "Needs no extra key. Default: the rag.enabled setting, else off.")
+    Boolean rag;
+
     @Option(names = "--maven-settings", paramLabel = "FILE", description = "Maven settings.xml (e.g. for a private Nexus).")
     Path mavenSettings;
 
@@ -73,8 +79,10 @@ final class MigrateCommand implements Callable<Integer> {
             tools.put("verify.skipTests", "true");
         }
         AiConfiguration aiConfig = AiConfiguration.load(registry, ai);
-        System.err.println("AI: " + aiConfig.describe());
-        MigrationOptions options = new MigrationOptions(out, aiConfig.aiSettings(), maxAiIterations, !noVerify, tools, skip);
+        RagSettings ragSettings = aiConfig.ragSettings(rag);
+        System.err.println("AI: " + aiConfig.describe() + (ragSettings.enabled() ? "; RAG on" : ""));
+        MigrationOptions options = new MigrationOptions(out, aiConfig.aiSettings(), maxAiIterations, !noVerify, tools, skip,
+                ragSettings);
         MigrationOutcome outcome = new Migrator(registry, msg -> System.err.println("» " + msg))
                 .migrate(analysis, plan, options);
 

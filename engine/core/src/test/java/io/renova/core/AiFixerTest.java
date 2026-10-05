@@ -34,7 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AiFixerTest {
 
     /** Sources under src/ belong to build.txt (editable); variant.txt references build.txt read-only. */
-    static final class ToyPlugin implements EcosystemPlugin {
+    static class ToyPlugin implements EcosystemPlugin {
         public String id() { return "toy"; }
         public String displayName() { return "Toy"; }
         public boolean supports(Path root) { return true; }

@@ -170,6 +170,11 @@ public final class JavaPlugin implements EcosystemPlugin {
         return List.of(buildFile);
     }
 
+    @Override
+    public List<RelatedFile> referencedFiles(ProjectModel model, Path root, String file) {
+        return JavaReferences.find(model, root, file);
+    }
+
     /** The module with the longest path containing {@code file}; with {@code strict}, excluding a module at exactly that path. */
     private static Module owner(ProjectModel model, String file, boolean strict) {
         Module owner = null;

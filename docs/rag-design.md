@@ -1,6 +1,6 @@
 # RAG design: retrieval for AI-assisted migration
 
-**Status:** proposal, not yet implemented
+**Status:** phase 1 implemented (off by default, `--rag`); phases 2–4 proposed
 **Scope:** `engine/core` (contracts, assembler), ecosystem plugins (code retrieval), new `engine/rag-*` modules
 
 ## 1. Problem
@@ -178,6 +178,20 @@ Each test app has a known-good migrated version, so results are scored automatic
 | 4 | Server storage: per-tenant indexes, lesson management in the web console | — |
 
 Phase 1 gives most of the value for code migration and works for every customer, so it comes first.
+
+**Phase 1 as built.** The contracts (`Retriever`, `ContextItem`, `RetrievalQuery`), the `ContextAssembler`
+(reciprocal rank fusion, budget) and the knowledge retriever are in `engine/core` (`io.renova.core.rag`).
+Java structural retrieval is `JavaPlugin.referencedFiles`. Differences from the proposal above:
+
+- Knowledge cards are inline in the playbook YAML (`knowledge:`), so they load the same way from the
+  classpath and from a customer's playbook file.
+- Lexical search is an in-memory BM25 over the cards, not Lucene: the corpus is small. A card is used when
+  one of its triggers appears in the request, or when its BM25 score alone is high. Lucene arrives with
+  code-level lexical search and the semantic channel.
+- Knowledge notes go in the user message, not a cached system block, because each request gets a different
+  selection. Prompt caching can follow once a migration's cards are sent as one stable block.
+- The context each request received is listed in its AI audit log (`.renova/ai/NNN.md`), not yet in
+  `report.md`.
 
 ## 7. Open questions
 

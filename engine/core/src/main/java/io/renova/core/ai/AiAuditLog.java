@@ -37,6 +37,10 @@ final class AiAuditLog {
             md.append("## Files offered\n\n");
             request.files().forEach(f -> md.append("- `").append(f.path()).append("` (").append(f.role().name().toLowerCase())
                     .append(f.why() == null ? "" : ": " + f.why()).append(")\n"));
+            if (!request.knowledge().isEmpty()) {
+                md.append("\n## Knowledge notes\n\n");
+                request.knowledge().forEach(k -> md.append("- `").append(k.source()).append("` (").append(k.why()).append(")\n"));
+            }
             if (!request.hints().isEmpty()) {
                 md.append("\n## Rules\n\n");
                 request.hints().forEach(h -> md.append("- ").append(h).append('\n'));

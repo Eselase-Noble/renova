@@ -8,6 +8,7 @@ import io.renova.core.config.Secret;
 import io.renova.core.config.Settings;
 import io.renova.core.config.UserConfig;
 import io.renova.core.engine.PluginRegistry;
+import io.renova.core.rag.RagSettings;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,6 +29,8 @@ final class AiConfiguration {
     static final String MODEL = "ai.model";
     static final String EFFORT = "ai.effort";
     static final String FALLBACKS = "ai.fallbacks";
+    static final String RAG = "rag.enabled";
+    static final String RAG_BUDGET = "rag.budget";
 
     private final PluginRegistry registry;
     private final Settings settings;
@@ -69,6 +72,8 @@ final class AiConfiguration {
         putIfSet(values, MODEL, env.get("RENOVA_AI_MODEL"));
         putIfSet(values, EFFORT, env.get("RENOVA_AI_EFFORT"));
         putIfSet(values, FALLBACKS, env.get("RENOVA_AI_FALLBACKS"));
+        putIfSet(values, RAG, env.get("RENOVA_RAG"));
+        putIfSet(values, RAG_BUDGET, env.get("RENOVA_RAG_BUDGET"));
         for (AiProviderFactory factory : registry.aiProviders()) {
             putIfSet(values, apiKeyKey(factory.name()), env.get(factory.apiKeyEnvironmentVariable()));
             if (factory.baseUrlEnvironmentVariable() != null) {
@@ -106,6 +111,26 @@ final class AiConfiguration {
                 Secret.of(settings.get(apiKeyKey(provider)).orElse(null)),
                 settings.get(baseUrlKey(provider)).orElse(null),
                 options);
+    }
+
+    /**
+     * Retrieval for AI requests: the --rag/--no-rag flag when given, else {@code rag.enabled} (off by
+     * default), with {@code rag.budget} as the share of each request it may use.
+     */
+    RagSettings ragSettings(Boolean flag) {
+        boolean enabled = flag != null ? flag : settings.get(RAG).map(v -> {
+            if (!v.equalsIgnoreCase("true") && !v.equalsIgnoreCase("false")) {
+                throw new IllegalArgumentException(RAG + " must be true or false, not '" + v + "'");
+            }
+            return Boolean.parseBoolean(v);
+        }).orElse(false);
+        double budget;
+        try {
+            budget = settings.get(RAG_BUDGET).map(Double::parseDouble).orElse(RagSettings.DEFAULT_BUDGET);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(RAG_BUDGET + " must be a number such as 0.3");
+        }
+        return new RagSettings(enabled, budget);
     }
 
     /** "anthropic / claude-opus-5-5, key sk-ant-…9f3a from environment": safe to print. */

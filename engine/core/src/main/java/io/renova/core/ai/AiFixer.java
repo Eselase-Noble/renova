@@ -6,6 +6,9 @@ import io.renova.core.engine.PlanStep;
 import io.renova.core.engine.StageResult;
 import io.renova.core.engine.VerifyResult;
 import io.renova.core.playbook.FixSpec;
+import io.renova.core.rag.ContextAssembler;
+import io.renova.core.rag.ContextItem;
+import io.renova.core.rag.RetrievalQuery;
 import io.renova.core.spi.Fixer;
 import io.renova.core.spi.RelatedFile;
 import io.renova.core.spi.Verifier;
@@ -31,6 +34,8 @@ import java.util.TreeSet;
  * <p>Each request carries the target files plus their related files from the ecosystem plugin
  * (for Java, the owning build file), so a fix that spans a source file and its build file is one
  * edit. The model may only change files it was given as editable; anything else is rejected.
+ * With RAG enabled, retrieved code is added as reference files and retrieved knowledge as notes,
+ * within a share of the request size.
  */
 public final class AiFixer implements Fixer {
 
@@ -148,8 +153,26 @@ public final class AiFixer implements Fixer {
             }
         }
 
+        List<ContextItem> knowledge = new ArrayList<>();
+        ContextAssembler assembler = ContextAssembler.forMigration(context, MAX_REQUEST_CHARS);
+        if (assembler != null) {
+            Map<String, String> targetContents = new LinkedHashMap<>();
+            files.stream().filter(f -> f.role() == RequestFile.Role.TARGET).forEach(f -> targetContents.put(f.path(), f.content()));
+            int used = files.stream().mapToInt(f -> f.content().length()).sum();
+            for (ContextItem item : assembler.assemble(new RetrievalQuery(targetContents, hints, errors), included,
+                    MAX_REQUEST_CHARS - used)) {
+                if (item.kind() == ContextItem.Kind.CODE) {
+                    included.add(item.source());
+                    files.add(new RequestFile(item.source(), item.content(), RequestFile.Role.REFERENCE, item.why()));
+                } else {
+                    knowledge.add(item);
+                }
+                tally.retrieved++;
+            }
+        }
+
         String label = String.join(", ", targets);
-        FixRequest request = new FixRequest(context.playbook().name(), files, hints, errors);
+        FixRequest request = new FixRequest(context.playbook().name(), files, hints, errors, knowledge);
         if (request.totalChars() > MAX_REQUEST_CHARS && targets.size() > 1) {
             // Too much for one response: fall back to one target per request.
             for (String target : targets) {
@@ -254,10 +277,12 @@ public final class AiFixer implements Fixer {
         final List<String> writtenThisRound = new ArrayList<>();
         long inputTokens;
         long outputTokens;
+        int retrieved;
         final List<String> log = new ArrayList<>();
 
         String usage() {
-            return inputTokens + " input / " + outputTokens + " output tokens";
+            return inputTokens + " input / " + outputTokens + " output tokens"
+                    + (retrieved == 0 ? "" : "; " + retrieved + " retrieved context item(s)");
         }
     }
 }

@@ -165,6 +165,21 @@ or reports.
 | `anthropic.baseUrl` | `ANTHROPIC_BASE_URL` | Anthropic API |
 | `openai.apiKey` | `OPENAI_API_KEY` | — |
 | `openai.baseUrl` | `OPENAI_BASE_URL` | OpenAI API. Point it at an on-premises OpenAI-compatible server to keep code in your network |
+| `rag.enabled` | `RENOVA_RAG` | `false`. `--rag` / `--no-rag` override it for one migration |
+| `rag.budget` | `RENOVA_RAG_BUDGET` | `0.3`: the share of each AI request that retrieved context may use |
+
+### Retrieval (RAG)
+
+With `--rag`, each AI request also carries context retrieved for it, with no extra key or model call:
+
+- **Related project code:** for Java, the project types a file extends or imports, the configuration files
+  that name it, and the classes a Spring XML or JSP file names. These files are sent as reference only and
+  can never be edited.
+- **Curated knowledge:** short notes shipped with the playbook (`knowledge:`), chosen when a note's trigger
+  terms appear in the request's rules, build errors or files, and ranked with BM25.
+
+Each AI exchange's log (`.renova/ai/NNN.md`) lists the context it received. RAG is off by default until
+benchmarks show it improves results. See [docs/rag-design.md](docs/rag-design.md).
 
 ## Playbooks
 
@@ -219,7 +234,8 @@ twenty lines and is a good starting point. See [`engine/README.md`](engine/READM
 
 ## Roadmap
 
-1. **RAG:** retrieve related code and past migration knowledge for AI requests, on the customer's own keys.
+1. **RAG:** phase 1 (structural code retrieval and curated knowledge, no key needed) is in, behind `--rag`.
+   Next: lessons from accepted fixes, then optional embeddings on the customer's own key.
 2. **Guards after AI repair:** re-check guards on edits made by the repair loop.
 3. **Behavioural verification:** run the original and migrated applications side by side and compare responses and data effects.
 4. **Benchmark harness:** measure Renova against public legacy projects with known migrated versions.

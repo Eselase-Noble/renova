@@ -566,3 +566,118 @@ rules:
       argument whose type comes from a sibling module can leave a call unconverted, and Spring 6 no
       longer compiles it. Calls whose argument contains a comma or nested calls are left to the build
       and AI repair.
+
+# ---------------------------------------------------------------- Knowledge cards
+# Curated notes retrieved for AI requests when RAG is enabled (--rag). A card is sent when one of its
+# triggers appears in the request's rules, build errors or target files. Written from public migration
+# guides and release notes; never from customer code.
+
+knowledge:
+
+  - id: jdk-removed-java-ee-modules
+    title: Java EE APIs that Java 8 supplied are gone from the JDK
+    triggers: ["package jakarta.annotation does not exist", "package javax.annotation does not exist",
+               "package javax.xml.bind does not exist", "package jakarta.xml.bind does not exist",
+               "javax.annotation.PostConstruct", "jakarta.annotation.PostConstruct"]
+    body: |
+      Java 11 removed the Java EE and CORBA modules from the JDK (JEP 320): javax.annotation (JSR-250, e.g.
+      @PostConstruct, @Resource), javax.xml.bind (JAXB), javax.xml.ws (JAX-WS), javax.activation. A Java 8
+      build compiled against them without declaring anything. After javax → jakarta they must be declared:
+      - jakarta.annotation:jakarta.annotation-api:2.1.1 (provided on Tomcat 10.1/11 and WildFly, which ship it)
+      - jakarta.xml.bind:jakarta.xml.bind-api:4.0.2 plus an implementation (see the JAXB note)
+      Fix this in the module's build file, not by changing the code that uses the annotations.
+
+  - id: jaxb-needs-implementation
+    title: Jakarta XML Binding needs an implementation at runtime
+    triggers: ["JAXBContext", "jakarta.xml.bind", "javax.xml.bind", "DatatypeConverter",
+               "Implementation of Jakarta XML Binding-API has not been found"]
+    body: |
+      The API jar (jakarta.xml.bind-api) compiles but JAXBContext.newInstance fails at runtime with
+      "Implementation of Jakarta XML Binding-API has not been found" unless an implementation is on the
+      classpath: org.glassfish.jaxb:jaxb-runtime:4.0.5 (runtime scope) matches API 4.0.2. Full Jakarta EE
+      servers (WildFly, JBoss EAP 8) supply both; Tomcat supplies neither. jakarta.xml.bind.DatatypeConverter
+      exists in the API jar; java.util.Base64 and java.util.HexFormat (Java 17) are JDK alternatives.
+
+  - id: spring6-commons-multipart-removed
+    title: Spring 6 removed CommonsMultipartResolver
+    triggers: ["CommonsMultipartResolver", "commons-fileupload"]
+    body: |
+      Use org.springframework.web.multipart.support.StandardServletMultipartResolver, which relies on the
+      servlet container's multipart support. Spring looks the resolver up by the bean name
+      "multipartResolver"; keep that name. Limits move to the DispatcherServlet's <multipart-config> in
+      web.xml (or a MultipartConfigElement): Commons maxUploadSize limited the whole request, so map it to
+      max-request-size (and max-file-size, to keep per-file uploads at most as large); maxInMemorySize maps
+      to file-size-threshold. Without a <multipart-config> the container rejects multipart requests.
+
+  - id: commons-fileupload2-artifacts
+    title: Apache Commons FileUpload 2 artifacts and packages
+    triggers: ["commons-fileupload2", "org.apache.commons.fileupload"]
+    body: |
+      FileUpload 2 splits into artifacts per servlet API, each with its own package:
+      commons-fileupload2-jakarta-servlet5 (org.apache.commons.fileupload2.jakarta.servlet5) for Servlet 5
+      and commons-fileupload2-jakarta-servlet6 (...jakarta.servlet6) for Servlet 6 / Tomcat 10.1+. Keep the
+      artifact, its version and the code's imports consistent; mixing the two leaves a dependency without a
+      managed version or classes that do not resolve. FileUpload 2 lowered the default per-part header limit
+      from 10240 to 512 bytes; set 10240 explicitly so long file names are still accepted.
+
+  - id: nashorn-removed
+    title: Nashorn was removed in Java 15
+    triggers: ["nashorn", "getEngineByName", "ScriptEngineManager", "jdk.nashorn"]
+    body: |
+      Java 15 removed the Nashorn JavaScript engine (JEP 372). ScriptEngineManager.getEngineByName("nashorn"
+      or "javascript") then returns null, so code compiles and fails at runtime with a NullPointerException.
+      Add org.openjdk.nashorn:nashorn-core:15.7 (it needs Java 11+) to the module that runs scripts; it
+      registers under the same engine names, so the Java code can stay unchanged. Direct imports of
+      jdk.nashorn.api.* become org.openjdk.nashorn.api.*.
+
+  - id: spring6-handler-interceptor-adapter
+    title: Spring 6 removed HandlerInterceptorAdapter
+    triggers: ["HandlerInterceptorAdapter"]
+    body: |
+      HandlerInterceptorAdapter was an empty implementation of AsyncHandlerInterceptor. Replace
+      "extends HandlerInterceptorAdapter" with "implements AsyncHandlerInterceptor" (or HandlerInterceptor if
+      afterConcurrentHandlingStarted is not overridden). The interfaces have default methods, so only the
+      overridden methods are needed and behaviour does not change. Check superclasses too: a project base
+      class may extend the adapter.
+
+  - id: spring6-assert-messages
+    title: Spring 6 removed the message-less Assert overloads
+    triggers: ["org.springframework.util.Assert", "no suitable method found for notNull",
+               "no suitable method found for isTrue", "no suitable method found for state"]
+    body: |
+      Assert.notNull(Object), isNull, isTrue, state, hasText, hasLength, notEmpty and noNullElements without a
+      message were removed. Pass the message the removed overload used so exception text is unchanged, e.g.
+      notNull: "[Assertion failed] - this argument is required; it must not be null"; isTrue:
+      "[Assertion failed] - this expression must be true"; state: "[Assertion failed] - this state invariant
+      must be true"; hasText: "[Assertion failed] - this String argument must have text; it must not be
+      null, empty, or blank".
+
+  - id: spring6-url-matching
+    title: Spring 6 URL matching defaults changed
+    triggers: ["RequestMapping", "useSuffixPatternMatch", "suffix-pattern", "PathPatternParser", "AntPathMatcher",
+               "No more pattern data allowed after"]
+    body: |
+      Spring 6 matches URLs with PathPatternParser by default and dropped suffix pattern matching, so
+      "/orders" no longer answers "/orders.do", and trailing-slash matching is off ("/orders/" no longer
+      matches "/orders"). PathPatternParser also rejects "**" in the middle of a pattern, which stops startup
+      with "No more pattern data allowed after {*...} or ** pattern element". To keep old behaviour, configure
+      an AntPathMatcher with <mvc:path-matching path-matcher="..."/> and list ".do" forms explicitly.
+
+  - id: servlet-container-versions
+    title: Servlet and Jakarta EE versions by container
+    triggers: ["jakarta.servlet-api", "web-app_6_0", "web-app_5_0", "jakarta.jakartaee-api"]
+    body: |
+      Tomcat 10.0 implements Servlet 5.0 (Jakarta EE 9), Tomcat 10.1 Servlet 6.0 (Jakarta EE 10), Tomcat 11
+      Servlet 6.1 (Jakarta EE 11). WildFly 27+ and JBoss EAP 8 implement Jakarta EE 10. Compile against the
+      target's API version with provided scope: jakarta.servlet:jakarta.servlet-api:6.0.0 for Tomcat 10.1 or
+      jakarta.platform:jakarta.jakartaee-api:10.0.0 for a full Jakarta EE 10 server. Bundling the API in
+      WEB-INF/lib causes class-loading conflicts.
+
+  - id: tomcat10-sitemesh2-forward
+    title: SiteMesh 2 pages render blank on Tomcat 10.1/11
+    triggers: ["sitemesh", "suspendWrappedResponseAfterForward"]
+    body: |
+      Tomcat 10.1+ finishes the response after a RequestDispatcher forward (suspendWrappedResponseAfterForward
+      defaults to true), discarding output SiteMesh 2 buffered. Use the Jakarta build of SiteMesh 2
+      (opensymphony:sitemesh 2.6.0+) and add <Context suspendWrappedResponseAfterForward="false" /> to
+      src/main/webapp/META-INF/context.xml.
