@@ -1,0 +1,191 @@
+# Renova
+
+**Assess and modernise legacy software systems, safely and repeatably.**
+
+Renova analyses a legacy codebase, produces a migration plan, and carries out the migration on a copy
+of the project. Deterministic rewrites handle the mechanical bulk. Context-dependent changes go to an
+AI model or a person, and the real build checks every change.
+
+> **Status:** early development (`0.1.0-SNAPSHOT`). The engine and command-line interface work for
+> Java projects. The web, desktop and IDE products are planned. See the [roadmap](#roadmap).
+
+---
+
+## Contents
+
+- [Why Renova](#why-renova)
+- [How it works](#how-it-works)
+- [Repository layout](#repository-layout)
+- [Getting started](#getting-started)
+- [Playbooks](#playbooks)
+- [Extending Renova](#extending-renova)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Why Renova
+
+Platform upgrades such as Java 8 → 21, `javax` → `jakarta`, or a new application server touch thousands
+of files. Most of those edits are mechanical. A small number need judgement, and those usually take
+most of the effort. Renova treats the two differently:
+
+- **Assessment before change.** A read-only analysis reports every affected place, grouped by
+  category and severity, with an *automation rate*: the share of the work that needs no human
+  decision.
+- **Migrations are data.** A migration path is a YAML *playbook* of rules. New targets, or a client's
+  own conventions, are added without changing the engine.
+- **The right tool for each change:** AST-aware recipes ([OpenRewrite](https://docs.openrewrite.org/))
+  for code, text rules for JSP, TLD and configuration files, an AI provider for context-dependent
+  edits, and clear guidance for anything left to a person.
+- **Safe by construction.** The source project is never modified. Each stage of a migration is a
+  separate git commit in an isolated workspace, so every change can be reviewed, audited or reverted.
+- **Verified.** The migrated project is built, and build failures become structured errors that feed
+  an automatic repair loop.
+- **Any ecosystem.** The engine has no Java-specific code. Java is the first plugin.
+
+## How it works
+
+```
+             ┌────────────┐   ┌──────────┐   ┌──────────────────────── migrate (on a copy) ───────────────────────┐
+ project ──► │  analyze   │ ─►│   plan   │ ─►│ recipe ─► replace ─► ai ─► verify (build) ─► ai repair ─► report  │
+             │ (read-only)│   │ ordered  │   │          every stage is one git commit in the workspace           │
+             └────────────┘   └──────────┘   └────────────────────────────────────────────────────────────────────┘
+```
+
+Every finding belongs to a change category, and plan steps run in the order A → E → B → C → D:
+
+| Code | Category | Examples |
+|---|---|---|
+| A | Build, platform and descriptors | Java level, `web.xml` schema, build variants |
+| B | Namespace renames | `javax.servlet` → `jakarta.servlet` in Java, JSP and TLD files |
+| C | Removed or changed APIs | `sun.misc.BASE64Decoder`, Spring 6 API removals |
+| D | Runtime and container behaviour | URL matching defaults, servlet-container settings |
+| E | Dependency declarations | Libraries previously supplied only transitively |
+
+## Repository layout
+
+| Path | Description | Status |
+|---|---|---|
+| [`engine/core`](engine) | Ecosystem-neutral engine: playbooks, plugin SPI, analysis, planning, migration, AI loop, reports | Working |
+| [`engine/java`](engine) | Java plugin: Maven/Gradle model, Java detectors, OpenRewrite fixer, Maven verifier, bundled playbooks | Working |
+| [`cli`](cli) | `renova` command for terminals and CI pipelines | Working |
+| [`web`](web) | REST API and web console, hosted or on-premises | Planned |
+| [`desktop`](desktop) | Offline desktop application reusing the web UI | Planned |
+| [`ide`](ide) | IntelliJ IDEA and VS Code integrations | Planned |
+
+## Getting started
+
+### Prerequisites
+
+- JDK 21 or later
+- Maven 3.8 or later
+- Git, used to version migration workspaces
+- Network access to Maven Central, or a mirror configured in `settings.xml`
+
+### Build
+
+```sh
+git clone https://github.com/Eselase-Noble/renova.git
+cd renova
+mvn install
+```
+
+This builds and tests every module and produces the CLI at `cli/target/renova.jar`.
+
+### Use
+
+```sh
+# List installed ecosystems and playbooks
+cli/bin/renova playbooks
+
+# Assess a project (read-only). Markdown by default, JSON for tooling.
+cli/bin/renova analyze /path/to/project
+cli/bin/renova analyze /path/to/project -f json -o assessment.json
+
+# Migrate a copy of the project into an empty directory
+cli/bin/renova migrate /path/to/project --out /path/to/migrated \
+    [--playbook ID|FILE] [--maven-settings settings.xml] [--offline] [--skip ai]
+```
+
+After a migration, `/path/to/migrated` contains:
+
+- the migrated project, with one git commit per stage (`git log` lists them)
+- `.renova/report.md`: a human-readable migration report, structured like a migration guide
+- `.renova/report.json`: the same data for CI gates and dashboards
+
+`migrate` exits with `0` when the migrated build passes, `1` when it fails, and `2` on usage errors.
+
+## Playbooks
+
+A playbook is a list of rules. Each rule says what to detect and how to fix it:
+
+```yaml
+id: java8-to-21-jakarta-ee10
+ecosystem: java
+rules:
+  - id: javax-in-jsp
+    title: Rename javax.servlet references in JSP pages and tag files
+    category: B
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.jsp", "**/*.tag"]
+      pattern: "javax\\.servlet"
+    fix:
+      strategy: replace
+      include: "**/*.{jsp,tag}"
+      find: "javax.servlet"
+      replace: "jakarta.servlet"
+```
+
+| Fix strategy | Who resolves it |
+|---|---|
+| `recipe` | An ecosystem rewrite tool (OpenRewrite for Java), deterministic and type-aware |
+| `replace` | Text replacement driven by the playbook, for files without a parser |
+| `ai` | The configured AI provider. The build verifies the result |
+| `manual` | A person, guided by the rule's `hint` in the report |
+
+Bundled playbook: **`java8-to-21-jakarta-ee10`**, which takes Java 8 / Java EE web applications to Java 21,
+Jakarta EE 10 and Spring 6, for Tomcat 10.1/11 and WildFly 27+ / JBoss EAP 8. Pass `--playbook path/to/file.yaml`
+to use your own.
+
+## Extending Renova
+
+All extension points are Java interfaces discovered with `ServiceLoader`. Adding a jar to the
+classpath is enough.
+
+| Extension point | Purpose |
+|---|---|
+| `EcosystemPlugin` | Project model, detectors, fixers, verifier and bundled playbooks for one technology stack |
+| `DetectorFactory` | A new `detect.type` for playbooks |
+| `Fixer` | A new fix strategy |
+| `Verifier` | Proves a migrated workspace builds (and, later, behaves the same) |
+| `AiProvider` | Any model, hosted or on-premises, that proposes file edits |
+
+`engine/core/src/test/java/io/renova/core/EngineTest.java` implements a complete toy ecosystem in about
+twenty lines and is a good starting point. See [`engine/README.md`](engine/README.md) for details.
+
+## Roadmap
+
+1. **AI providers:** Anthropic (via `ANTHROPIC_API_KEY`) and an on-premises option.
+2. **Post-migration guard rules:** checks on the migrated code, such as keeping the servlet API in `provided` scope.
+3. **Behavioural verification:** run the original and migrated applications side by side and compare responses and data effects.
+4. **Benchmark harness:** measure Renova against public legacy projects with known migrated versions.
+5. **Web console and REST API**, then the **desktop** and **IDE** products.
+6. **More playbooks and ecosystems:** Spring Boot 2 → 3, Java EE → Quarkus, then .NET and Python.
+
+## Contributing
+
+- Branch from `main` using a descriptive prefix: `feature/…`, `fix/…`, `docs/…`.
+- Write commit messages in [Conventional Commits](https://www.conventionalcommits.org/) style,
+  for example `feat(engine): add Gradle recipe runner`.
+- Run `mvn verify` before opening a pull request. All tests must pass.
+- Never commit secrets. Configuration such as API keys comes from the environment or a local `.env`,
+  which git ignores.
+
+## License
+
+Copyright © 2026 Eselase Noble. All rights reserved.
+
+This software is proprietary. No licence is granted to use, copy, modify or distribute it without
+written permission from the copyright holder.
