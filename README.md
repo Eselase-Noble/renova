@@ -39,8 +39,8 @@ most of the effort. Renova treats the two differently:
   edits, and clear guidance for anything left to a person.
 - **Safe by construction.** The source project is never modified. Each stage of a migration is a
   separate git commit in an isolated workspace, so every change can be reviewed, audited or reverted.
-- **Verified.** The migrated project is built, and build failures become structured errors that feed
-  an automatic repair loop. One repair can change a source file and its build file together.
+- **Verified.** The migrated project is built and its tests are run (`--skip-tests` to only compile).
+  Compiler, build-file and test failures become structured errors that feed an automatic repair loop. One repair can change a source file and its build file together.
 - **Bring your own AI key.** Each user or organisation supplies its own provider credentials. Token
   usage is reported per migration.
 - **Any ecosystem.** The engine has no Java-specific code. Java is the first plugin.
@@ -113,7 +113,7 @@ cli/bin/renova analyze /path/to/project -f json -o assessment.json
 
 # Migrate a copy of the project into an empty directory
 cli/bin/renova migrate /path/to/project --out /path/to/migrated \
-    [--playbook ID|FILE] [--maven-settings settings.xml] [--offline] [--skip ai]
+    [--playbook ID|FILE] [--maven-settings settings.xml] [--offline] [--skip ai] [--skip-tests]
 ```
 
 After a migration, `/path/to/migrated` contains:
@@ -121,6 +121,9 @@ After a migration, `/path/to/migrated` contains:
 - the migrated project, with one git commit per stage (`git log` lists them)
 - `.renova/report.md`: a human-readable migration report, structured like a migration guide
 - `.renova/report.json`: the same data for CI gates and dashboards
+
+Verification runs the project's own tests, because code that compiles on the new JDK can still fail
+at runtime. A failed test is attributed to the project code that threw, so repairs target that code.
 
 `migrate` exits with `0` when the migrated build passes, `1` when it fails, and `2` on usage errors.
 

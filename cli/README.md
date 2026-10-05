@@ -17,7 +17,7 @@ cli/bin/renova analyze <project> [-f md|json] [-o FILE]   # read-only assessment
 cli/bin/renova migrate <project> --out <dir>              # migrate a copy; each stage is a git commit
           [--playbook ID|FILE] [--maven-settings FILE] [--offline]
           [--ai PROVIDER] [--ai-model MODEL] [--ai-effort LEVEL] [--env-file FILE]
-          [--skip recipe,ai] [--no-verify] [--max-ai-iterations N]
+          [--skip recipe,ai] [--no-verify] [--skip-tests] [--max-ai-iterations N]
 cli/bin/renova config show | set KEY VALUE | set-key PROVIDER | unset KEY | check
 ```
 

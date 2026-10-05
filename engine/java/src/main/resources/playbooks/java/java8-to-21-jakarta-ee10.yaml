@@ -328,6 +328,22 @@ rules:
         javax.* modules are renamed jakarta.* in EAP 8 / WildFly 27+. Update module names in
         exclusions and dependencies, and re-check every excluded subsystem still exists.
 
+  - id: nashorn-script-engine
+    title: Nashorn JavaScript engine (removed in Java 15)
+    category: D
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.java"]
+      pattern: 'getEngineByName\(\s*"(?i:nashorn|javascript|js|ecmascript)"\s*\)|import\s+jdk\.nashorn\.'
+    fix:
+      strategy: ai
+      hint: >
+        Java 15 removed Nashorn: ScriptEngineManager.getEngineByName returns null and the code fails at
+        runtime even though it compiles. Add the standalone engine org.openjdk.nashorn:nashorn-core:15.7
+        to this module's build file; it registers under the same engine names, so the Java code can stay
+        as it is. Imports of jdk.nashorn.api.* become org.openjdk.nashorn.api.*.
+
   - id: security-manager
     title: SecurityManager use (deprecated for removal, disabled by default since Java 18)
     category: D
@@ -398,6 +414,29 @@ rules:
       umbrella into individual artifacts may add them with compile scope; bundled copies in WEB-INF/lib can
       cause class-loading conflicts. XML Binding is left out on purpose: whether the server supplies it
       depends on the container, so review jakarta.xml.bind-api and jaxb-runtime scopes for the target server.
+
+  - id: guard-jaxb-implementation
+    phase: guard
+    title: A bundled Jakarta XML Binding API needs an implementation at runtime
+    category: E
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates: ["jakarta.xml.bind:jakarta.xml.bind-api"]
+      scopeNot: provided
+      # An implementation is already there, or the full Jakarta EE server supplies one.
+      unlessDeclared:
+        - "org.glassfish.jaxb:jaxb-runtime"
+        - "com.sun.xml.bind:jaxb-impl"
+        - "org.eclipse.persistence:org.eclipse.persistence.moxy"
+        - "jakarta.platform:jakarta.jakartaee-api"
+    fix:
+      strategy: maven
+      params: { action: addDependency, dependency: "org.glassfish.jaxb:jaxb-runtime:4.0.5", scope: runtime }
+    rationale: >
+      Java 8 shipped JAXB with the JDK. After the move to jakarta.xml.bind the API compiles, but
+      JAXBContext fails at runtime ("Implementation of Jakarta XML Binding-API has not been found")
+      unless an implementation is on the classpath. jaxb-runtime 4.0.5 matches the 4.0.2 API.
 
   - id: guard-war-plugin-java17
     phase: guard

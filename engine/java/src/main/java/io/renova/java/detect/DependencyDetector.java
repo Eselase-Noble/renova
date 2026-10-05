@@ -19,11 +19,13 @@ import java.util.regex.Pattern;
 
 /**
  * {@code type: dependency, coordinates: ["javax.servlet:*", "org.springframework:spring-*"], versionBelow?: "6",
- * scopeNot?: provided, packaging?: war, whenDeclared?: "jakarta.platform:*"} — one finding per declared dependency in any Maven pom
+ * scopeNot?: provided, packaging?: war, whenDeclared?: "jakarta.platform:*", unlessDeclared?: [globs]} — one
+ * finding per declared dependency in any Maven pom
  * (including variants such as pom.jboss.xml) or Gradle build file. Coordinates are
  * {@code groupId:artifactId} globs. {@code scopeNot} reports only real (not managed) dependencies
  * whose scope differs (no scope counts as compile); {@code packaging} limits the check to modules of
- * that packaging; {@code whenDeclared} to poms that also declare a real dependency matching that glob.
+ * that packaging; {@code whenDeclared} to poms that also declare a real dependency matching that glob;
+ * {@code unlessDeclared} skips poms that declare (or inherit from a parent pom) any matching dependency.
  * These apply to Maven only.
  */
 public final class DependencyDetector implements DetectorFactory {
@@ -43,7 +45,8 @@ public final class DependencyDetector implements DetectorFactory {
         String scopeNot = params.optString("scopeNot").orElse(null);
         String packaging = params.optString("packaging").orElse(null);
         Pattern whenDeclared = params.optString("whenDeclared").map(DependencyDetector::glob).orElse(null);
-        boolean mavenOnly = scopeNot != null || packaging != null || whenDeclared != null;
+        List<Pattern> unlessDeclared = params.strings("unlessDeclared").stream().map(DependencyDetector::glob).toList();
+        boolean mavenOnly = scopeNot != null || packaging != null || whenDeclared != null || !unlessDeclared.isEmpty();
         return ctx -> {
             List<Finding> findings = new ArrayList<>();
             for (Path pom : ctx.files("**/pom*.xml")) {
@@ -53,6 +56,10 @@ public final class DependencyDetector implements DetectorFactory {
                 }
                 if (whenDeclared != null && read.dependencies().stream()
                         .noneMatch(d -> !d.managed() && whenDeclared.matcher(d.groupId() + ":" + d.artifactId()).matches())) {
+                    continue;
+                }
+                if (!unlessDeclared.isEmpty() && declaredHereOrInParents(ctx, pom, read).stream()
+                        .anyMatch(ga -> unlessDeclared.stream().anyMatch(p -> p.matcher(ga).matches()))) {
                     continue;
                 }
                 for (PomReader.Dependency d : read.dependencies()) {
@@ -93,6 +100,22 @@ public final class DependencyDetector implements DetectorFactory {
         }
         // Unknown or unresolved versions (managed by a parent) are reported: better a false alarm than a miss.
         return version == null || version.contains("${") || Versions.isBelow(version, versionBelow);
+    }
+
+    /** groupId:artifactId of real dependencies in this pom and the pom.xml files of parent directories. */
+    private static List<String> declaredHereOrInParents(ScanContext ctx, Path pom, PomReader.Pom read) {
+        List<String> declared = new ArrayList<>();
+        read.dependencies().stream().filter(d -> !d.managed()).forEach(d -> declared.add(d.groupId() + ":" + d.artifactId()));
+        Path dir = pom.getParent();
+        while (dir != null) {
+            dir = dir.getParent();
+            Path parentPom = dir == null ? Path.of("pom.xml") : dir.resolve("pom.xml");
+            if (ctx.files(ScanContext.toProjectPath(parentPom)).contains(parentPom)) {
+                readPom(ctx, parentPom).dependencies().stream().filter(d -> !d.managed())
+                        .forEach(d -> declared.add(d.groupId() + ":" + d.artifactId()));
+            }
+        }
+        return declared;
     }
 
     static PomReader.Pom readPom(ScanContext ctx, Path pom) {

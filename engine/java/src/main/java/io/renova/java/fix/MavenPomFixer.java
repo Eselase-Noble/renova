@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
@@ -22,7 +23,8 @@ import java.util.regex.Pattern;
  *   <li>{@code action: setPluginVersion, plugin: maven-war-plugin, version: "3.4.0", groupId?}</li>
  *   <li>{@code action: setProperty, name: maven.compiler.target, value: "${maven.compiler.source}"}</li>
  *   <li>{@code action: addDependency}: adds the dependency each finding describes in its data
- *       (groupId, artifactId, version, scope)</li>
+ *       (groupId, artifactId, version, scope), or the fixed {@code dependency: "g:a:v"} (and
+ *       {@code scope}) given in the params</li>
  * </ul>
  */
 public final class MavenPomFixer implements Fixer {
@@ -61,6 +63,14 @@ public final class MavenPomFixer implements Fixer {
                     case "addDependency" -> {
                         String content = before;
                         int changes = 0;
+                        Optional<String> fixed = params.optString("dependency");
+                        if (fixed.isPresent()) {
+                            String[] gav = fixed.get().split(":");
+                            if (gav.length != 3) {
+                                throw new IllegalArgumentException("Rule '" + ruleId + "': dependency must be groupId:artifactId:version");
+                            }
+                            yield PomEditor.addDependency(content, gav[0], gav[1], gav[2], params.optString("scope").orElse(null));
+                        }
                         for (Finding f : step.findings()) {
                             if (!f.file().equals(file) || !f.data().containsKey("artifactId")) {
                                 continue;
