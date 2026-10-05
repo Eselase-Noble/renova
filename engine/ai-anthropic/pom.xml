@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.renova</groupId>
+        <artifactId>renova-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>renova-ai-anthropic</artifactId>
+    <name>Renova :: AI provider :: Anthropic</name>
+    <description>AI provider backed by Claude, using the caller's own Anthropic API key.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.renova</groupId>
+            <artifactId>renova-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.anthropic</groupId>
+            <artifactId>anthropic-java</artifactId>
+        </dependency>
+    </dependencies>
+</project>
