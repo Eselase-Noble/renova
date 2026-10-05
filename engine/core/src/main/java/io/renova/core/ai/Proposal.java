@@ -1,17 +1,25 @@
 package io.renova.core.ai;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 /**
- * A provider's answer for one file.
+ * A provider's answer to one request.
  *
- * @param newContent the complete new file content; null unless {@link Outcome#CHANGED}
- * @param rationale  why the file was changed, left alone, or declined
+ * @param edits     new complete content by project-relative path; empty unless {@link Outcome#CHANGED}
+ * @param rationale why files were changed, left alone, or the request declined
  */
-public record Proposal(Outcome outcome, String newContent, String rationale, long inputTokens, long outputTokens) {
+public record Proposal(Outcome outcome, Map<String, String> edits, String rationale, long inputTokens, long outputTokens) {
 
     public enum Outcome { CHANGED, UNCHANGED, DECLINED }
 
-    public static Proposal changed(String content, String rationale, long in, long out) {
-        return new Proposal(Outcome.CHANGED, content, rationale, in, out);
+    public Proposal {
+        edits = edits == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(edits));
+    }
+
+    public static Proposal changed(Map<String, String> edits, String rationale, long in, long out) {
+        return new Proposal(Outcome.CHANGED, edits, rationale, in, out);
     }
 
     public static Proposal unchanged(String rationale, long in, long out) {

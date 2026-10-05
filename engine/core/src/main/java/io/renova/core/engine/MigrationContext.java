@@ -3,6 +3,7 @@ package io.renova.core.engine;
 import io.renova.core.ai.AiProvider;
 import io.renova.core.model.ProjectModel;
 import io.renova.core.playbook.Playbook;
+import io.renova.core.spi.EcosystemPlugin;
 import io.renova.core.workspace.Workspace;
 
 /**
@@ -10,5 +11,5 @@ import io.renova.core.workspace.Workspace;
  * relative paths are equally valid inside the workspace.
  */
 public record MigrationContext(Workspace workspace, ProjectModel project, Playbook playbook,
-                               MigrationOptions options, AiProvider ai) {
+                               MigrationOptions options, AiProvider ai, EcosystemPlugin plugin) {
 }

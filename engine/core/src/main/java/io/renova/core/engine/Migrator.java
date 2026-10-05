@@ -37,7 +37,8 @@ public final class Migrator {
         try (AiProvider ai = registry.ai(options.ai())) {
             progress.accept("Copying project to " + options.outputDir());
             Workspace workspace = Workspace.create(analysis.project().root(), options.outputDir());
-            return run(new MigrationContext(workspace, analysis.project(), plan.playbook(), options, ai), plan);
+            return run(new MigrationContext(workspace, analysis.project(), plan.playbook(), options, ai,
+                    registry.plugin(plan.playbook().ecosystem())), plan);
         }
     }
 

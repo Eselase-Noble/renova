@@ -8,6 +8,7 @@ import io.renova.core.ai.AiProviderException;
 import io.renova.core.ai.AiSettings;
 import io.renova.core.ai.FixRequest;
 import io.renova.core.ai.Proposal;
+import io.renova.core.ai.RequestFile;
 import io.renova.core.config.Secret;
 import io.renova.core.engine.BuildError;
 import org.junit.jupiter.api.AfterEach;
@@ -72,19 +73,22 @@ class AnthropicProviderTest {
     }
 
     private static FixRequest request() {
-        return new FixRequest("Java 8 → 21", "src/A.java", "import sun.misc.BASE64Decoder;\nclass A {}\n",
+        return new FixRequest("Java 8 → 21", List.of(
+                new RequestFile("src/A.java", "import sun.misc.BASE64Decoder;\nclass A {}\n", RequestFile.Role.TARGET, null),
+                new RequestFile("pom.xml", "<project/>\n", RequestFile.Role.RELATED, "build file of module a")),
                 List.of("Replace sun.misc.BASE64Decoder: use java.util.Base64"),
                 List.of(new BuildError("src/A.java", 1, "package sun.misc does not exist")));
     }
 
     @Test
     void returnsTheEditedFileAndSendsTheUsersOwnKey() throws Exception {
-        answerJson = JSON.writeValueAsString(Map.of("changed", true,
-                "content", "import java.util.Base64;\nclass A {}\n", "rationale", "Use java.util.Base64."));
+        answerJson = JSON.writeValueAsString(Map.of("rationale", "Use java.util.Base64.", "edits", List.of(
+                Map.of("path", "src/A.java", "content", "import java.util.Base64;\nclass A {}\n"))));
         try (AiProvider ai = provider(Map.of("effort", "medium"))) {
             Proposal p = ai.propose(request());
             assertThat(p.outcome()).isEqualTo(Proposal.Outcome.CHANGED);
-            assertThat(p.newContent()).contains("java.util.Base64");
+            assertThat(p.edits()).containsOnlyKeys("src/A.java");
+            assertThat(p.edits().get("src/A.java")).contains("java.util.Base64");
             assertThat(p.inputTokens()).isEqualTo(120);
             assertThat(p.outputTokens()).isEqualTo(45);
         }
@@ -94,16 +98,17 @@ class AnthropicProviderTest {
         assertThat(body.path("stream").asBoolean()).isTrue();
         assertThat(body.path("output_config").path("effort").asText()).isEqualTo("medium");
         assertThat(body.path("output_config").path("format").path("schema").path("required"))
-                .extracting(JsonNode::asText).containsExactly("changed", "content", "rationale");
+                .extracting(JsonNode::asText).containsExactly("rationale", "edits");
         assertThat(body.has("thinking")).as("adaptive thinking is the model default").isFalse();
         assertThat(body.has("fallbacks")).as("no fallbacks through a custom base URL").isFalse();
         String userText = body.path("messages").get(0).path("content").asText();
-        assertThat(userText).contains("<file path=\"src/A.java\">", "<build_errors>", "line 1: package sun.misc");
+        assertThat(userText).contains("<file path=\"src/A.java\" role=\"target\">", "<build_errors>",
+                "src/A.java:1: package sun.misc", "<file path=\"pom.xml\" role=\"related\" why=\"build file of module a\">");
     }
 
     @Test
     void reportsNoChange() throws Exception {
-        answerJson = JSON.writeValueAsString(Map.of("changed", false, "content", "", "rationale", "Already compatible."));
+        answerJson = JSON.writeValueAsString(Map.of("rationale", "Already compatible.", "edits", List.of()));
         try (AiProvider ai = provider(Map.of())) {
             assertThat(ai.propose(request())).extracting(Proposal::outcome, Proposal::rationale)
                     .containsExactly(Proposal.Outcome.UNCHANGED, "Already compatible.");
@@ -112,7 +117,7 @@ class AnthropicProviderTest {
 
     @Test
     void declinesTruncatedAndRefusedResponsesInsteadOfWritingThem() throws Exception {
-        answerJson = "{\"changed\": true, \"content\": \"class A {";
+        answerJson = "{\"rationale\": \"x\", \"edits\": [{\"path\": \"src/A.java\", \"content\": \"class A {";
         stopReason = "max_tokens";
         try (AiProvider ai = provider(Map.of())) {
             assertThat(ai.propose(request()).outcome()).isEqualTo(Proposal.Outcome.DECLINED);
@@ -145,10 +150,11 @@ class AnthropicProviderTest {
     }
 
     @Test
-    void declinesFilesTooLargeForOneResponse() throws Exception {
-        String huge = "x".repeat(AnthropicProvider.MAX_FILE_CHARS + 1);
+    void declinesRequestsTooLargeForOneResponse() throws Exception {
+        String huge = "x".repeat(AnthropicProvider.MAX_REQUEST_CHARS + 1);
         try (AiProvider ai = provider(Map.of())) {
-            Proposal p = ai.propose(new FixRequest("goal", "Big.java", huge, List.of("rule"), List.of()));
+            Proposal p = ai.propose(new FixRequest("goal",
+                    List.of(new RequestFile("Big.java", huge, RequestFile.Role.TARGET, null)), List.of("rule"), List.of()));
             assertThat(p.outcome()).isEqualTo(Proposal.Outcome.DECLINED);
         }
         assertThat(requestBody.get()).isNull();

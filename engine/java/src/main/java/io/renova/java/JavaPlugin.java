@@ -6,6 +6,7 @@ import io.renova.core.scan.ScanContext;
 import io.renova.core.spi.DetectorFactory;
 import io.renova.core.spi.EcosystemPlugin;
 import io.renova.core.spi.Fixer;
+import io.renova.core.spi.RelatedFile;
 import io.renova.core.spi.Verifier;
 import io.renova.java.detect.DependencyDetector;
 import io.renova.java.detect.ImportDetector;
@@ -122,6 +123,33 @@ public final class JavaPlugin implements EcosystemPlugin {
     @Override
     public Optional<Verifier> verifier() {
         return Optional.of(new MavenVerifier());
+    }
+
+    /**
+     * A source file's related file is the build file of the module that owns it (editable, so a
+     * missing dependency can be added in the same edit). A variant such as pom.jboss.xml gets the
+     * module's pom.xml as a read-only reference to align with.
+     */
+    @Override
+    public List<RelatedFile> relatedFiles(ProjectModel model, String file) {
+        Module owner = null;
+        for (Module m : model.modules()) {
+            boolean contains = m.path().equals(".") || file.startsWith(m.path() + "/");
+            if (contains && (owner == null || m.path().length() > owner.path().length())) {
+                owner = m;
+            }
+        }
+        if (owner == null || owner.buildFile().equals(file)) {
+            return List.of();
+        }
+        String dir = owner.path().equals(".") ? "" : owner.path() + "/";
+        String name = file.substring(file.lastIndexOf('/') + 1);
+        boolean variantPom = file.equals(dir + name) && name.startsWith("pom.") && name.endsWith(".xml");
+        if (variantPom) {
+            return List.of(new RelatedFile(owner.buildFile(), false,
+                    "main build file of module " + owner.name() + ", already migrated; align the variant with it"));
+        }
+        return List.of(new RelatedFile(owner.buildFile(), true, "build file of module " + owner.name()));
     }
 
     @Override

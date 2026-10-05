@@ -35,6 +35,14 @@ public interface EcosystemPlugin {
         return Optional.empty();
     }
 
+    /**
+     * Files to show the AI alongside {@code file} (project-relative), such as the build file that
+     * declares its dependencies. Lets one request fix a source file and its build file together.
+     */
+    default List<RelatedFile> relatedFiles(ProjectModel model, String file) {
+        return List.of();
+    }
+
     /** Classpath resources of the playbooks this plugin ships with. */
     default List<String> bundledPlaybooks() {
         return List.of();

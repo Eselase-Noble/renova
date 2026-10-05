@@ -91,4 +91,20 @@ class JavaPlaybookTest {
                     .as("detector for rule %s", r.id()).isPresent());
         }
     }
+
+    @Test
+    void relatesSourcesToTheirBuildFileAndVariantsToTheMainPom() {
+        JavaPlugin plugin = new JavaPlugin();
+        assertThat(plugin.relatedFiles(analysis.project(), "src/main/java/com/acme/web/OrderController.java"))
+                .singleElement().satisfies(r -> {
+                    assertThat(r.path()).isEqualTo("pom.xml");
+                    assertThat(r.editable()).isTrue();
+                });
+        assertThat(plugin.relatedFiles(analysis.project(), "pom.jboss.xml"))
+                .singleElement().satisfies(r -> {
+                    assertThat(r.path()).isEqualTo("pom.xml");
+                    assertThat(r.editable()).isFalse();
+                });
+        assertThat(plugin.relatedFiles(analysis.project(), "pom.xml")).isEmpty();
+    }
 }
