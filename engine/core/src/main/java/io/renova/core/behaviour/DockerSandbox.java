@@ -120,8 +120,8 @@ public final class DockerSandbox {
         Files.writeString(workDir.resolve(name + ".txt"), encode(scenarios));
         Path responses = workDir.resolve(name + "-responses.txt");
         Files.deleteIfExists(responses);
-        Path probeClasses = probeClasspath();
-        String mounted = Files.isDirectory(probeClasses) ? "/renova/classes" : "/renova/renova.jar";
+        Path probeClasses = probeClasses(workDir);
+        String mounted = "/renova/classes";
         List<String> probe = new ArrayList<>(List.of("docker", "run", "--rm", "--name", id + "-probe-" + name, "--network", id));
         probe.addAll(userFlag());
         probe.addAll(List.of("-v", probeClasses + ":" + mounted + ":ro", "-v", workDir.toAbsolutePath() + ":/work",
@@ -243,13 +243,26 @@ public final class DockerSandbox {
         }
     }
 
-    /** Where the probe's class is loaded from: Renova's jar, or a classes directory in development. */
-    static Path probeClasspath() {
-        try {
-            return Path.of(Probe.class.getProtectionDomain().getCodeSource().getLocation().toURI());
-        } catch (Exception e) {
-            throw new IllegalStateException("Cannot locate Renova's classes for the probe", e);
+    /**
+     * The probe's class files, copied out of whatever Renova runs from (a classes directory, the CLI's jar, or
+     * a jar nested inside the web server's jar), so a plain JRE container can run them.
+     */
+    static Path probeClasses(Path workDir) throws IOException {
+        Path dir = workDir.resolve("probe-classes");
+        List<Class<?>> classes = new ArrayList<>(List.of(Probe.class.getDeclaredClasses()));
+        classes.add(Probe.class);
+        for (Class<?> c : classes) {
+            String resource = c.getName().replace('.', '/') + ".class";
+            try (var in = Probe.class.getClassLoader().getResourceAsStream(resource)) {
+                if (in == null) {
+                    throw new IOException("Cannot find " + resource + " to run the probe");
+                }
+                Path target = dir.resolve(resource);
+                Files.createDirectories(target.getParent());
+                Files.write(target, in.readAllBytes());
+            }
         }
+        return dir;
     }
 
     /** Runs the probe as the current user, so the files it writes belong to them. */

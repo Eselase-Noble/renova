@@ -52,7 +52,7 @@ public final class AiFixer implements Fixer {
     public StageResult apply(MigrationContext context, List<PlanStep> steps) throws Exception {
         AiProvider ai = context.ai();
         if (!ai.available()) {
-            return StageResult.skipped("ai", steps.size() + " step(s) need an AI provider (--ai) or manual work");
+            return StageResult.skipped("ai", steps.size() + " step(s) need an AI provider or a person");
         }
         // One request per file, carrying every rule that matched it.
         Map<String, List<String>> hintsByFile = new LinkedHashMap<>();
