@@ -28,6 +28,10 @@
             <artifactId>renova-ai-anthropic</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.renova</groupId>
+            <artifactId>renova-ai-openai</artifactId>
+        </dependency>
+        <dependency>
             <groupId>info.picocli</groupId>
             <artifactId>picocli</artifactId>
         </dependency>

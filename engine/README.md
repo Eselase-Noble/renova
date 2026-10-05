@@ -42,6 +42,7 @@ This is the headline number for customers.
 
 - `core` (`renova-core`): ecosystem-neutral engine (model, playbooks, SPI, analyzer, planner, migrator, workspace, AI loop, reports)
 - `ai-anthropic` (`renova-ai-anthropic`): Claude provider (official Anthropic Java SDK, JSON-schema responses, streaming, refusal handling)
+- `ai-openai` (`renova-ai-openai`): OpenAI provider (official OpenAI Java SDK, strict JSON-schema responses, streaming); works with OpenAI-compatible servers through `openai.baseUrl`
 - `java` (`renova-java`): Java plugin (Maven/Gradle model, Java detectors, OpenRewrite fixer, Maven verifier, Java 8→21/Jakarta playbook)
 
 ## Adding an ecosystem

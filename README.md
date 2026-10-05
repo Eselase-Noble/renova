@@ -40,7 +40,7 @@ most of the effort. Renova treats the two differently:
 - **Safe by construction.** The source project is never modified. Each stage of a migration is a
   separate git commit in an isolated workspace, so every change can be reviewed, audited or reverted.
 - **Verified.** The migrated project is built, and build failures become structured errors that feed
-  an automatic repair loop.
+  an automatic repair loop. One repair can change a source file and its build file together.
 - **Bring your own AI key.** Each user or organisation supplies its own provider credentials. Token
   usage is reported per migration.
 - **Any ecosystem.** The engine has no Java-specific code. Java is the first plugin.
@@ -71,6 +71,7 @@ Every finding belongs to a change category, and plan steps run in the order A �
 | [`engine/core`](engine) | Ecosystem-neutral engine: playbooks, plugin SPI, analysis, planning, migration, AI loop, reports | Working |
 | [`engine/java`](engine) | Java plugin: Maven/Gradle model, Java detectors, OpenRewrite fixer, Maven verifier, bundled playbooks | Working |
 | [`engine/ai-anthropic`](engine) | AI provider for Claude, using each user's own Anthropic API key | Working |
+| [`engine/ai-openai`](engine) | AI provider for OpenAI or any OpenAI-compatible server (Azure OpenAI, vLLM, Ollama), using the user's own key | Working |
 | [`cli`](cli) | `renova` command for terminals and CI pipelines | Working |
 | [`web`](web) | REST API and web console, hosted or on-premises | Planned |
 | [`desktop`](desktop) | Offline desktop application reusing the web UI | Planned |
@@ -125,11 +126,12 @@ give Renova **your own** API key in any of these ways:
 
 ```sh
 # 1. Store it in your user config file (prompted without echo; file is readable only by you)
-cli/bin/renova config set-key anthropic
-cli/bin/renova config set ai.provider anthropic
+cli/bin/renova config set-key anthropic          # or: openai
+cli/bin/renova config set ai.provider anthropic  # or: openai
 
 # 2. Or use environment variables
 export ANTHROPIC_API_KEY=...        RENOVA_AI_PROVIDER=anthropic
+export OPENAI_API_KEY=...           RENOVA_AI_PROVIDER=openai
 
 # 3. Or point at a .env file kept outside the repository
 cli/bin/renova migrate <project> --out <dir> --ai anthropic --env-file ~/secrets/renova.env
@@ -147,11 +149,13 @@ or reports.
 | Setting | Environment variable | Default |
 |---|---|---|
 | `ai.provider` | `RENOVA_AI_PROVIDER` | `none` |
-| `ai.model` | `RENOVA_AI_MODEL` | provider default (`claude-opus-5-5`) |
-| `ai.effort` | `RENOVA_AI_EFFORT` | `high` |
-| `ai.fallbacks` | `RENOVA_AI_FALLBACKS` | `default` (server-side refusal fallbacks; `off` to disable) |
+| `ai.model` | `RENOVA_AI_MODEL` | provider default (`claude-opus-5-5` / `gpt-5.5`) |
+| `ai.effort` | `RENOVA_AI_EFFORT` | Anthropic: `high`. OpenAI: not sent unless set |
+| `ai.fallbacks` | `RENOVA_AI_FALLBACKS` | Anthropic only: `default` (server-side refusal fallbacks; `off` to disable) |
 | `anthropic.apiKey` | `ANTHROPIC_API_KEY` | — |
 | `anthropic.baseUrl` | `ANTHROPIC_BASE_URL` | Anthropic API |
+| `openai.apiKey` | `OPENAI_API_KEY` | — |
+| `openai.baseUrl` | `OPENAI_BASE_URL` | OpenAI API. Point it at an on-premises OpenAI-compatible server to keep code in your network |
 
 ## Playbooks
 
@@ -205,7 +209,7 @@ twenty lines and is a good starting point. See [`engine/README.md`](engine/READM
 
 ## Roadmap
 
-1. **More AI providers:** an on-premises option for customers whose code must not leave their network.
+1. **RAG:** retrieve related code and past migration knowledge for AI requests, on the customer's own keys.
 2. **Post-migration guard rules:** checks on the migrated code, such as keeping the servlet API in `provided` scope.
 3. **Behavioural verification:** run the original and migrated applications side by side and compare responses and data effects.
 4. **Benchmark harness:** measure Renova against public legacy projects with known migrated versions.
