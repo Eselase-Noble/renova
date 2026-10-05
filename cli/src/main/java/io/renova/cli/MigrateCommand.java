@@ -1,22 +1,14 @@
 package io.renova.cli;
 
-import io.renova.core.engine.AnalysisResult;
-import io.renova.core.engine.Analyzer;
 import io.renova.core.engine.MigrationOptions;
 import io.renova.core.engine.MigrationOutcome;
-import io.renova.core.engine.MigrationPlan;
-import io.renova.core.engine.Migrator;
-import io.renova.core.engine.Planner;
 import io.renova.core.engine.PluginRegistry;
 import io.renova.core.engine.StageResult;
 import io.renova.core.rag.RagSettings;
-import io.renova.core.report.JsonReport;
-import io.renova.core.report.MarkdownReport;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -63,11 +55,6 @@ final class MigrateCommand implements Callable<Integer> {
     @Override
     public Integer call() throws Exception {
         PluginRegistry registry = PluginRegistry.load();
-        AnalysisResult analysis = new Analyzer(registry).analyze(project.root(), project.playbook(registry));
-        MigrationPlan plan = new Planner().plan(analysis);
-        System.err.printf("Plan: %d steps for %d findings, %d%% automated%n",
-                plan.steps().size(), analysis.findings().size(), Math.round(plan.automationRate() * 100));
-
         Map<String, String> tools = new LinkedHashMap<>();
         if (mavenSettings != null) {
             tools.put("maven.settings", mavenSettings.toString());
@@ -83,12 +70,12 @@ final class MigrateCommand implements Callable<Integer> {
         System.err.println("AI: " + aiConfig.describe() + (ragSettings.enabled() ? "; RAG on" : ""));
         MigrationOptions options = new MigrationOptions(out, aiConfig.aiSettings(), maxAiIterations, !noVerify, tools, skip,
                 ragSettings);
-        MigrationOutcome outcome = new Migrator(registry, msg -> System.err.println("» " + msg))
-                .migrate(analysis, plan, options);
-
-        Path reportDir = outcome.workspace().resolve(".renova");
-        Files.writeString(reportDir.resolve("report.md"), MarkdownReport.render(analysis, plan, outcome));
-        Files.writeString(reportDir.resolve("report.json"), JsonReport.render(analysis, plan, outcome));
+        MigrationRun run = MigrationRun.execute(registry, project.root(), project.playbook(registry), options,
+                msg -> System.err.println("» " + msg),
+                (analysis, plan) -> System.err.printf("Plan: %d steps for %d findings, %d%% automated%n",
+                        plan.steps().size(), analysis.findings().size(), Math.round(plan.automationRate() * 100)));
+        MigrationOutcome outcome = run.outcome();
+        Path reportDir = run.reportDir();
 
         for (StageResult stage : outcome.stages()) {
             System.err.printf("  %-10s %-8s %s%n", stage.stage(), stage.status(), stage.summary());

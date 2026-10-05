@@ -55,6 +55,14 @@ public interface EcosystemPlugin {
         return List.of();
     }
 
+    /**
+     * Whether {@code file} is a test. Tests define the behaviour a migration must keep, so AI requests
+     * never offer them as editable: a failing test is fixed in the code under test or the build.
+     */
+    default boolean isTestFile(String file) {
+        return false;
+    }
+
     /** Classpath resources of the playbooks this plugin ships with. */
     default List<String> bundledPlaybooks() {
         return List.of();

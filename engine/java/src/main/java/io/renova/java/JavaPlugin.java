@@ -171,6 +171,11 @@ public final class JavaPlugin implements EcosystemPlugin {
     }
 
     @Override
+    public boolean isTestFile(String file) {
+        return file.startsWith("src/test/") || file.contains("/src/test/");
+    }
+
+    @Override
     public List<RelatedFile> referencedFiles(ProjectModel model, Path root, String file) {
         return JavaReferences.find(model, root, file);
     }

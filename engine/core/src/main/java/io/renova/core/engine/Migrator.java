@@ -1,8 +1,8 @@
 package io.renova.core.engine;
 
 import io.renova.core.ai.AiFixer;
-import io.renova.core.ai.AiProvider;
 import io.renova.core.ai.AiProviderException;
+import io.renova.core.ai.MeteredAiProvider;
 import io.renova.core.model.ProjectModel;
 import io.renova.core.playbook.FixSpec;
 import io.renova.core.playbook.Playbook;
@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 /**
  * Applies a plan to a copy of the project: deterministic stages first, then AI-assisted edits,
@@ -27,6 +28,8 @@ public final class Migrator {
     /** Deterministic before judgement: AI sees code that recipes have already modernised. */
     private static final List<String> STAGE_ORDER = List.of(FixSpec.RECIPE, FixSpec.REPLACE, FixSpec.AI);
     private static final int MAX_GUARD_PASSES = 3;
+    /** A repair round that edited files and rebuilt, as {@link AiFixer#repair} logs it. */
+    private static final Pattern REPAIR_ROUND = Pattern.compile("^round \\d+: edited ");
 
     private final PluginRegistry registry;
     private final Consumer<String> progress;
@@ -38,11 +41,15 @@ public final class Migrator {
 
     public MigrationOutcome migrate(AnalysisResult analysis, MigrationPlan plan, MigrationOptions options) throws Exception {
         // Create the provider first so bad credentials fail before any copying or building.
-        try (AiProvider ai = registry.ai(options.ai())) {
+        try (MeteredAiProvider ai = new MeteredAiProvider(registry.ai(options.ai()))) {
             progress.accept("Copying project to " + options.outputDir());
             Workspace workspace = Workspace.create(analysis.project().root(), options.outputDir());
-            return run(new MigrationContext(workspace, analysis.project(), plan.playbook(), options, ai,
+            MigrationOutcome outcome = run(new MigrationContext(workspace, analysis.project(), plan.playbook(), options, ai,
                     registry.plugin(plan.playbook().ecosystem())), plan);
+            int rounds = (int) outcome.stages().stream().filter(s -> s.stage().equals("ai-repair"))
+                    .flatMap(s -> s.details().stream()).filter(l -> REPAIR_ROUND.matcher(l).find()).count();
+            return new MigrationOutcome(outcome.workspace(), outcome.stages(), outcome.verification(), outcome.manualSteps(),
+                    ai.usage(), rounds);
         }
     }
 

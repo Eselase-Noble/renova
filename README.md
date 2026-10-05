@@ -128,6 +128,9 @@ at runtime. A failed test is attributed to the project code that threw, so repai
 
 `migrate` exits with `0` when the migrated build passes, `1` when it fails, and `2` on usage errors.
 
+To measure Renova itself across several apps and configurations (with and without AI or retrieval), use
+`cli/bin/renova benchmark`; see [`benchmark/README.md`](benchmark/README.md).
+
 ### Configure AI (bring your own key)
 
 AI steps are optional. Without a provider they appear in the report as manual work. To enable them,
@@ -238,7 +241,8 @@ twenty lines and is a good starting point. See [`engine/README.md`](engine/READM
    Next: lessons from accepted fixes, then optional embeddings on the customer's own key.
 2. **Guards after AI repair:** re-check guards on edits made by the repair loop.
 3. **Behavioural verification:** run the original and migrated applications side by side and compare responses and data effects.
-4. **Benchmark harness:** measure Renova against public legacy projects with known migrated versions.
+4. **Benchmark harness:** `renova benchmark` scores migrations of synthetic legacy apps (see
+   [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.
 5. **Web console and REST API**, then the **desktop** and **IDE** products.
 6. **More playbooks and ecosystems:** Spring Boot 2 → 3, Java EE → Quarkus, then .NET and Python.
 

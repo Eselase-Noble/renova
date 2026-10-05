@@ -41,6 +41,9 @@ class JavaReferencesTest {
                         implements Auditing<List<Item>>, java.io.Serializable {
                 }
                 """);
+        write(root, "web/src/test/java/com/acme/web/AuditInterceptorTest.java",
+                "package com.acme.web;\nclass AuditInterceptorTest { AuditInterceptor subject = new AuditInterceptor(); }\n");
+        write(root, "web/src/test/java/com/acme/web/UnrelatedTest.java", "package com.acme.web;\nclass UnrelatedTest {}\n");
         write(root, "web/src/main/webapp/WEB-INF/spring/servlet-context.xml",
                 "<beans><bean class=\"com.acme.web.AuditInterceptor\"/><bean class=\"org.example.External\"/></beans>");
 
@@ -52,9 +55,12 @@ class JavaReferencesTest {
                         tuple("web/src/main/java/com/acme/web/BaseInterceptor.java", "supertype com.acme.web.BaseInterceptor", false),
                         tuple("web/src/main/java/com/acme/web/Auditing.java", "supertype com.acme.web.Auditing", false),
                         tuple("core/src/main/java/com/acme/core/Item.java", "project type com.acme.core.Item, imported here", false),
+                        tuple("web/src/test/java/com/acme/web/AuditInterceptorTest.java", "test that uses AuditInterceptor", false),
                         tuple("web/src/main/webapp/WEB-INF/spring/servlet-context.xml", "refers to com.acme.web.AuditInterceptor", false));
 
         // From configuration to code: the bean classes that are project types.
+        assertThat(plugin.isTestFile("web/src/test/java/com/acme/web/AuditInterceptorTest.java")).isTrue();
+        assertThat(plugin.isTestFile("web/src/main/java/com/acme/web/AuditInterceptor.java")).isFalse();
         assertThat(plugin.referencedFiles(model, root, "web/src/main/webapp/WEB-INF/spring/servlet-context.xml"))
                 .extracting(RelatedFile::path).containsExactly("web/src/main/java/com/acme/web/AuditInterceptor.java");
     }

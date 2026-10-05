@@ -1,0 +1,60 @@
+# Renova benchmark suite: synthetic legacy apps, each migrated with every configuration and scored.
+# Run: cli/bin/renova benchmark --out <empty dir> [--configs deterministic] [--only app,...] [--ai anthropic]
+#
+# Checks pin down what a correct migration must preserve beyond "the build passes": behaviour-relevant
+# values, and workarounds it must not use. A check names a file (or a glob) in the migrated copy and one of
+# contains / absent / matches.
+
+id: java-legacy-apps
+appsDir: ../../renova-test-apps
+
+configurations:
+  - id: deterministic           # recipes, text rules and guards only; free
+  - id: ai                      # plus the configured AI provider, on the user's own key
+    ai: true
+  - id: ai-rag                  # plus retrieval (related project code, knowledge cards)
+    ai: true
+    rag: true
+
+apps:
+  - id: acme-shop
+    path: acme-shop-java8
+    checks:
+      - { file: "**/*.java", absent: "sun.misc.BASE64", why: "removed in Java 9" }
+      - { file: "**/*.java", absent: "HandlerInterceptorAdapter", why: "removed in Spring 6" }
+      - { file: "**/*.jsp", absent: "javax.servlet", why: "Tomcat 10+ has jakarta.servlet only" }
+      - { file: "**/pom*.xml", absent: "--add-opens", why: "no encapsulation workarounds" }
+
+  - id: inventory-platform
+    path: inventory-platform
+    checks:
+      - { file: inventory-web/src/main/webapp/WEB-INF/web.xml, contains: "<max-file-size>10485760</max-file-size>",
+          why: "upload limit unchanged" }
+      - { file: inventory-web/src/main/webapp/WEB-INF/web.xml, contains: "<file-size-threshold>1048576</file-size-threshold>",
+          why: "in-memory threshold unchanged" }
+      - { file: inventory-web/src/main/webapp/WEB-INF/spring/servlet-context.xml, matches: 'id="multipartResolver"[^>]*StandardServletMultipartResolver|StandardServletMultipartResolver[^>]*id="multipartResolver"',
+          why: "Spring finds the resolver by this bean name" }
+      - { file: inventory-batch/pom.xml, contains: "nashorn-core", why: "script engine still available on Java 21" }
+      - { file: "**/pom.xml", contains: "jaxb-runtime", why: "JAXB works at runtime" }
+      - { file: "**/pom*.xml", absent: "--add-opens", why: "no encapsulation workarounds" }
+
+  - id: ledger-javaee
+    path: ledger-javaee
+    checks:
+      - { file: src/main/resources/META-INF/persistence.xml, contains: "jakarta.persistence.lock.timeout",
+          why: "javax.persistence.* properties renamed, or they are ignored" }
+      - { file: src/main/resources/META-INF/persistence.xml, absent: "javax.persistence", why: "no old property names left" }
+      - { file: pom.xml, matches: '(?s)<artifactId>jakarta.ejb-api</artifactId>\s*(<version>[^<]*</version>\s*)?<scope>provided</scope>',
+          why: "the server supplies EJB; not bundled" }
+      - { file: "**/pom*.xml", absent: "--add-opens", why: "no encapsulation workarounds" }
+
+  # Harder: each problem compiles on Java 21 and fails only at runtime, and the right fix depends on code
+  # outside the failing file (a job's own stop method, the exact layout the tests expect).
+  - id: claims-portal
+    path: claims-portal
+    checks:
+      - { file: "**/*.java", absent: "sun.misc", why: "removed in Java 9" }
+      - { file: "**/*.java", absent: ".stop()", why: "Thread.stop throws on Java 20+" }
+      - { file: "**/*.java", absent: 'getDeclaredField("value")', why: "JDK internals are encapsulated on Java 17+" }
+      - { file: "**/pom*.xml", absent: "add-opens", why: "no encapsulation workarounds" }
+      - { file: "**/pom*.xml", absent: "add-exports", why: "no encapsulation workarounds" }

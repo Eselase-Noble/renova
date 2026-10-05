@@ -35,7 +35,8 @@ import java.util.TreeSet;
  * (for Java, the owning build file), so a fix that spans a source file and its build file is one
  * edit. The model may only change files it was given as editable; anything else is rejected.
  * With RAG enabled, retrieved code is added as reference files and retrieved knowledge as notes,
- * within a share of the request size.
+ * within a share of the request size. Test files are only ever sent as reference: a migration must keep
+ * the behaviour they describe, not change them to pass.
  */
 public final class AiFixer implements Fixer {
 
@@ -133,7 +134,10 @@ public final class AiFixer implements Fixer {
         for (String target : targets) {
             String content = read(context, target, tally);
             if (content != null && included.add(target)) {
-                files.add(new RequestFile(target, content, RequestFile.Role.TARGET, null));
+                files.add(context.plugin().isTestFile(target)
+                        ? new RequestFile(target, content, RequestFile.Role.REFERENCE,
+                                "the failing test; tests define the expected behaviour and are never changed")
+                        : new RequestFile(target, content, RequestFile.Role.TARGET, null));
             }
         }
         if (files.isEmpty()) {

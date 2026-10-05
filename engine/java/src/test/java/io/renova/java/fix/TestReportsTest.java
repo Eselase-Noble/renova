@@ -79,4 +79,21 @@ class TestReportsTest {
             assertThat(e.message()).startsWith("test ParserTest.parsesFile failed: java.lang.AssertionError: Expected size: 2 but was: 1");
         });
     }
+
+    @Test
+    void attributesAFailedAssertionToTheClassUnderTest(@TempDir Path ws) throws Exception {
+        write(ws, "common/src/main/java/com/acme/codec/TokenCodec.java", "class TokenCodec {}");
+        write(ws, "common/src/test/java/com/acme/codec/TokenCodecTest.java", "class TokenCodecTest {}");
+        write(ws, "common/target/surefire-reports/com.acme.codec.TokenCodecTest.txt", """
+                Test set: com.acme.codec.TokenCodecTest
+                com.acme.codec.TokenCodecTest.wrapsLongTokens -- Time elapsed: 0.01 s <<< FAILURE!
+                org.opentest4j.AssertionFailedError: expected: <a\nb> but was: <ab>
+                \tat org.junit.jupiter.api.AssertionUtils.fail(AssertionUtils.java:151)
+                \tat com.acme.codec.TokenCodecTest.wrapsLongTokens(TokenCodecTest.java:21)
+                """);
+        assertThat(TestReports.parse(ws, ws)).singleElement().satisfies(e -> {
+            assertThat(e.file()).isEqualTo("common/src/main/java/com/acme/codec/TokenCodec.java");
+            assertThat(e.message()).contains("expected: <a").contains("(at TokenCodecTest.java:21)");
+        });
+    }
 }

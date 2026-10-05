@@ -22,7 +22,8 @@ import java.util.stream.Stream;
 /**
  * Structural retrieval for Java: which project files help an AI understand a file. For a Java
  * source, the project types it extends or implements, then the project types it imports, then the
- * configuration files (Spring XML, web.xml, JSP, properties) that name it. For any other file, the
+ * tests that use it (they show the behaviour to keep), then the configuration files (Spring XML,
+ * web.xml, JSP, properties) that name it. For any other file, the
  * project types it names by fully qualified name, such as the classes of beans in a Spring XML file.
  */
 final class JavaReferences {
@@ -54,6 +55,11 @@ final class JavaReferences {
                 javaReferences(types, content, found);
                 String fqn = fqnOf(types, file);
                 if (fqn != null) {
+                    for (String test : testsUsing(root, types, fqn)) {
+                        if (!test.equals(file)) {
+                            found.putIfAbsent(test, "test that uses " + fqn.substring(fqn.lastIndexOf('.') + 1));
+                        }
+                    }
                     for (String config : configFiles(model, root)) {
                         if (!config.equals(file) && Files.readString(root.resolve(config), StandardCharsets.ISO_8859_1).contains(fqn)) {
                             found.putIfAbsent(config, "refers to " + fqn);
@@ -120,6 +126,28 @@ final class JavaReferences {
                 found.putIfAbsent(source, "project type " + fqn + ", imported here");
             }
         }
+    }
+
+    /** Test sources that import the type, or name it from the same package. */
+    private static List<String> testsUsing(Path root, Map<String, String> types, String fqn) throws IOException {
+        int dot = fqn.lastIndexOf('.');
+        String pkg = dot < 0 ? "" : fqn.substring(0, dot);
+        Pattern simpleName = Pattern.compile("\\b" + Pattern.quote(fqn.substring(dot + 1)) + "\\b");
+        List<String> tests = new ArrayList<>();
+        for (Map.Entry<String, String> type : types.entrySet()) {
+            String path = type.getValue();
+            if (!(path.startsWith("src/test/java/") || path.contains("/src/test/java/"))) {
+                continue;
+            }
+            String code = Files.readString(root.resolve(path), StandardCharsets.UTF_8);
+            Matcher pkgMatch = PACKAGE.matcher(code);
+            boolean samePackage = (pkgMatch.find() ? pkgMatch.group(1) : "").equals(pkg);
+            boolean imports = code.contains("import " + fqn + ";") || (!pkg.isEmpty() && code.contains("import " + pkg + ".*;"));
+            if ((samePackage || imports) && simpleName.matcher(code).find()) {
+                tests.add(path);
+            }
+        }
+        return tests;
     }
 
     private static String resolve(Map<String, String> types, String name, Map<String, String> imported,

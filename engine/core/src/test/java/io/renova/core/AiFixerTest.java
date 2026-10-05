@@ -164,4 +164,28 @@ class AiFixerTest {
         assertThat(ai.requests).hasSize(2);
         assertThat(log).contains("round 1: edited build.txt; build still fails", "round 2: edited build.txt; build passes");
     }
+
+    @Test
+    void failingTestsAreShownButNeverEdited(@TempDir Path tmp) throws Exception {
+        ScriptedAi ai = new ScriptedAi(request -> Map.of("src/ATest.java", "assertTrue(true)\n", "build.txt", "deps:\n  lib\n"));
+        MigrationContext base = context(tmp, ai);
+        Files.writeString(base.workspace().root().resolve("src/ATest.java"), "assertEquals(1, a())\n");
+        ToyPlugin plugin = new ToyPlugin() {
+            @Override
+            public boolean isTestFile(String file) {
+                return file.endsWith("Test.java");
+            }
+        };
+        MigrationContext ctx = new MigrationContext(base.workspace(), base.project(), base.playbook(), base.options(), ai, plugin);
+        VerifyResult failing = new VerifyResult(false, List.of(new BuildError("src/ATest.java", 1, "expected 1 but was 2")), "");
+        List<String> log = new ArrayList<>();
+
+        new AiFixer().repair(ctx, c -> new VerifyResult(true, List.of(), ""), failing, 1, log);
+
+        assertThat(ai.requests.getFirst().files()).extracting(RequestFile::path, RequestFile::role).containsExactly(
+                org.assertj.core.groups.Tuple.tuple("src/ATest.java", RequestFile.Role.REFERENCE),
+                org.assertj.core.groups.Tuple.tuple("build.txt", RequestFile.Role.RELATED));
+        assertThat(Files.readString(base.workspace().root().resolve("src/ATest.java"))).isEqualTo("assertEquals(1, a())\n");
+        assertThat(log).anyMatch(l -> l.contains("rejected edit to src/ATest.java"));
+    }
 }

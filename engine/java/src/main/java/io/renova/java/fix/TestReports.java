@@ -21,8 +21,9 @@ import java.util.stream.Stream;
  * console output, which differs between versions and omits stack traces.
  *
  * <p>Each failure is attributed to the first stack frame in the project's main sources (for example
- * the class that threw), falling back to the test class: the fix is usually in the code under test or
- * its build file, not in the test.
+ * the class that threw). When no main frame exists, as for a failed assertion, it goes to the class
+ * under test by naming convention ({@code FooTest} → {@code Foo}), and only then to the test class:
+ * the fix is usually in the code under test or its build file, not in the test.
  */
 final class TestReports {
 
@@ -131,7 +132,13 @@ final class TestReports {
                     testLine = Integer.parseInt(frame.group(3));
                 }
             }
-            if (file == null) {
+            String underTest = file == null ? underTest(testClass, mainSources) : null;
+            if (underTest != null) {
+                file = underTest;
+                if (testFile != null) {
+                    frames.add(simple(testClass) + ".java:" + testLine);
+                }
+            } else if (file == null) {
                 file = testFile != null ? testFile : testClass == null ? null : testSources.get(testClass);
                 line = testFile != null ? testLine : 0;
             }
@@ -140,6 +147,23 @@ final class TestReports {
             i = j - 1;
         }
         return errors;
+    }
+
+    /** The main source a test class tests by naming convention (FooTest, FooTests, FooIT, TestFoo), or null. */
+    static String underTest(String testClass, Map<String, String> mainSources) {
+        if (testClass == null) {
+            return null;
+        }
+        String outer = testClass.replaceAll("\\$.*", "");
+        int dot = outer.lastIndexOf('.');
+        String pkg = dot < 0 ? "" : outer.substring(0, dot + 1);
+        String name = outer.substring(dot + 1);
+        for (String candidate : List.of(name.replaceFirst("(Tests?|IT|TestCase)$", ""), name.replaceFirst("^Test", ""))) {
+            if (!candidate.isEmpty() && !candidate.equals(name) && mainSources.containsKey(pkg + candidate)) {
+                return mainSources.get(pkg + candidate);
+            }
+        }
+        return null;
     }
 
     /** Fully qualified class name to workspace-relative path, for sources under the given root. */

@@ -62,7 +62,7 @@ Next:
 1. **More AI providers**: an on-premises option.
 2. **Guards after AI repair**: re-check guards on edits made by the repair loop.
 3. **Behavioural verification**: run the old and new apps side by side and diff HTTP responses and DB effects.
-4. **Benchmark harness**: score the tool against public legacy projects with known migrated versions.
+4. **Benchmark harness**: `renova benchmark` (see `benchmark/`); next, public open-source legacy projects.
 5. **Category E detector**: classes used in code but only available through transitive dependencies.
 6. Gradle recipe runner, `pom.*.xml` variant handling, more playbooks (Spring Boot 2→3, Java EE→Quarkus, then .NET/Python).
 7. Licensing, a playbook marketplace and private playbook packs.
