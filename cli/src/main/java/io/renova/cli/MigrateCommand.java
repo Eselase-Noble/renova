@@ -33,8 +33,8 @@ final class MigrateCommand implements Callable<Integer> {
     @Option(names = "--out", required = true, paramLabel = "DIR", description = "Empty or new directory for the migrated copy.")
     Path out;
 
-    @Option(names = "--ai", defaultValue = "none", paramLabel = "PROVIDER", description = "AI provider for 'ai' steps and build repair (default: ${DEFAULT-VALUE}).")
-    String ai;
+    @Mixin
+    AiOptions ai;
 
     @Option(names = "--max-ai-iterations", defaultValue = "3", description = "Build-repair rounds (default: ${DEFAULT-VALUE}).")
     int maxAiIterations;
@@ -66,7 +66,9 @@ final class MigrateCommand implements Callable<Integer> {
         if (offline) {
             tools.put("maven.offline", "true");
         }
-        MigrationOptions options = new MigrationOptions(out, ai, maxAiIterations, !noVerify, tools, skip);
+        AiConfiguration aiConfig = AiConfiguration.load(registry, ai);
+        System.err.println("AI: " + aiConfig.describe());
+        MigrationOptions options = new MigrationOptions(out, aiConfig.aiSettings(), maxAiIterations, !noVerify, tools, skip);
         MigrationOutcome outcome = new Migrator(registry, msg -> System.err.println("» " + msg))
                 .migrate(analysis, plan, options);
 

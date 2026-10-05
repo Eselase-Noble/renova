@@ -1,5 +1,6 @@
 package io.renova.cli;
 
+import io.renova.core.ai.AiProviderFactory;
 import io.renova.core.engine.PluginRegistry;
 import io.renova.core.playbook.Playbook;
 import io.renova.core.spi.EcosystemPlugin;
@@ -16,6 +17,12 @@ final class PlaybooksCommand implements Callable<Integer> {
         System.out.println("Ecosystems:");
         for (EcosystemPlugin plugin : registry.plugins()) {
             System.out.printf("  %-10s %s%n", plugin.id(), plugin.displayName());
+        }
+        System.out.println("\nAI providers:");
+        System.out.printf("  %-10s %s%n", "none", "No AI; AI steps are reported as manual work");
+        for (AiProviderFactory ai : registry.aiProviders()) {
+            System.out.printf("  %-10s %s (default model %s, key from %s)%n", ai.name(), ai.displayName(),
+                    ai.defaultModel(), ai.apiKeyEnvironmentVariable());
         }
         System.out.println("\nPlaybooks:");
         for (Playbook p : registry.playbooks()) {

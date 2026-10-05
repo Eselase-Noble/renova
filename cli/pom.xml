@@ -18,12 +18,14 @@
         <dependency>
             <groupId>io.renova</groupId>
             <artifactId>renova-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>io.renova</groupId>
             <artifactId>renova-java</artifactId>
-            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.renova</groupId>
+            <artifactId>renova-ai-anthropic</artifactId>
         </dependency>
         <dependency>
             <groupId>info.picocli</groupId>
