@@ -213,3 +213,14 @@ No app behaved the same after migration, although every check passed:
   are reported as accepted and left alone.
 - The original is built once per migration and reused in later rounds. `--no-behaviour-repair` only reports.
 
+Validated with Claude (claude-opus-5-5, RAG on) and `--verify-behaviour`:
+
+| App | Differences before repair | Repair | After | AI requests / tokens (whole migration) |
+|---|---|---|---|---|
+| `inventory-platform` | 2 of 6 requests (`/items/`, `/items/sample/`: 404 instead of 200 and 500) | 1 round | all 6 the same | 4 / 13.6K in, 4.0K out |
+| `claims-portal` | 1 of 14 requests (`/export/sample/`: 404 instead of 400); database the same | 1 round (after 2 build rounds) | all 14 the same, database the same | 4 / 10.1K in, 5.1K out |
+
+In both, the difference went to the Spring configuration, and Claude added `<mvc:path-matching
+trailing-slash="true"/>` to `<mvc:annotation-driven>`: the one-line, documented way to keep Spring 5's
+trailing-slash matching, rather than a change to each controller.
+

@@ -107,7 +107,7 @@ public final class Migrator {
                 VerifyResult repaired = new VerifyResult(false, BehaviourErrors.of(behaviour), behaviour.summary());
                 try {
                     repaired = new AiFixer().repair(context, checking, repaired, options.maxAiIterations(), log,
-                            guardsAfterRepair(context, stages, manual, "behaviour repair round "));
+                            guardsAfterRepair(context, stages, manual, "behaviour repair round "), "behaviour");
                 } catch (AiProviderException e) {
                     log.add("stopped: " + e.getMessage());
                 }

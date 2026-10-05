@@ -91,6 +91,12 @@ public final class AiFixer implements Fixer {
      */
     public VerifyResult repair(MigrationContext context, Verifier verifier, VerifyResult failed,
                                int maxIterations, List<String> log, RoundHook afterEdits) throws Exception {
+        return repair(context, verifier, failed, maxIterations, log, afterEdits, "build");
+    }
+
+    /** @param kind what is repaired, for commit messages: "build" or "behaviour" */
+    public VerifyResult repair(MigrationContext context, Verifier verifier, VerifyResult failed,
+                               int maxIterations, List<String> log, RoundHook afterEdits, String kind) throws Exception {
         VerifyResult current = failed;
         Tally tally = new Tally();
         for (int round = 1; round <= maxIterations && !current.success() && context.ai().available(); round++) {
@@ -111,7 +117,7 @@ public final class AiFixer implements Fixer {
                 log.add("round " + round + ": no edits proposed; stopping");
                 break;
             }
-            context.workspace().commitAll("renova: AI build repair, round " + round);
+            context.workspace().commitAll("renova: AI " + kind + " repair, round " + round);
             afterEdits.afterEdits(round);
             current = verifier.verify(context);
             log.add("round " + round + ": edited " + String.join(", ", changedThisRound) + "; build "
