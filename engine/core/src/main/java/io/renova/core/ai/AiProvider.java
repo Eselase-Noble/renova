@@ -1,19 +1,32 @@
 package io.renova.core.ai;
 
-import java.util.Optional;
-
 /**
- * A model that proposes file edits. Kept vendor-neutral so customers can choose a hosted model or
- * one running inside their own network. Implementations are discovered with ServiceLoader.
+ * A model that proposes file edits. Instances are created per run by an {@link AiProviderFactory}
+ * with the user's own settings and credentials.
  */
-public interface AiProvider {
+public interface AiProvider extends AutoCloseable {
 
-    /** Selected with {@code --ai <name>}. */
     String name();
 
-    /** False when, for example, credentials are missing; the engine then reports work as manual. */
-    boolean available();
+    /** False only for the "none" provider; the engine then reports AI work as manual. */
+    default boolean available() {
+        return true;
+    }
 
-    /** Returns the complete new content of the file, or empty when the model declines. */
-    Optional<FilePatch> propose(FixRequest request) throws Exception;
+    /** The model actually used, for reports. */
+    default String model() {
+        return null;
+    }
+
+    /** @throws AiProviderException on provider failures */
+    Proposal propose(FixRequest request);
+
+    /** Verifies credentials and model without generating anything; returns a short description. */
+    default String check() {
+        return name();
+    }
+
+    @Override
+    default void close() {
+    }
 }

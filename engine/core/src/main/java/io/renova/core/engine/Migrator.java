@@ -1,6 +1,8 @@
 package io.renova.core.engine;
 
 import io.renova.core.ai.AiFixer;
+import io.renova.core.ai.AiProvider;
+import io.renova.core.ai.AiProviderException;
 import io.renova.core.playbook.FixSpec;
 import io.renova.core.spi.Fixer;
 import io.renova.core.spi.Verifier;
@@ -31,11 +33,18 @@ public final class Migrator {
     }
 
     public MigrationOutcome migrate(AnalysisResult analysis, MigrationPlan plan, MigrationOptions options) throws Exception {
+        // Create the provider first so bad credentials fail before any copying or building.
+        try (AiProvider ai = registry.ai(options.ai())) {
+            progress.accept("Copying project to " + options.outputDir());
+            Workspace workspace = Workspace.create(analysis.project().root(), options.outputDir());
+            return run(new MigrationContext(workspace, analysis.project(), plan.playbook(), options, ai), plan);
+        }
+    }
+
+    private MigrationOutcome run(MigrationContext context, MigrationPlan plan) throws Exception {
         String ecosystem = plan.playbook().ecosystem();
-        progress.accept("Copying project to " + options.outputDir());
-        Workspace workspace = Workspace.create(analysis.project().root(), options.outputDir());
-        MigrationContext context = new MigrationContext(workspace, analysis.project(), plan.playbook(), options,
-                registry.ai(options.ai()));
+        MigrationOptions options = context.options();
+        Workspace workspace = context.workspace();
 
         Set<String> strategies = new LinkedHashSet<>(STAGE_ORDER);
         plan.steps().forEach(s -> strategies.add(s.strategy()));
@@ -61,7 +70,8 @@ public final class Migrator {
             try {
                 result = fixer.get().apply(context, steps);
             } catch (Exception e) {
-                result = new StageResult(strategy, StageResult.Status.FAILED, e.toString(), List.of());
+                result = new StageResult(strategy, StageResult.Status.FAILED,
+                        e.getMessage() == null ? e.toString() : e.getMessage(), List.of());
             }
             workspace.commitAll("renova: " + strategy + " stage: " + result.summary());
             stages.add(result);
@@ -75,7 +85,11 @@ public final class Migrator {
             if (!verification.success() && context.ai().available() && options.maxAiIterations() > 0) {
                 progress.accept("Build fails with " + verification.errors().size() + " error(s); starting AI repair");
                 List<String> log = new ArrayList<>();
-                verification = new AiFixer().repair(context, verifier.get(), verification, options.maxAiIterations(), log);
+                try {
+                    verification = new AiFixer().repair(context, verifier.get(), verification, options.maxAiIterations(), log);
+                } catch (AiProviderException e) {
+                    log.add("stopped: " + e.getMessage());
+                }
                 stages.add(new StageResult("ai-repair",
                         verification.success() ? StageResult.Status.APPLIED : StageResult.Status.PARTIAL,
                         verification.success() ? "build repaired" : "build still failing", log));

@@ -9,20 +9,20 @@ import io.renova.core.playbook.FixSpec;
 import io.renova.core.spi.Fixer;
 import io.renova.core.spi.Verifier;
 
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
  * Handles the long tail that deterministic rules cannot: proactive edits for rules with strategy
- * {@code ai}, and a build-repair loop that feeds compiler errors back to the model until the build
- * passes or the iteration budget runs out. Every accepted edit is committed separately.
+ * {@code ai}, and a build-repair loop that feeds build errors back to the model until the build
+ * passes or the iteration budget runs out. Every round of edits is committed separately.
  */
 public final class AiFixer implements Fixer {
 
@@ -44,22 +44,23 @@ public final class AiFixer implements Fixer {
                 hintsByFile.computeIfAbsent(file, f -> new ArrayList<>()).add(hint(step));
             }
         }
-        List<String> details = new ArrayList<>();
-        int changed = 0;
+        Tally tally = new Tally();
         for (Map.Entry<String, List<String>> entry : hintsByFile.entrySet()) {
-            if (edit(context, entry.getKey(), entry.getValue(), List.of(), details)) {
-                changed++;
-            }
+            edit(context, entry.getKey(), entry.getValue(), List.of(), tally);
         }
-        context.workspace().commitAll("renova: AI-assisted rule fixes (" + changed + " files)");
-        StageResult.Status status = changed == hintsByFile.size() ? StageResult.Status.APPLIED : StageResult.Status.PARTIAL;
-        return new StageResult("ai", status, changed + " of " + hintsByFile.size() + " file(s) edited by " + ai.name(), details);
+        context.workspace().commitAll("renova: AI-assisted rule fixes (" + tally.changed + " files)");
+        int handled = tally.changed + tally.unchanged;
+        StageResult.Status status = handled == hintsByFile.size() ? StageResult.Status.APPLIED
+                : handled == 0 ? StageResult.Status.FAILED : StageResult.Status.PARTIAL;
+        return new StageResult("ai", status, tally.changed + " of " + hintsByFile.size() + " file(s) edited by "
+                + describe(ai) + "; " + tally.usage(), tally.log);
     }
 
     /** Re-runs the build after each round of fixes until it passes or {@code maxIterations} is spent. */
     public VerifyResult repair(MigrationContext context, Verifier verifier, VerifyResult failed,
                                int maxIterations, List<String> log) throws Exception {
         VerifyResult current = failed;
+        Tally tally = new Tally();
         for (int round = 1; round <= maxIterations && !current.success() && context.ai().available(); round++) {
             Map<String, List<BuildError>> byFile = current.errors().stream()
                     .filter(e -> e.file() != null)
@@ -68,42 +69,88 @@ public final class AiFixer implements Fixer {
                 log.add("round " + round + ": build failed without file-level errors; stopping");
                 break;
             }
-            int changed = 0;
+            int before = tally.changed;
             for (Map.Entry<String, List<BuildError>> entry : byFile.entrySet()) {
-                if (edit(context, entry.getKey(), List.of(), entry.getValue(), log)) {
-                    changed++;
-                }
+                edit(context, entry.getKey(), List.of(), entry.getValue(), tally);
             }
-            if (changed == 0) {
+            log.addAll(tally.log);
+            tally.log.clear();
+            if (tally.changed == before) {
                 log.add("round " + round + ": no edits proposed; stopping");
                 break;
             }
             context.workspace().commitAll("renova: AI build repair, round " + round);
             current = verifier.verify(context);
-            log.add("round " + round + ": " + changed + " file(s) edited, build " + (current.success() ? "passes" : "still fails"));
+            log.add("round " + round + ": " + (tally.changed - before) + " file(s) edited, build "
+                    + (current.success() ? "passes" : "still fails"));
         }
+        log.add("usage: " + tally.usage());
         return current;
     }
 
-    private static boolean edit(MigrationContext context, String file, List<String> hints, List<BuildError> errors,
-                                List<String> log) throws Exception {
+    private static void edit(MigrationContext context, String file, List<String> hints, List<BuildError> errors,
+                             Tally tally) throws Exception {
         Path path = context.workspace().root().resolve(file);
         if (!Files.isRegularFile(path)) {
-            return false;
+            tally.log.add(file + ": skipped (not a file)");
+            return;
         }
-        String content = Files.readString(path);
-        FixRequest request = new FixRequest(context.playbook().name(), file, content, hints, errors);
-        Optional<FilePatch> patch = context.ai().propose(request);
-        if (patch.isEmpty() || patch.get().newContent().equals(content)) {
-            return false;
+        String content;
+        try {
+            content = Files.readString(path, StandardCharsets.UTF_8);
+        } catch (CharacterCodingException e) {
+            tally.log.add(file + ": skipped (not UTF-8; convert the file encoding first)");
+            return;
         }
-        Files.writeString(path, patch.get().newContent());
-        log.add(file + ": " + Objects.requireNonNullElse(patch.get().rationale(), "edited"));
-        return true;
+        Proposal proposal;
+        try {
+            proposal = context.ai().propose(new FixRequest(context.playbook().name(), file, content, hints, errors));
+        } catch (AiProviderException e) {
+            if (e.fatal()) {
+                throw e;
+            }
+            tally.log.add(file + ": provider error: " + e.getMessage());
+            return;
+        }
+        tally.inputTokens += proposal.inputTokens();
+        tally.outputTokens += proposal.outputTokens();
+        switch (proposal.outcome()) {
+            case CHANGED -> {
+                if (proposal.newContent().equals(content)) {
+                    tally.unchanged++;
+                    tally.log.add(file + ": unchanged");
+                } else {
+                    Files.writeString(path, proposal.newContent(), StandardCharsets.UTF_8);
+                    tally.changed++;
+                    tally.log.add(file + ": edited: " + proposal.rationale());
+                }
+            }
+            case UNCHANGED -> {
+                tally.unchanged++;
+                tally.log.add(file + ": no change needed: " + proposal.rationale());
+            }
+            case DECLINED -> tally.log.add(file + ": declined: " + proposal.rationale());
+        }
     }
 
     private static String hint(PlanStep step) {
         String hint = step.rule().fix().hint();
-        return hint == null ? step.rule().title() : step.rule().title() + ": " + hint;
+        return hint == null ? step.rule().title() : step.rule().title() + ": " + hint.strip();
+    }
+
+    private static String describe(AiProvider ai) {
+        return ai.model() == null ? ai.name() : ai.name() + " (" + ai.model() + ")";
+    }
+
+    private static final class Tally {
+        int changed;
+        int unchanged;
+        long inputTokens;
+        long outputTokens;
+        final List<String> log = new ArrayList<>();
+
+        String usage() {
+            return inputTokens + " input / " + outputTokens + " output tokens";
+        }
     }
 }

@@ -2,6 +2,8 @@ package io.renova.core.engine;
 
 import io.renova.core.ai.AiFixer;
 import io.renova.core.ai.AiProvider;
+import io.renova.core.ai.AiProviderFactory;
+import io.renova.core.ai.AiSettings;
 import io.renova.core.ai.NoAiProvider;
 import io.renova.core.playbook.Playbook;
 import io.renova.core.playbook.PlaybookLoader;
@@ -21,17 +23,17 @@ import java.util.Optional;
 import java.util.ServiceLoader;
 
 /**
- * Everything discovered at startup: ecosystem plugins, AI providers, detectors, fixers and the
+ * Everything discovered at startup: ecosystem plugins, AI provider factories, detectors, fixers and the
  * playbooks the plugins ship with.
  */
 public final class PluginRegistry {
 
     private final Map<String, EcosystemPlugin> plugins = new LinkedHashMap<>();
-    private final Map<String, AiProvider> aiProviders = new LinkedHashMap<>();
+    private final Map<String, AiProviderFactory> aiProviders = new LinkedHashMap<>();
     private final Map<String, DetectorFactory> detectors = new LinkedHashMap<>();
     private final List<Playbook> playbooks = new ArrayList<>();
 
-    public PluginRegistry(List<EcosystemPlugin> plugins, List<AiProvider> aiProviders) {
+    public PluginRegistry(List<EcosystemPlugin> plugins, List<AiProviderFactory> aiProviders) {
         CoreDetectors.all().forEach(this::addDetector);
         for (EcosystemPlugin plugin : plugins) {
             this.plugins.put(plugin.id(), plugin);
@@ -39,7 +41,6 @@ public final class PluginRegistry {
             ClassLoader loader = plugin.getClass().getClassLoader();
             plugin.bundledPlaybooks().forEach(r -> playbooks.add(PlaybookLoader.loadResource(loader, r)));
         }
-        this.aiProviders.put(NoAiProvider.NAME, new NoAiProvider());
         aiProviders.forEach(p -> this.aiProviders.put(p.name(), p));
     }
 
@@ -47,7 +48,7 @@ public final class PluginRegistry {
         ClassLoader loader = PluginRegistry.class.getClassLoader();
         return new PluginRegistry(
                 ServiceLoader.load(EcosystemPlugin.class, loader).stream().map(ServiceLoader.Provider::get).toList(),
-                ServiceLoader.load(AiProvider.class, loader).stream().map(ServiceLoader.Provider::get).toList());
+                ServiceLoader.load(AiProviderFactory.class, loader).stream().map(ServiceLoader.Provider::get).toList());
     }
 
     private void addDetector(DetectorFactory factory) {
@@ -82,12 +83,25 @@ public final class PluginRegistry {
         return Optional.ofNullable(byStrategy.get(strategy));
     }
 
-    public AiProvider ai(String name) {
-        AiProvider provider = aiProviders.get(name);
-        if (provider == null) {
-            throw new IllegalArgumentException("Unknown AI provider '" + name + "'. Installed: " + aiProviders.keySet());
+    public List<AiProviderFactory> aiProviders() {
+        return List.copyOf(aiProviders.values());
+    }
+
+    public Optional<AiProviderFactory> aiProvider(String name) {
+        return Optional.ofNullable(aiProviders.get(name));
+    }
+
+    /** Creates a provider with the caller's settings; "none" yields the no-op provider. */
+    public AiProvider ai(AiSettings settings) {
+        if (settings == null || NoAiProvider.NAME.equals(settings.provider())) {
+            return new NoAiProvider();
         }
-        return provider;
+        AiProviderFactory factory = aiProviders.get(settings.provider());
+        if (factory == null) {
+            throw new IllegalArgumentException("Unknown AI provider '" + settings.provider() + "'. Installed: "
+                    + aiProviders.keySet() + " (or 'none')");
+        }
+        return factory.create(settings);
     }
 
     public List<Playbook> playbooks() {

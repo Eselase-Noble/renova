@@ -1,5 +1,6 @@
 package io.renova.core;
 
+import io.renova.core.ai.AiSettings;
 import io.renova.core.engine.AnalysisResult;
 import io.renova.core.engine.Analyzer;
 import io.renova.core.engine.MigrationOptions;
@@ -80,7 +81,7 @@ class EngineTest {
 
         Path out = tmp.resolve("out");
         MigrationOutcome outcome = new Migrator(registry, msg -> { })
-                .migrate(analysis, plan, new MigrationOptions(out, "none", 0, true, Map.of(), List.of()));
+                .migrate(analysis, plan, new MigrationOptions(out, AiSettings.NONE, 0, true, Map.of(), List.of()));
 
         assertThat(Files.readString(out.resolve("readme.txt"))).isEqualTo("Made by NewCo.\nNewCo rules.\n");
         assertThat(Files.readString(project.resolve("readme.txt"))).contains("OldCo");
@@ -101,12 +102,12 @@ class EngineTest {
         Migrator migrator = new Migrator(registry, msg -> { });
 
         assertThatThrownBy(() -> migrator.migrate(analysis, plan,
-                new MigrationOptions(project.resolve("out"), "none", 0, false, Map.of(), List.of())))
+                new MigrationOptions(project.resolve("out"), AiSettings.NONE, 0, false, Map.of(), List.of())))
                 .hasMessageContaining("outside the project");
         Path busy = Files.createDirectories(tmp.resolve("busy"));
         Files.writeString(busy.resolve("x"), "");
         assertThatThrownBy(() -> migrator.migrate(analysis, plan,
-                new MigrationOptions(busy, "none", 0, false, Map.of(), List.of())))
+                new MigrationOptions(busy, AiSettings.NONE, 0, false, Map.of(), List.of())))
                 .hasMessageContaining("not empty");
     }
 }

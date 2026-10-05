@@ -1,7 +1,5 @@
 package io.renova.core.ai;
 
-import java.util.Optional;
-
 /** Used when no provider is configured; every AI step is reported as manual work. */
 public final class NoAiProvider implements AiProvider {
 
@@ -18,7 +16,7 @@ public final class NoAiProvider implements AiProvider {
     }
 
     @Override
-    public Optional<FilePatch> propose(FixRequest request) {
-        return Optional.empty();
+    public Proposal propose(FixRequest request) {
+        return Proposal.declined("no AI provider configured", 0, 0);
     }
 }
