@@ -14,7 +14,7 @@ import java.time.Instant;
 /** One migration started in this session, observed by the views while it runs on a background thread. */
 public final class MigrationRun {
 
-    public enum State { RUNNING, PASSED, FAILED, ERROR }
+    public enum State { RUNNING, PASSED, FAILED, ERROR, CANCELLED }
 
     private final String projectName;
     private final MigrationOptions options;
@@ -24,15 +24,53 @@ public final class MigrationRun {
     private MigrationOutcome outcome;
     private String error;
     private Instant finished;
+    private volatile boolean cancelRequested;
+    private volatile Thread worker;
 
     public MigrationRun(String projectName, MigrationOptions options) {
         this.projectName = projectName;
         this.options = options;
     }
 
-    /** Safe to call from any thread. */
+    /**
+     * Safe to call from any thread. Once the run is cancelled, the next line stops the migration: stages that run
+     * inside this process do not notice an interrupt, but every one of them reports progress.
+     */
     public void log(String line) {
+        if (cancelRequested) {
+            throw new java.util.concurrent.CancellationException("Cancelled");
+        }
         Platform.runLater(() -> log.add(line));
+    }
+
+    /** The thread doing the work, so it can be interrupted. */
+    public void worker(Thread thread) {
+        this.worker = thread;
+    }
+
+    /**
+     * Asks the migration to stop: the build it is waiting for is killed, and it ends at its next step. The
+     * migrated folder keeps the stages committed so far.
+     */
+    public void cancel() {
+        cancelRequested = true;
+        Thread thread = worker;
+        if (thread != null) {
+            thread.interrupt();
+        }
+    }
+
+    public boolean cancelRequested() {
+        return cancelRequested;
+    }
+
+    /** Ends the run as cancelled (call from the worker when it stops because of {@link #cancel()}). */
+    public void cancelled() {
+        Platform.runLater(() -> {
+            this.finished = Instant.now();
+            log.add("Cancelled");
+            state.set(State.CANCELLED);
+        });
     }
 
     public void finish(MigrationOutcome outcome, State result) {

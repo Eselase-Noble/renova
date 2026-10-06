@@ -8,12 +8,18 @@ import io.renova.desktop.Navigator;
 import io.renova.desktop.service.MigrationResult;
 import io.renova.desktop.service.MigrationRun;
 import io.renova.desktop.service.Phases;
+import io.renova.desktop.service.DiffLines;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.concurrent.Task;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -95,15 +101,41 @@ public final class MigrationView {
         log.setPrefHeight(480);
         ProgressIndicator spinner = new ProgressIndicator();
         spinner.setMaxSize(18, 18);
-        boolean stopped = run.state().get() == MigrationRun.State.ERROR;
-        HBox status = new HBox(8, stopped ? Ui.badge("Error", Ui.Tone.BAD, Icons.ALERT) : Ui.badge("Running", Ui.Tone.INFO, Icons.REFRESH));
+        boolean cancelled = run.state().get() == MigrationRun.State.CANCELLED;
+        boolean stopped = run.state().get() == MigrationRun.State.ERROR || cancelled;
+        HBox status = new HBox(8, cancelled ? Ui.badge("Cancelled", Ui.Tone.MUTED, Icons.STOP)
+                : stopped ? Ui.badge("Error", Ui.Tone.BAD, Icons.ALERT) : Ui.badge("Running", Ui.Tone.INFO, Icons.REFRESH));
+        Label time = Ui.label(elapsed(), Styles.TEXT_MUTED, Styles.TEXT_SMALL);
         if (running()) {
-            status.getChildren().add(spinner);
+            status.getChildren().addAll(spinner, time);
+            // The clock stops with the view: the timeline ends when the run does or the page is replaced.
+            Timeline clock = new Timeline(new KeyFrame(javafx.util.Duration.seconds(1), e -> time.setText(elapsed())));
+            clock.setCycleCount(Timeline.INDEFINITE);
+            clock.play();
+            run.state().addListener((obs, old, now) -> clock.stop());
+            page.sceneProperty().addListener((obs, old, now) -> {
+                if (now == null) {
+                    clock.stop();
+                }
+            });
+        } else {
+            status.getChildren().add(time);
         }
         status.setAlignment(Pos.CENTER_LEFT);
-        page.getChildren().setAll(Ui.header(Icons.WORKFLOW, "Migration of " + run.projectName(), workspace + "  ·  " + elapsed()), status);
+        Button cancel = new Button("Cancel migration", Icons.of(Icons.STOP, 14));
+        cancel.setOnAction(e -> confirmCancel(cancel));
+        Button folder = new Button("Open migrated folder", Icons.of(Icons.FOLDER_OPEN, 14));
+        folder.setOnAction(e -> nav.openPath(workspace));
+        folder.setDisable(!Files.isDirectory(workspace));
+        page.getChildren().setAll(running()
+                ? Ui.header(Icons.WORKFLOW, "Migration of " + run.projectName(), workspace.toString(), cancel)
+                : Ui.header(Icons.WORKFLOW, "Migration of " + run.projectName(), workspace.toString(), folder), status);
         if (run.error() != null) {
             page.getChildren().add(new Message("The migration stopped", run.error()));
+        }
+        if (cancelled) {
+            page.getChildren().add(new Message("This migration was cancelled",
+                    "The stages committed before it stopped are kept in the migrated folder. The project itself was never changed."));
         }
         // The pipeline follows the log: each new line may start the next phase.
         VBox pipeline = new VBox();
@@ -165,6 +197,20 @@ public final class MigrationView {
         tabs.getTabs().stream().filter(t -> t.getText().toLowerCase().startsWith(String.valueOf(wanted).toLowerCase()))
                 .findFirst().ifPresent(t -> tabs.getSelectionModel().select(t));
         page.getChildren().add(tabs);
+    }
+
+    private void confirmCancel(Button button) {
+        Alert ask = new Alert(Alert.AlertType.CONFIRMATION, "Renova stops at the current step and ends the build it is waiting for. "
+                + "Stages already committed stay in the migrated folder; the project itself is untouched.",
+                new ButtonType("Cancel migration", ButtonBar.ButtonData.OK_DONE), new ButtonType("Keep running", ButtonBar.ButtonData.CANCEL_CLOSE));
+        ask.setTitle("Cancel this migration?");
+        ask.setHeaderText("Cancel this migration?");
+        ask.initOwner(page.getScene().getWindow());
+        ask.showAndWait().filter(b -> b.getButtonData() == ButtonBar.ButtonData.OK_DONE).ifPresent(b -> {
+            button.setDisable(true);
+            button.setText("Cancelling…");
+            run.cancel();
+        });
     }
 
     private static Tab tab(String title, Node content) {
@@ -494,37 +540,72 @@ public final class MigrationView {
             @Override
             protected void updateItem(WorkspaceHistory.Commit c, boolean empty) {
                 super.updateItem(c, empty);
-                setText(empty || c == null ? null
-                        : c.message().replaceFirst("^renova: ", "") + "\n" + c.filesChanged() + " file(s)  +" + c.insertions() + " −" + c.deletions());
+                setText(null);
+                if (empty || c == null) {
+                    setGraphic(null);
+                    return;
+                }
+                Label title = Ui.label(c.message().replaceFirst("^renova: ", ""), Styles.TEXT_BOLD);
+                Label stats = Ui.label(c.hash().substring(0, Math.min(7, c.hash().length())) + "  ·  " + c.filesChanged() + " file(s)  ·  +"
+                        + c.insertions() + " −" + c.deletions(), Styles.TEXT_MUTED, Styles.TEXT_SMALL, "mono");
+                VBox box = new VBox(2, title, stats);
+                box.getStyleClass().add("commit-cell");
+                // Wrap the title to the list's width rather than widening the list.
+                box.maxWidthProperty().bind(list.widthProperty().subtract(24));
+                setGraphic(box);
             }
         });
-        ListView<String> diff = new ListView<>();
+        ListView<DiffLines.Line> diff = new ListView<>();
         diff.getStyleClass().addAll("diff", Styles.DENSE);
+        diff.setPlaceholder(new Label("No file changes in this stage."));
         diff.setCellFactory(list -> new ListCell<>() {
+            private final Label before = new Label();
+            private final Label after = new Label();
+            private final Label sign = new Label();
+            private final Label code = new Label();
+            private final HBox numbered = new HBox(before, after, sign, code);
+            /** File names, hunk headers and notes span the row; they have no line numbers. */
+            private final Label heading = new Label();
+
+            {
+                before.getStyleClass().add("gutter");
+                after.getStyleClass().add("gutter");
+                sign.getStyleClass().add("sign");
+                code.getStyleClass().add("code");
+                heading.getStyleClass().add("code");
+            }
+
             @Override
-            protected void updateItem(String line, boolean empty) {
+            protected void updateItem(DiffLines.Line line, boolean empty) {
                 super.updateItem(line, empty);
-                getStyleClass().removeAll("added", "removed", "hunk", "file");
-                setText(empty ? null : line);
-                if (!empty && line != null) {
-                    if (line.startsWith("diff --git")) {
-                        getStyleClass().add("file");
-                        setText(line.replaceFirst("^diff --git a/\\S+ b/", ""));
-                    } else if (line.startsWith("+") && !line.startsWith("+++")) {
-                        getStyleClass().add("added");
-                    } else if (line.startsWith("-") && !line.startsWith("---")) {
-                        getStyleClass().add("removed");
-                    } else if (line.startsWith("@@")) {
-                        getStyleClass().add("hunk");
+                getStyleClass().removeAll("added", "removed", "hunk", "file", "note");
+                setText(null);
+                if (empty || line == null) {
+                    setGraphic(null);
+                    return;
+                }
+                switch (line.kind()) {
+                    case FILE, HUNK, NOTE -> {
+                        getStyleClass().add(line.kind().name().toLowerCase());
+                        heading.setText(line.text());
+                        setGraphic(heading);
+                    }
+                    default -> {
+                        if (line.kind() != DiffLines.Kind.CONTEXT) {
+                            getStyleClass().add(line.kind().name().toLowerCase());
+                        }
+                        before.setText(line.before() > 0 ? String.valueOf(line.before()) : "");
+                        after.setText(line.after() > 0 ? String.valueOf(line.after()) : "");
+                        sign.setText(line.kind() == DiffLines.Kind.ADDED ? "+" : line.kind() == DiffLines.Kind.REMOVED ? "−" : "");
+                        code.setText(line.text());
+                        setGraphic(numbered);
                     }
                 }
             }
         });
         commits.getSelectionModel().selectedItemProperty().addListener((obs, old, c) -> {
             if (c != null) {
-                background(() -> WorkspaceHistory.diff(workspace, c.hash()).lines()
-                        .filter(l -> !l.startsWith("index ") && !l.startsWith("--- ") && !l.startsWith("+++ ")).limit(20_000).toList(),
-                        lines -> diff.getItems().setAll(lines));
+                background(() -> DiffLines.parse(WorkspaceHistory.diff(workspace, c.hash()), 20_000), lines -> diff.getItems().setAll(lines));
             }
         });
         background(() -> WorkspaceHistory.commits(workspace), list -> {

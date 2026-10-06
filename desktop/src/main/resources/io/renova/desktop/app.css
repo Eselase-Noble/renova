@@ -423,3 +423,51 @@
     -fx-border-width: 0 0 2 0;
 }
 .tab-pane > .tab-header-area > .headers-region > .tab:selected .tab-label { -fx-font-weight: bold; }
+
+/* ---- Overview ----------------------------------------------------------------------------------------------- */
+
+.outcome-passed { -fx-background-color: #0ca30c; }
+.outcome-failed { -fx-background-color: #d03b3b; }
+.outcome-stopped { -fx-background-color: #ec835a; }
+.meter { -fx-background-color: -color-accent-subtle; -fx-background-radius: 99; }
+.meter-fill { -fx-background-color: -color-accent-emphasis; -fx-background-radius: 99; }
+
+.check-step { -fx-padding: 14 18 14 18; -fx-spacing: 8; -fx-border-color: transparent -color-border-muted transparent transparent; }
+.check-number {
+    -fx-background-radius: 99;
+    -fx-border-radius: 99;
+    -fx-border-color: -color-border-default;
+    -fx-min-width: 24;
+    -fx-min-height: 24;
+    -fx-max-width: 24;
+    -fx-max-height: 24;
+    -fx-alignment: center;
+    -fx-font-size: 0.85em;
+    -fx-font-weight: bold;
+}
+.check-number.done { -fx-background-color: -color-success-emphasis; -fx-border-color: -color-success-emphasis; }
+.check-number.next { -fx-border-color: -color-accent-emphasis; -fx-text-fill: -color-accent-fg; }
+
+/* ---- Diff with line numbers --------------------------------------------------------------------------------- */
+
+.diff .gutter {
+    -fx-text-fill: -color-fg-subtle;
+    -fx-min-width: 46;
+    -fx-max-width: 46;
+    -fx-alignment: center-right;
+    -fx-padding: 0 8 0 0;
+    -fx-border-color: transparent -color-border-muted transparent transparent;
+    -fx-font-family: "JetBrains Mono", "DejaVu Sans Mono", "Monospaced";
+}
+.diff .sign { -fx-min-width: 22; -fx-alignment: center; -fx-font-family: "JetBrains Mono", "DejaVu Sans Mono", "Monospaced"; }
+.diff .code { -fx-font-family: "JetBrains Mono", "DejaVu Sans Mono", "Monospaced"; }
+.diff .list-cell { -fx-padding: 0 10 0 0; }
+.diff .list-cell.added .code, .diff .list-cell.added .sign { -fx-text-fill: -color-success-fg; }
+.diff .list-cell.removed .code, .diff .list-cell.removed .sign { -fx-text-fill: -color-danger-fg; }
+.diff .list-cell.hunk .code { -fx-text-fill: -color-accent-fg; }
+.diff .list-cell.file .code { -fx-font-weight: bold; }
+.diff .list-cell.note .code { -fx-text-fill: -color-fg-muted; }
+.diff .list-cell.file, .diff .list-cell.hunk, .diff .list-cell.note { -fx-padding: 3 10 3 10; }
+.diff .list-cell.file { -fx-padding: 7 10 7 10; }
+
+.commit-cell { -fx-padding: 8 10 8 10; }

@@ -7,6 +7,10 @@ import java.nio.file.Path;
 /** What the views can ask the application window to do. */
 public interface Navigator {
 
+    /** The start screen: what has been migrated and what is running. */
+    void overview();
+
+    /** Projects opened before, and opening another. */
     void home();
 
     void settings();

@@ -258,6 +258,88 @@ public final class Ui {
         return grid;
     }
 
+    /** One day's counts in a {@link #columns} chart; passed, failed and stopped are stacked in that order. */
+    public record Day(String label, int passed, int failed, int stopped) {
+        int total() {
+            return passed + failed + stopped;
+        }
+    }
+
+    /** Counts per day as stacked columns on one axis, with a legend that names each outcome and its total. */
+    public static Node columns(List<Day> days) {
+        double height = 130;
+        int max = Math.max(1, days.stream().mapToInt(Day::total).max().orElse(1));
+        HBox plot = new HBox();
+        plot.setAlignment(Pos.BOTTOM_LEFT);
+        plot.setMinHeight(height);
+        plot.setMaxHeight(height);
+        plot.setStyle("-fx-border-color: transparent transparent -color-border-default transparent;");
+        HBox labels = new HBox();
+        int every = (int) Math.ceil(days.size() / 7.0);
+        for (int i = 0; i < days.size(); i++) {
+            Day d = days.get(i);
+            VBox column = new VBox(2);
+            column.setAlignment(Pos.BOTTOM_CENTER);
+            column.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(column, Priority.ALWAYS);
+            int[] values = {d.stopped(), d.failed(), d.passed()};
+            String[] styles = {"outcome-stopped", "outcome-failed", "outcome-passed"};
+            boolean top = true;
+            for (int k = 0; k < values.length; k++) {
+                if (values[k] == 0) {
+                    continue;
+                }
+                Region part = new Region();
+                part.getStyleClass().add(styles[k]);
+                double h = Math.max(3, (height - 8) * values[k] / max);
+                part.setMinSize(18, h);
+                part.setMaxSize(18, h);
+                part.setStyle(top ? "-fx-background-radius: 4 4 0 0;" : "");
+                top = false;
+                column.getChildren().add(part);
+            }
+            Tooltip.install(column, new Tooltip(d.label() + (d.total() == 0 ? ": no migrations"
+                    : ": " + d.passed() + " passed, " + d.failed() + " failed, " + d.stopped() + " stopped")));
+            plot.getChildren().add(column);
+            Label tick = label((days.size() - 1 - i) % every == 0 ? d.label() : "", Styles.TEXT_MUTED, Styles.TEXT_SMALL);
+            tick.setWrapText(false);
+            tick.setAlignment(Pos.CENTER);
+            tick.setMaxWidth(Double.MAX_VALUE);
+            tick.setMinWidth(0);
+            tick.setPrefWidth(10);
+            HBox.setHgrow(tick, Priority.ALWAYS);
+            labels.getChildren().add(tick);
+        }
+        HBox legend = new HBox(18);
+        String[][] items = {{"Passed", "outcome-passed"}, {"Failed", "outcome-failed"}, {"Stopped", "outcome-stopped"}};
+        int[] totals = {days.stream().mapToInt(Day::passed).sum(), days.stream().mapToInt(Day::failed).sum(), days.stream().mapToInt(Day::stopped).sum()};
+        for (int k = 0; k < items.length; k++) {
+            Region swatch = new Region();
+            swatch.getStyleClass().addAll("swatch", items[k][1]);
+            HBox item = new HBox(7, swatch, label(items[k][0], Styles.TEXT_MUTED, Styles.TEXT_SMALL), label(String.valueOf(totals[k]), Styles.TEXT_BOLD, Styles.TEXT_SMALL));
+            item.setAlignment(Pos.CENTER_LEFT);
+            legend.getChildren().add(item);
+        }
+        Label top = label("Most in a day: " + max, Styles.TEXT_MUTED, Styles.TEXT_SMALL);
+        return new VBox(8, top, plot, labels, legend);
+    }
+
+    /** A thin bar for a share of a whole. */
+    public static Node meter(double share) {
+        GridPane bar = new GridPane();
+        ColumnConstraints filled = new ColumnConstraints();
+        filled.setPercentWidth(Math.max(0, Math.min(1, share)) * 100);
+        bar.getColumnConstraints().add(filled);
+        Region fill = new Region();
+        fill.getStyleClass().add("meter-fill");
+        fill.setMinHeight(6);
+        bar.add(fill, 0, 0);
+        bar.getStyleClass().add("meter");
+        bar.setMinHeight(6);
+        bar.setMaxHeight(6);
+        return bar;
+    }
+
     /** The phases of a migration as a row of steps joined by a line. */
     public static Node pipeline(List<Phases.Phase> phases) {
         GridPane grid = new GridPane();

@@ -57,6 +57,7 @@ public final class MigrationsView {
                 setGraphic(empty || state == null ? null : switch (state) {
                     case "PASSED" -> Ui.badge("Passed", Ui.Tone.GOOD, Icons.CHECK);
                     case "FAILED" -> Ui.badge("Failed", Ui.Tone.BAD, Icons.CROSS);
+                    case "CANCELLED" -> Ui.badge("Cancelled", Ui.Tone.MUTED, Icons.STOP);
                     default -> Ui.badge("Error", Ui.Tone.BAD, Icons.ALERT);
                 });
             }

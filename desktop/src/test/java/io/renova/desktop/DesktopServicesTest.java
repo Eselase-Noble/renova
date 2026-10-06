@@ -4,6 +4,7 @@ import io.renova.core.ai.AiSettings;
 import io.renova.core.config.UserConfig;
 import io.renova.core.engine.PluginRegistry;
 import io.renova.core.config.AiPreferences;
+import io.renova.desktop.service.DiffLines;
 import io.renova.desktop.service.MigrationHistory;
 import io.renova.desktop.service.MigrationResult;
 import io.renova.desktop.service.Phases;
@@ -124,7 +125,7 @@ class DesktopServicesTest {
 
     private static MigrationHistory.Entry entry(Path ws, String state) {
         return new MigrationHistory.Entry("shop", "/code/shop", ws.toString(), state, "2026-10-06T10:00:00Z",
-                "2026-10-06T10:05:00Z", "Passes", "Not checked", 0, 0);
+                "2026-10-06T10:05:00Z", "Passes", "Not checked", 0, 0, 0.8);
     }
 
     @Test
@@ -167,5 +168,42 @@ class DesktopServicesTest {
                     assertThat(p.state()).isEqualTo(Phases.State.WARN);
                     assertThat(p.note()).startsWith("Sending 4");
                 });
+    }
+
+    @Test
+    void diffLinesAreNumberedFromTheirHunk() {
+        String diff = """
+                commit abc
+                Author: Renova
+
+                    renova: recipe stage
+
+                diff --git a/src/A.java b/src/A.java
+                index 111..222 100644
+                --- a/src/A.java
+                +++ b/src/A.java
+                @@ -10,4 +10,5 @@ class A {
+                 keep
+                -import javax.servlet.Filter;
+                +import jakarta.servlet.Filter;
+                +import jakarta.servlet.Servlet;
+                 end
+                diff --git a/new.txt b/new.txt
+                new file mode 100644
+                @@ -0,0 +1 @@
+                +hello
+                """;
+        List<DiffLines.Line> lines = DiffLines.parse(diff, 1000);
+        assertThat(lines).extracting(DiffLines.Line::kind).containsExactly(DiffLines.Kind.FILE, DiffLines.Kind.HUNK,
+                DiffLines.Kind.CONTEXT, DiffLines.Kind.REMOVED, DiffLines.Kind.ADDED, DiffLines.Kind.ADDED, DiffLines.Kind.CONTEXT,
+                DiffLines.Kind.FILE, DiffLines.Kind.NOTE, DiffLines.Kind.HUNK, DiffLines.Kind.ADDED);
+        assertThat(lines.get(0).text()).isEqualTo("src/A.java");
+        // keep is line 10 on both sides; the removed line is 11 before; the two added are 11 and 12 after; end is 12 and 13.
+        assertThat(lines.subList(2, 7)).extracting(DiffLines.Line::before).containsExactly(10, 11, 0, 0, 12);
+        assertThat(lines.subList(2, 7)).extracting(DiffLines.Line::after).containsExactly(10, 0, 11, 12, 13);
+        assertThat(lines.get(3).text()).isEqualTo("import javax.servlet.Filter;");
+        assertThat(lines.getLast().after()).isEqualTo(1);
+
+        assertThat(DiffLines.parse(diff, 3)).hasSize(4).last().satisfies(l -> assertThat(l.kind()).isEqualTo(DiffLines.Kind.NOTE));
     }
 }

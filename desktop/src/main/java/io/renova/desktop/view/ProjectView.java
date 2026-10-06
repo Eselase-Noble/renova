@@ -162,7 +162,6 @@ public final class ProjectView {
         TabPane tabs = new TabPane(
                 new Tab("Overview", new VBox(18,
                         Ui.section("Automation", "How much of the migration needs no human decision.", automation),
-                        stats,
                         Ui.section("Findings by category", "Plan steps run in the order A → E → B → C → D.", Ui.bars(categories)),
                         Ui.section("Playbook", null, playbookInfo(a.playbook())))),
                 new Tab("Plan (" + plan.size() + ")", Ui.section("Migration plan", "Select a step to see its guidance and files.", planTable(plan))),
@@ -179,7 +178,7 @@ public final class ProjectView {
 
         page.getChildren().setAll(
                 Ui.header(Icons.FOLDER, path.getFileName().toString(), path.toString(), playbookChooser(a), reassess, export, migrate),
-                tabs);
+                stats, tabs);
         if (!a.analysis().warnings().isEmpty()) {
             page.getChildren().add(new Message("Analysis warnings", String.join("\n", a.analysis().warnings())));
         }
@@ -358,7 +357,11 @@ public final class ProjectView {
                     MigrationOutcome outcome = engine.migrate(a, options, run::log);
                     run.finish(outcome, passed(outcome) ? MigrationRun.State.PASSED : MigrationRun.State.FAILED);
                 } catch (Exception ex) {
-                    run.fail(ex.getMessage() == null ? ex.toString() : ex.getMessage());
+                    if (run.cancelRequested()) {
+                        run.cancelled();
+                    } else {
+                        run.fail(ex.getMessage() == null ? ex.toString() : ex.getMessage());
+                    }
                 }
             });
         }
