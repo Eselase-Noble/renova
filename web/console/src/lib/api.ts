@@ -160,6 +160,13 @@ export interface Playbook {
   knowledgeCards: number;
 }
 
+/** The migration paths a project can take, and the one Renova suggests for it. */
+export interface ProjectTargets {
+  current: string;
+  recommended: string;
+  playbooks: Playbook[];
+}
+
 export interface ProviderSettings {
   name: string;
   displayName: string;
@@ -355,6 +362,9 @@ export const api = {
   project: (id: string) => request<Project>(`/projects/${id}`),
   addProject: (body: { name?: string; path: string }) =>
     request<Project>("/projects", { method: "POST", body: JSON.stringify(body) }),
+  projectTargets: (id: string) => request<ProjectTargets>(`/projects/${id}/playbooks`),
+  retargetProject: (id: string, playbook: string) =>
+    request<Project>(`/projects/${id}`, { method: "PATCH", body: JSON.stringify({ playbook }) }),
   deleteProject: (id: string) => request<void>(`/projects/${id}`, { method: "DELETE" }),
   assessment: (id: string) => request<Assessment>(`/projects/${id}/assessment`),
   projectMigrations: (id: string) => request<Migration[]>(`/projects/${id}/migrations`),

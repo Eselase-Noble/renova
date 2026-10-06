@@ -30,7 +30,7 @@ public class CatalogueController {
         return registry.playbooks().stream().map(CatalogueController::view).toList();
     }
 
-    private static PlaybookView view(Playbook p) {
+    static PlaybookView view(Playbook p) {
         return new PlaybookView(p.id(), p.name(), p.ecosystem(), p.version(), p.description() == null ? null : p.description().strip(),
                 p.targets(), p.rules().stream().filter(r -> !r.guard()).count(), p.rules().stream().filter(Rule::guard).count(),
                 p.knowledge().size());
