@@ -276,6 +276,9 @@ rules:
 
 ### Targets
 
+Every target below has been run end to end without AI, with a passing build and tests, on at least one
+project, including the public Spring PetClinic sample: see [docs/verified-migrations.md](docs/verified-migrations.md).
+
 A playbook is a target: where the project should end up. Renova suggests the one that fits the project, and
 any other can be chosen (`--playbook ID`, the **Target** selector on a project in the console, or the playbook
 list in the desktop app):
