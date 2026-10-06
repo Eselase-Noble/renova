@@ -41,13 +41,26 @@ and `RENOVA_MASTER_KEY` (see Security).
 
 ## What it does
 
-- **Projects:** register a directory on the server; Renova detects the ecosystem and playbook. The project
-  is only read; migrations work on copies.
-- **Assessment:** findings by category, automation rate, and the plan with who resolves each step.
-- **Migrations:** background jobs (one at a time by default) with live progress. Options: AI with retrieval,
-  running the project's tests, behavioural verification, AI repair rounds.
+- **Overview:** what needs attention: migrations in progress, the share that passed, the average automation
+  rate, AI tokens used, activity over the last 14 days and each project's latest result. A new organisation
+  gets a short checklist: connect an AI provider, add a project, run a migration, invite the team.
+- **Projects:** choose a folder on the server from a folder browser (or type its path); Renova detects the
+  ecosystem and playbook. The project is only read; migrations work on copies.
+- **Assessment:** automation rate, who resolves the findings (rules, AI or a person), findings by category,
+  the project's modules, the ordered **plan** with each step's guidance and files, and every **finding**
+  with filters by category and text.
+- **Migrations:** background jobs (one at a time by default) shown as a pipeline of phases with live progress.
+  Options: AI with retrieval, running the project's tests, behavioural verification, AI repair rounds. A queued or
+  running migration can be **cancelled** (its build is stopped; committed stages stay in the workspace), and a
+  finished one **run again** with the same options.
 - **Review:** stages, build errors, behaviour differences (both answers side by side, database changes,
-  accepted changes), every stage's diff, the log, and the Markdown report to download.
+  accepted changes), every stage's diff with line numbers, the log (filter, copy, download), and the Markdown
+  report to download.
+- **Playbooks:** the migration paths installed on the server, with their targets, rules, guards and knowledge notes.
+- **Audit log:** for admins: who signed in, added or removed projects, started or cancelled migrations, changed
+  settings or keys, and changed membership. Entries are only appended (`audit/ORGANISATION.jsonl` in the data
+  directory) and never contain a key, password or invitation token.
+- **Search:** Ctrl K (⌘K) jumps to any page, project or migration.
 - **Settings:** per organisation: AI provider, model, effort, retrieval, and the organisation's own keys and
   optional endpoints (for example an on-premises OpenAI-compatible server). Keys are write-only and only ever
   returned masked. The server's environment variables and personal Renova config are not used, so no
@@ -73,9 +86,13 @@ All endpoints except `/api/auth/*` need a signed-in session; requests that chang
 | GET | `/api/projects/{id}/assessment` | Findings and plan (report JSON without a migration) |
 | GET, POST | `/api/projects/{id}/migrations` | List; start `{ai, rag, verifyBehaviour, skipTests, maxAiIterations, playbook}` |
 | GET | `/api/migrations`, `/api/migrations/{id}?since=N` | Records; progress lines from N on |
+| POST | `/api/migrations/{id}/cancel` | Stop a queued or running migration (member) |
 | GET | `/api/migrations/{id}/report`, `/report.md`, `/behaviour` | Reports from the workspace |
 | GET | `/api/migrations/{id}/commits`, `/commits/{hash}/diff` | Stages as commits, and their diffs |
 | GET | `/api/playbooks` | Installed playbooks |
+| GET | `/api/org/audit?area=&limit=` | Audit log, newest first (admin); `area`: auth, project, migration, settings, member, invitation |
+| GET | `/api/system` | Version, ecosystems, AI providers, concurrency, project roots |
+| GET | `/api/system/directories?path=` | Folders under the project roots, for the folder browser (admin) |
 | GET, PUT | `/api/settings` | AI settings (keys masked) |
 | PUT, DELETE | `/api/settings/keys/{provider}` | Set or remove a key |
 | POST | `/api/settings/check` | Check the key and model without generating anything |
@@ -90,4 +107,4 @@ All endpoints except `/api/auth/*` need a signed-in session; requests that chang
   of backups of the data directory, or the backup holds both the keys and what decrypts them.
 - Projects can only be added from `renova.project-roots`, checked after resolving symbolic links.
 - The API listens on `127.0.0.1` by default. To serve a team, put it and the console behind HTTPS.
-- Not yet: single sign-on (OIDC/SAML), audit log, licensing.
+- Not yet: single sign-on (OIDC/SAML), licensing.
