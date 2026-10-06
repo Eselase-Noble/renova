@@ -83,6 +83,8 @@ export default function MigrationPage({ params }: { params: Promise<{ id: string
   const s = m.summary;
   const startedBy = org.data?.members.find((member) => member.id === m.startedBy)?.name;
   const steps = phases(m, detail.data.progress);
+  // A failing build is expected when the plan had steps for AI and this migration ran without it.
+  const skippedAi = s?.build === "FAILS" && s.aiRequests === 0 ? (report.data?.plan ?? []).filter((p) => p.strategy === "ai").map((p) => p.title) : [];
   const current = steps.find((p) => p.state === "current");
 
   return (
@@ -145,6 +147,27 @@ export default function MigrationPage({ params }: { params: Promise<{ id: string
             <TriangleAlert />
             <AlertTitle>The migration stopped</AlertTitle>
             <AlertDescription>{m.error}</AlertDescription>
+          </Alert>
+        )}
+        {skippedAi.length > 0 && (
+          <Alert>
+            <Sparkles />
+            <AlertTitle>The build fails because the AI steps were not done</AlertTitle>
+            <AlertDescription>
+              <p>
+                This migration ran without AI, so {plural(skippedAi.length, "step")} of the plan {skippedAi.length === 1 ? "was" : "were"} left undone and
+                the code that depends on {skippedAi.length === 1 ? "it" : "them"} does not build yet:
+              </p>
+              <ul className="my-1.5 list-disc pl-5">
+                {skippedAi.map((title) => (
+                  <li key={title}>{title}</li>
+                ))}
+              </ul>
+              <p>
+                <Link href="/settings" className="font-medium underline">Add an AI provider key in Settings</Link> and run it again: Renova then makes
+                these changes and repairs the build errors that are left. Or make the changes by hand in the workspace.
+              </p>
+            </AlertDescription>
           </Alert>
         )}
         {m.status === "CANCELLED" && (
