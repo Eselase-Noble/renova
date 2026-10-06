@@ -1,0 +1,28 @@
+# Add-on: optional, combined with a target as in java-to-21+commons-lang3. Not a migration path on its own.
+
+id: commons-lang3
+name: "Commons Lang 2 → 3"
+ecosystem: java
+version: 0.1.0
+description: >
+  Moves code from commons-lang 2 (package org.apache.commons.lang) to commons-lang3.
+
+settings:
+  kind: addon
+  openrewrite:
+    artifacts:
+      - org.openrewrite.recipe:rewrite-apache:2.30.0
+
+rules:
+
+  - id: commons-lang-2-to-3
+    title: Move from Commons Lang 2 to 3
+    category: C
+    severity: WARNING
+    detect:
+      type: dependency
+      coordinates: ["commons-lang:commons-lang"]
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.apache.commons.lang.UpgradeApacheCommonsLang_2_3]
+    rationale: The package became org.apache.commons.lang3, and a few methods were renamed or moved.

@@ -108,8 +108,32 @@ public final class PluginRegistry {
         return List.copyOf(playbooks);
     }
 
-    /** A bundled playbook id, or a path to a YAML file. */
+    /**
+     * A bundled playbook id, or a path to a YAML file; with add-ons joined by {@code +}, as in
+     * {@code java-to-21+junit5+log4j2}, the target combined with them.
+     */
     public Playbook playbook(String idOrPath) {
+        if (Files.isRegularFile(Path.of(idOrPath))) {
+            return PlaybookLoader.load(Path.of(idOrPath));
+        }
+        String[] parts = idOrPath.split("\\+");
+        Playbook base = single(parts[0]);
+        if (parts.length == 1) {
+            return base;
+        }
+        List<Playbook> addons = new ArrayList<>();
+        for (int i = 1; i < parts.length; i++) {
+            Playbook addon = single(parts[i]);
+            if (!addon.addon()) {
+                throw new IllegalArgumentException("'" + addon.id() + "' is a target, not an add-on. A migration has one target ("
+                        + base.id() + ") and any number of add-ons: " + addons().stream().map(Playbook::id).toList());
+            }
+            addons.add(addon);
+        }
+        return base.with(addons);
+    }
+
+    private Playbook single(String idOrPath) {
         Path file = Path.of(idOrPath);
         if (Files.isRegularFile(file)) {
             return PlaybookLoader.load(file);
@@ -119,10 +143,20 @@ public final class PluginRegistry {
                         + playbooks.stream().map(Playbook::id).toList()));
     }
 
-    /** The playbooks that can migrate the project: those of the ecosystems that recognise it. */
+    /** The optional add-ons that can be combined with a target. */
+    public List<Playbook> addons() {
+        return playbooks.stream().filter(Playbook::addon).toList();
+    }
+
+    /** The add-ons that would change something in the project: those of its ecosystem, for a picker to offer. */
+    public List<Playbook> addonsFor(Path root) {
+        return addons().stream().filter(p -> plugins.containsKey(p.ecosystem()) && plugins.get(p.ecosystem()).supports(root)).toList();
+    }
+
+    /** The targets the project can be migrated to: those of the ecosystems that recognise it, without add-ons. */
     public List<Playbook> playbooksFor(Path root) {
         return playbooks.stream()
-                .filter(p -> plugins.containsKey(p.ecosystem()) && plugins.get(p.ecosystem()).supports(root))
+                .filter(p -> !p.addon() && plugins.containsKey(p.ecosystem()) && plugins.get(p.ecosystem()).supports(root))
                 .toList();
     }
 

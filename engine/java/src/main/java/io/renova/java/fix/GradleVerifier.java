@@ -60,6 +60,14 @@ final class GradleVerifier {
                 log.append(result.tail(40)).append('\n');
                 errors.addAll(parse(result.output(), workspace));
                 errors.addAll(testFailures(workspace, root));
+            } else if (!skipTests) {
+                String buildFile = java.nio.file.Files.exists(root.resolve("build.gradle.kts")) ? "build.gradle.kts" : "build.gradle";
+                java.util.Optional<BuildError> noTests = TestsRan.check(workspace, root, buildFile, "test-results");
+                if (noTests.isPresent()) {
+                    success = false;
+                    errors.add(noTests.get());
+                    log.append(noTests.get().message()).append('\n');
+                }
             }
         }
         return new VerifyResult(success, errors, log.toString());

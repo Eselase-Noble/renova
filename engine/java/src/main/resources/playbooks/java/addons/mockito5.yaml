@@ -1,0 +1,31 @@
+# Add-on: optional, combined with a target as in java-to-21+mockito5. Not a migration path on its own.
+
+id: mockito5
+name: "Mockito → 5"
+ecosystem: java
+version: 0.1.0
+description: >
+  Moves tests from Mockito 1 to 4 to Mockito 5, which is the first line that works on current Java without extra flags.
+
+settings:
+  kind: addon
+  openrewrite:
+    artifacts:
+      - org.openrewrite.recipe:rewrite-testing-frameworks:3.44.0
+
+rules:
+
+  - id: mockito-to-5
+    title: Upgrade Mockito to 5
+    category: C
+    severity: WARNING
+    detect:
+      type: dependency
+      coordinates: ["org.mockito:mockito-core", "org.mockito:mockito-all", "org.mockito:mockito-junit-jupiter"]
+      versionBelow: "5"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.testing.mockito.Mockito1to5Migration]
+    rationale: >
+      Mockito 1 and 2 use bytecode tools that fail on Java 17 and later. Matchers became ArgumentMatchers,
+      MockitoJUnitRunner moved, and mockito-all was replaced by mockito-core.

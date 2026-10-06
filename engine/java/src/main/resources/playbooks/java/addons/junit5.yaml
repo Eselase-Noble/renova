@@ -1,0 +1,47 @@
+# Add-on: optional, combined with a target as in java-to-21+junit5. Not a migration path on its own.
+
+id: junit5
+name: "JUnit 4 → 5"
+ecosystem: java
+version: 0.1.0
+description: >
+  Moves tests from JUnit 4 to JUnit 5 (Jupiter): annotations, assertions, rules and runners, and the build's test dependencies.
+
+settings:
+  kind: addon
+  openrewrite:
+    artifacts:
+      - org.openrewrite.recipe:rewrite-testing-frameworks:3.44.0
+
+rules:
+
+  - id: junit4-to-5
+    title: Move tests from JUnit 4 to JUnit 5
+    category: C
+    severity: WARNING
+    detect:
+      type: dependency
+      coordinates: ["junit:junit", "org.junit.vintage:junit-vintage-engine"]
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.testing.junit5.JUnit4to5Migration]
+    rationale: >
+      JUnit 4 has had no feature release since 2021. The recipe converts @Before/@After, expected exceptions,
+      rules such as TemporaryFolder, parameterised tests and runners; tests keep their names and what they check.
+
+  - id: guard-surefire-runs-junit5
+    phase: guard
+    title: maven-surefire-plugin must be 2.22 or newer to run JUnit 5 tests
+    category: A
+    severity: BLOCKER
+    detect:
+      type: mavenPluginBelow
+      plugin: maven-surefire-plugin
+      version: "2.22.0"
+      whenUndeclared: true
+    fix:
+      strategy: maven
+      params: { action: setPluginVersion, plugin: maven-surefire-plugin, version: "3.5.2" }
+    rationale: >
+      Older versions, including the one Maven 3 picks when none is declared, do not find JUnit 5 tests: the
+      build passes and reports "Tests run: 0". The tests moved to JUnit 5 would never run again.

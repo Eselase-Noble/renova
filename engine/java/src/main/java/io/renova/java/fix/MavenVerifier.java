@@ -73,6 +73,14 @@ public final class MavenVerifier implements Verifier {
                 log.append(result.tail(40)).append('\n');
                 errors.addAll(parse(result.output(), workspace, root));
                 errors.addAll(TestReports.parse(workspace, root));
+            } else if (goals.equals(DEFAULT_GOALS)) {
+                // A passing build proves nothing if it stopped running the tests.
+                java.util.Optional<BuildError> noTests = TestsRan.check(workspace, root, "pom.xml", "surefire-reports", "failsafe-reports");
+                if (noTests.isPresent()) {
+                    success = false;
+                    errors.add(noTests.get());
+                    log.append(noTests.get().message()).append('\n');
+                }
             }
         }
         return new VerifyResult(success, errors, log.toString());

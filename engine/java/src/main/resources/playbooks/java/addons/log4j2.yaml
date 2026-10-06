@@ -1,0 +1,42 @@
+# Add-on: optional, combined with a target as in java-to-21+log4j2. Not a migration path on its own.
+
+id: log4j2
+name: "Log4j 1 → Log4j 2"
+ecosystem: java
+version: 0.1.0
+description: >
+  Moves code and dependencies from Log4j 1, which reached end of life in 2015 and has unpatched vulnerabilities, to Log4j 2.
+
+settings:
+  kind: addon
+  openrewrite:
+    artifacts:
+      - org.openrewrite.recipe:rewrite-logging-frameworks:3.32.0
+
+rules:
+
+  - id: log4j1-to-2
+    title: Move from Log4j 1 to Log4j 2
+    category: C
+    severity: WARNING
+    detect:
+      type: dependency
+      coordinates: ["log4j:log4j", "org.slf4j:slf4j-log4j12", "ch.qos.reload4j:reload4j"]
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.logging.log4j.Log4j1ToLog4j2]
+    rationale: >
+      org.apache.log4j.Logger becomes org.apache.logging.log4j.Logger (LogManager.getLogger), and the build gets
+      log4j-api and log4j-core.
+
+  - id: log4j1-configuration
+    title: Convert the Log4j 1 configuration file
+    category: D
+    severity: WARNING
+    detect: { type: fileExists, include: ["**/log4j.properties", "**/log4j.xml"] }
+    fix:
+      strategy: manual
+      hint: >
+        Log4j 2 does not read log4j.properties or log4j.xml. Write the same appenders, levels and patterns as
+        log4j2.xml (or log4j2.properties) in the same resources folder, then delete the old file. Until then
+        Log4j 2 logs errors only, to the console, and the application's log files stay empty.

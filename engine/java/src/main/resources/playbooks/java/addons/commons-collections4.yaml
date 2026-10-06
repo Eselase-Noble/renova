@@ -1,0 +1,28 @@
+# Add-on: optional, combined with a target as in java-to-21+commons-collections4. Not a migration path on its own.
+
+id: commons-collections4
+name: "Commons Collections 3 → 4"
+ecosystem: java
+version: 0.1.0
+description: >
+  Moves code from commons-collections 3, known for its deserialisation vulnerabilities, to commons-collections4.
+
+settings:
+  kind: addon
+  openrewrite:
+    artifacts:
+      - org.openrewrite.recipe:rewrite-apache:2.30.0
+
+rules:
+
+  - id: commons-collections-3-to-4
+    title: Move from Commons Collections 3 to 4
+    category: C
+    severity: WARNING
+    detect:
+      type: dependency
+      coordinates: ["commons-collections:commons-collections"]
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.apache.commons.collections.UpgradeApacheCommonsCollections_3_4]
+    rationale: The package became org.apache.commons.collections4, with generics throughout.

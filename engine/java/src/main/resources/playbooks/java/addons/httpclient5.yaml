@@ -1,0 +1,30 @@
+# Add-on: optional, combined with a target as in java-to-21+httpclient5. Not a migration path on its own.
+
+id: httpclient5
+name: "Apache HttpClient 4 → 5"
+ecosystem: java
+version: 0.1.0
+description: >
+  Moves code from Apache HttpClient 4 to HttpClient 5: packages, renamed classes, and timeouts given as time values.
+
+settings:
+  kind: addon
+  openrewrite:
+    artifacts:
+      - org.openrewrite.recipe:rewrite-apache:2.30.0
+
+rules:
+
+  - id: httpclient-4-to-5
+    title: Move from Apache HttpClient 4 to 5
+    category: C
+    severity: WARNING
+    detect:
+      type: dependency
+      coordinates: ["org.apache.httpcomponents:httpclient", "org.apache.httpcomponents:httpmime"]
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.apache.httpclient5.UpgradeApacheHttpClient_5]
+    rationale: >
+      HttpClient 4 is in maintenance only. Packages became org.apache.hc.client5 and org.apache.hc.core5; some
+      calls changed shape, so the build and the tests show what the recipe could not convert.
