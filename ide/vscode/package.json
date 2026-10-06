@@ -1,0 +1,146 @@
+{
+  "name": "renova",
+  "displayName": "Renova",
+  "description": "Assess and migrate legacy Java projects (Java 8 → 21, Java EE → Jakarta EE 10, Spring 6) from VS Code.",
+  "version": "0.1.0",
+  "publisher": "renova",
+  "license": "SEE LICENSE IN LICENSE.txt",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Eselase-Noble/renova"
+  },
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "migration",
+    "legacy",
+    "java",
+    "jakarta",
+    "spring"
+  ],
+  "main": "./out/src/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/pom.xml",
+    "workspaceContains:**/build.gradle"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "renova.assess",
+        "title": "Assess Workspace",
+        "category": "Renova",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "renova.migrate",
+        "title": "Migrate…",
+        "category": "Renova",
+        "icon": "$(play)"
+      },
+      {
+        "command": "renova.chooseProvider",
+        "title": "Choose AI Provider…",
+        "category": "Renova"
+      },
+      {
+        "command": "renova.setKey",
+        "title": "Set API Key…",
+        "category": "Renova"
+      },
+      {
+        "command": "renova.clear",
+        "title": "Clear Findings",
+        "category": "Renova"
+      },
+      {
+        "command": "renova.openFinding",
+        "title": "Open Finding",
+        "category": "Renova"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "renova",
+          "title": "Renova",
+          "icon": "media/renova.svg"
+        }
+      ]
+    },
+    "views": {
+      "renova": [
+        {
+          "id": "renovaPlan",
+          "name": "Migration plan"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "renovaPlan",
+        "contents": "Find what a migration to Java 21, Jakarta EE 10 and Spring 6 must change, and who resolves each step.\n[Assess Workspace](command:renova.assess)\nRenova runs locally with Java 21+. AI is optional and uses your own key."
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "renova.assess",
+          "when": "view == renovaPlan",
+          "group": "navigation@1"
+        },
+        {
+          "command": "renova.migrate",
+          "when": "view == renovaPlan",
+          "group": "navigation@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "renova.openFinding",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Renova",
+      "properties": {
+        "renova.java": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Java 21+ executable used to run Renova. Empty: `JAVA_HOME`, then `java` on the PATH."
+        },
+        "renova.cliJar": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to the Renova CLI jar (`renova.jar`). Empty: the jar bundled with the extension."
+        },
+        "renova.assessOnOpen": {
+          "type": "boolean",
+          "default": false,
+          "description": "Assess the workspace when it opens."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -watch -p .",
+    "test": "npm run compile && node --test \"out/test/**/*.test.js\"",
+    "bundle-cli": "mkdir -p bin && cp ../../cli/target/renova.jar bin/renova.jar",
+    "package": "npm run compile && npm run bundle-cli && vsce package",
+    "test:vscode": "npm run compile && node out/test/vscode/run.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/vscode": "~1.95.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
+    "typescript": "~5.9.3"
+  }
+}
