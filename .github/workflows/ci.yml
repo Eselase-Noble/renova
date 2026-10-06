@@ -48,8 +48,9 @@ jobs:
           cache-dependency-path: web/console/package-lock.json
       - run: npm ci
       - run: npm run lint
-      - run: npx tsc --noEmit
+      # The build writes the route types (LayoutProps and friends) the type check needs, so it goes first.
       - run: npm run build
+      - run: npx tsc --noEmit
 
   vscode:
     name: VS Code extension
