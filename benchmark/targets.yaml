@@ -161,3 +161,13 @@ apps:
       - { file: pom.xml, contains: "<packaging>war</packaging>", why: "it has pages, so it stays a WAR that also runs on its own" }
       - { file: src/main/java/com/acme/payroll/WebConfiguration.java, contains: 'new com.acme.payroll.PayslipServlet(), "/payslip"', why: "an embedded server does not read web.xml: its servlets are declared in code" }
       - { file: src/main/resources/application.properties, contains: "server.servlet.context-path=/payroll", why: "the same address as on the server" }
+
+  # Struts 2 → 7 with the Jakarta target. The recipe renames the Aware setters in the action; a guard renames
+  # the calls to them in the test that sets the action up by hand.
+  - id: struts-2-to-7
+    path: helpdesk-struts2
+    playbook: java8-to-21-jakarta-ee10+struts7
+    checks:
+      - { file: pom.xml, matches: '(?s)<artifactId>struts2-core</artifactId>\s*<version>7\.', why: "Struts 7, the first line on Jakarta EE" }
+      - { file: src/main/java/com/acme/helpdesk/TicketAction.java, contains: "org.apache.struts2.action.SessionAware", why: "the interface Struts 7 has" }
+      - { file: src/test/java/com/acme/helpdesk/TicketActionTest.java, contains: "action.withSession(session)", why: "callers follow the renamed setter" }

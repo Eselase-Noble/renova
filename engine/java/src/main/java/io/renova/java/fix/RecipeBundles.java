@@ -31,6 +31,7 @@ import java.util.zip.ZipFile;
  *   first:                                        # recipes to run before the bundled ones
  *     - org.openrewrite.maven.ChangePropertyValue: { key: quarkus.platform.version, newValue: 3.33.4 }
  * </pre>
+ * A bundle without an artifact is a recipe the playbook composes itself from the list under {@code first}.
  * The files are joined into one configuration file with a recipe of the given name that runs them in release
  * order; the recipe run is pointed at that file.
  */
@@ -51,11 +52,12 @@ final class RecipeBundles {
         List<Bundle> bundles = new ArrayList<>();
         if (value instanceof Collection<?> list) {
             for (Object item : list) {
-                if (!(item instanceof Map<?, ?> map) || map.get("recipe") == null || map.get("artifact") == null) {
-                    throw new IllegalArgumentException("A recipe bundle needs 'recipe' and 'artifact': " + item);
+                if (!(item instanceof Map<?, ?> map) || map.get("recipe") == null
+                        || (map.get("artifact") == null && !(map.get("first") instanceof List<?>))) {
+                    throw new IllegalArgumentException("A recipe bundle needs 'recipe', and 'artifact' or a list 'first': " + item);
                 }
                 String path = map.get("path") == null ? "" : map.get("path").toString();
-                bundles.add(new Bundle(map.get("recipe").toString(), map.get("artifact").toString(), path,
+                bundles.add(new Bundle(map.get("recipe").toString(), map.get("artifact") == null ? null : map.get("artifact").toString(), path,
                         map.get("upTo") == null ? null : map.get("upTo").toString(),
                         map.get("first") instanceof List<?> first ? first : List.of()));
             }
@@ -74,7 +76,7 @@ final class RecipeBundles {
         }
         StringBuilder yaml = new StringBuilder();
         for (Bundle bundle : bundles) {
-            yaml.append(configuration(bundle, jar(context, buildRoot, bundle.artifact())));
+            yaml.append(configuration(bundle, bundle.artifact() == null ? null : jar(context, buildRoot, bundle.artifact())));
         }
         Path file = Files.createTempFile("renova-rewrite", ".yml");
         Files.writeString(file, yaml.toString());
@@ -85,7 +87,7 @@ final class RecipeBundles {
     static String configuration(Bundle bundle, Path jar) throws IOException {
         StringBuilder yaml = new StringBuilder();
         List<String> names = new ArrayList<>();
-        try (ZipFile zip = new ZipFile(jar.toFile())) {
+        if (jar != null) try (ZipFile zip = new ZipFile(jar.toFile())) {
             List<? extends ZipEntry> files = zip.stream()
                     .filter(e -> !e.isDirectory() && e.getName().startsWith(bundle.path())
                             && e.getName().indexOf('/', bundle.path().length()) < 0
@@ -109,12 +111,14 @@ final class RecipeBundles {
             }
         }
         yaml.append("---\ntype: specs.openrewrite.org/v1beta/recipe\nname: ").append(bundle.recipe())
-                .append("\ndisplayName: ").append(bundle.recipe()).append("\ndescription: The recipes of ")
-                .append(bundle.artifact().replace(':', ' ')).append(" in release order.\nrecipeList:\n");
+                .append("\ndisplayName: ").append(bundle.recipe()).append("\ndescription: ")
+                .append(bundle.artifact() == null ? "Recipes the playbook composes."
+                        : "The recipes of " + bundle.artifact().replace(':', ' ') + " in release order.").append("\nrecipeList:\n");
         for (Object first : bundle.first()) {
             if (first instanceof Map<?, ?> map && map.size() == 1 && map.values().iterator().next() instanceof Map<?, ?> params) {
                 yaml.append("  - ").append(map.keySet().iterator().next()).append(":\n");
-                params.forEach((k, v) -> yaml.append("      ").append(k).append(": \"").append(v).append("\"\n"));
+                params.forEach((k, v) -> yaml.append("      ").append(k).append(": ")
+                        .append(v instanceof Boolean || v instanceof Number ? v.toString() : "\"" + v + "\"").append('\n'));
             } else {
                 yaml.append("  - ").append(first).append('\n');
             }

@@ -198,13 +198,14 @@ public final class JavaPlugin implements EcosystemPlugin {
     public List<DetectorFactory> detectors() {
         return List.of(new ImportDetector(), new DependencyDetector(), new JavaVersionDetector(),
                 new MavenPluginDetector(), new PomPropertyDetector(), new ImportDependencyDetector(),
-                new UnversionedDependencyDetector(), new DuplicateDependencyDetector(), new MavenParentDetector(), new GradlePluginDetector(), new GradleImportDependencyDetector());
+                new UnversionedDependencyDetector(), new DuplicateDependencyDetector(), new MavenParentDetector(), new GradlePluginDetector(), new GradleImportDependencyDetector(),
+                new io.renova.java.detect.RenamedMethodCallers());
     }
 
     @Override
     public List<Fixer> fixers() {
         return List.of(new OpenRewriteFixer(), new MavenPomFixer(), new GradleBuildFixer(),
-                new io.renova.java.fix.SpringBootReplatformer());
+                new io.renova.java.fix.SpringBootReplatformer(), new io.renova.java.detect.RenamedMethodCallers());
     }
 
     @Override

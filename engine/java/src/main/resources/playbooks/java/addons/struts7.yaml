@@ -31,21 +31,30 @@ rules:
     rationale: >
       Struts 2.x and 6.x run on javax.servlet only; Struts 7 is the first line on Jakarta EE. The recipes rename
       the com.opensymphony.xwork2 classes to org.apache.struts2, replace the removed Aware interfaces
-      (SessionAware, ServletRequestAware) and update struts.xml constants and DTDs. Plugins without a Struts 7
+      (SessionAware.setSession is withSession, and so on, in the actions and in the code that calls them) and
+      update struts.xml constants and DTDs. Plugins without a Struts 7
       release, and OGNL expressions that relied on relaxed security defaults, need a person.
 
-  - id: struts-aware-callers
-    title: Update code that calls the Aware setters Struts 7 renamed
+  - id: guard-struts-aware-callers
+    phase: guard
+    title: Calls to the Aware setters Struts 7 renamed
     category: C
-    severity: WARNING
+    severity: BLOCKER
     detect:
-      type: fileContains
-      include: ["**/*.java"]
-      pattern: "\\.set(Session|ServletRequest|ServletResponse|Application|Parameters|Principal)\\(\\s*\\w"
+      type: renamedMethodCallers
+      renames:
+        setSession: withSession
+        setApplication: withApplication
+        setRequest: withRequest
+        setParameters: withParameters
+        setServletRequest: withServletRequest
+        setServletResponse: withServletResponse
+        setServletContext: withServletContext
+        setPrincipalProxy: withPrincipalProxy
+        setCookiesMap: withCookies
     fix:
-      strategy: manual
-      hint: >
-        Struts 7 replaced SessionAware.setSession, ServletRequestAware.setServletRequest and the other Aware
-        setters with withSession, withServletRequest and so on. The recipe renames the methods in the actions;
-        code that calls them on an action, most often unit tests that set an action up by hand, must call the
-        new names. Calls with the same names on other objects (a mock request's setSession) are not affected.
+      strategy: renameCalls
+    rationale: >
+      The upgrade recipe renames the setters where an action implements them. Code that calls them on an
+      action, most often a unit test that sets the action up by hand, is left calling a method that no longer
+      exists. Only calls on a variable of such an action class are renamed: a mock request's setSession is not.
