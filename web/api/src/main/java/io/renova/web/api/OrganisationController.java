@@ -4,6 +4,7 @@ import io.renova.web.account.Access;
 import io.renova.web.account.AccountService;
 import io.renova.web.account.AccountStore;
 import io.renova.web.account.Invitation;
+import io.renova.web.account.LocalMode;
 import io.renova.web.account.Organisation;
 import io.renova.web.account.Role;
 import io.renova.web.account.User;
@@ -32,9 +33,11 @@ public class OrganisationController {
     private final AccountService accounts;
     private final AccountStore store;
     private final AuditLog audit;
+    private final LocalMode local;
 
-    public OrganisationController(Access access, AccountService accounts, AccountStore store, AuditLog audit) {
+    public OrganisationController(Access access, AccountService accounts, AccountStore store, AuditLog audit, LocalMode local) {
         this.audit = audit;
+        this.local = local;
         this.access = access;
         this.accounts = accounts;
         this.store = store;
@@ -111,6 +114,9 @@ public class OrganisationController {
     @ResponseStatus(HttpStatus.CREATED)
     public InvitationView invite(@RequestBody NewInvitation body, HttpServletRequest request) {
         Access.Caller caller = access.require(request, Role.ADMIN);
+        if (local.enabled()) {
+            throw new IllegalStateException("Local mode is for one person on this machine. To work with others, run Renova in server mode.");
+        }
         Role role = body.role() == null ? Role.MEMBER : body.role();
         if (role == Role.OWNER && caller.role() != Role.OWNER) {
             throw new SecurityException("Only an owner can invite an owner");

@@ -1,0 +1,25 @@
+# Renova web API. Copy to /etc/systemd/system/, adjust the paths and the user, then:
+#   systemctl daemon-reload && systemctl enable --now renova-api renova-console
+[Unit]
+Description=Renova web API
+After=network.target
+
+[Service]
+User=renova
+# Where this bundle was unpacked.
+WorkingDirectory=/opt/renova-web
+# Optional settings, one NAME=value per line: RENOVA_MASTER_KEY (base64, 32 bytes) and anything from README.md.
+EnvironmentFile=-/etc/renova/renova.env
+ExecStart=/usr/bin/java -jar /opt/renova-web/api/renova-web-api.jar \
+    --server.port=8787 \
+    --renova.data-dir=/var/lib/renova \
+    --renova.project-roots=/srv/projects \
+    --server.servlet.session.cookie.secure=true
+Restart=on-failure
+# Migrations build projects: give them time to stop cleanly.
+TimeoutStopSec=60
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,6 @@
 package io.renova.web;
 
+import io.renova.web.account.LocalMode;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -8,19 +9,24 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 
 /**
  * Sessions with an HttpOnly cookie, CSRF protection in the form single-page apps use (an XSRF-TOKEN cookie
  * the console echoes in an X-XSRF-TOKEN header), and everything under /api except signing in needs a
- * signed-in user. Roles within an organisation are checked by {@link io.renova.web.account.Access}.
+ * signed-in user. In local mode ({@code renova.mode=local}) there is no sign-in: see {@link LocalMode}. Roles within an organisation are checked by {@link io.renova.web.account.Access}.
  */
 @Configuration
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain api(HttpSecurity http, SecurityContextRepository contexts) throws Exception {
+    SecurityFilterChain api(HttpSecurity http, SecurityContextRepository contexts, LocalMode local) throws Exception {
+        if (local.enabled()) {
+            // No accounts: each request is the machine's one user. See LocalMode for what keeps that safe.
+            http.addFilterBefore(local.filter(), AuthorizationFilter.class);
+        }
         http.authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/state", "/api/auth/setup", "/api/auth/login", "/api/auth/logout",
                                 "/api/auth/invitations/**").permitAll()

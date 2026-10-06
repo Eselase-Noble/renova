@@ -13,6 +13,7 @@ import io.renova.desktop.view.Icons;
 import io.renova.desktop.view.MarkdownView;
 import io.renova.desktop.view.MigrationsView;
 import io.renova.desktop.view.MigrationView;
+import io.renova.desktop.view.OverviewView;
 import io.renova.desktop.view.ProjectView;
 import io.renova.desktop.view.SettingsView;
 import io.renova.desktop.view.Ui;
@@ -56,7 +57,8 @@ import java.util.prefs.Preferences;
  * {@code --theme=light|dark} chooses the theme (and remembers it). Development aids: {@code --snapshot-dir=DIR} saves
  * a PNG of each screen shortly after it is shown
  * (at least {@code --snapshot-delay=SECONDS} after); {@code --migrate} (with {@code --open}) starts a migration with the
- * default options and no AI once the project is assessed; {@code --tab=NAME} opens that tab of a finished migration.
+ * default options and no AI once the project is assessed; {@code --cancel-after=SECONDS} cancels a migration that long
+ * after it starts; {@code --tab=NAME} opens that tab of a finished migration.
  */
 public final class RenovaApp extends Application implements Navigator {
 
@@ -68,6 +70,7 @@ public final class RenovaApp extends Application implements Navigator {
     private MigrationHistory history;
     private BorderPane root;
     private VBox runList;
+    private Button overviewButton;
     private Button homeButton;
     private Button settingsButton;
     private Button migrationsButton;
@@ -108,8 +111,10 @@ public final class RenovaApp extends Application implements Navigator {
             settings();
         } else if ("migrations".equals(getParameters().getNamed().get("show"))) {
             migrations();
-        } else {
+        } else if ("projects".equals(getParameters().getNamed().get("show"))) {
             home();
+        } else {
+            overview();
         }
     }
 
@@ -127,6 +132,7 @@ public final class RenovaApp extends Application implements Navigator {
         brand.setAlignment(Pos.CENTER_LEFT);
         brand.setPadding(new Insets(2, 6, 14, 6));
 
+        overviewButton = navButton("Overview", Icons.DASHBOARD, e -> overview());
         homeButton = navButton("Projects", Icons.FOLDER, e -> home());
         migrationsButton = navButton("Migrations", Icons.WORKFLOW, e -> migrations());
         settingsButton = navButton("Settings", Icons.SETTINGS, e -> settings());
@@ -151,7 +157,7 @@ public final class RenovaApp extends Application implements Navigator {
         Label caption = new Label("WORKSPACE");
         caption.getStyleClass().add("nav-caption");
         caption.setPadding(new Insets(0, 10, 6, 10));
-        VBox sidebar = new VBox(brand, caption, homeButton, migrationsButton, settingsButton, runCaption, runList, Ui.grow(), foot);
+        VBox sidebar = new VBox(brand, caption, overviewButton, homeButton, migrationsButton, settingsButton, runCaption, runList, Ui.grow(), foot);
         sidebar.getStyleClass().add("sidebar");
         return sidebar;
     }
@@ -178,6 +184,7 @@ public final class RenovaApp extends Application implements Navigator {
                     case RUNNING -> Ui.Tone.INFO;
                     case PASSED -> Ui.Tone.GOOD;
                     case FAILED, ERROR -> Ui.Tone.BAD;
+                    case CANCELLED -> Ui.Tone.MUTED;
                 }));
             };
             update.run();
@@ -192,6 +199,7 @@ public final class RenovaApp extends Application implements Navigator {
             case PASSED -> "Passed";
             case FAILED -> "Failed";
             case ERROR -> "Stopped with an error";
+            case CANCELLED -> "Cancelled";
         };
     }
 
@@ -206,7 +214,7 @@ public final class RenovaApp extends Application implements Navigator {
     }
 
     private void show(Node content, Button active, String snapshotName) {
-        for (Button b : new Button[] {homeButton, migrationsButton, settingsButton}) {
+        for (Button b : new Button[] {overviewButton, homeButton, migrationsButton, settingsButton}) {
             b.getStyleClass().remove("active");
         }
         if (active != null) {
@@ -217,6 +225,11 @@ public final class RenovaApp extends Application implements Navigator {
         scroll.getStyleClass().add("canvas");
         root.setCenter(scroll);
         snapshot(snapshotName, 1.5);
+    }
+
+    @Override
+    public void overview() {
+        show(new OverviewView(this, ai, recent, history, runs).build(), overviewButton, "overview");
     }
 
     @Override
@@ -245,6 +258,13 @@ public final class RenovaApp extends Application implements Navigator {
         });
         Thread thread = new Thread(work, "renova-migration");
         thread.setDaemon(true);
+        run.worker(thread);
+        String cancelAfter = getParameters().getNamed().get("cancel-after");
+        if (cancelAfter != null) {
+            PauseTransition wait = new PauseTransition(Duration.seconds(Double.parseDouble(cancelAfter)));
+            wait.setOnFinished(e -> run.cancel());
+            wait.play();
+        }
         thread.start();
         showRun(run);
     }
@@ -275,11 +295,13 @@ public final class RenovaApp extends Application implements Navigator {
             var ai = m.path("aiUsage");
             history.add(new MigrationHistory.Entry(run.projectName(), r.report().path("project").path("root").asText(null), ws.toString(),
                     r.state(), started, finished, build, behaviour, ai.path("requests").asInt(),
-                    ai.path("inputTokens").asLong() + ai.path("outputTokens").asLong()));
+                    ai.path("inputTokens").asLong() + ai.path("outputTokens").asLong(),
+                    r.report().path("summary").path("automationRate").isNumber() ? r.report().path("summary").path("automationRate").asDouble() : null));
         } catch (Exception e) {
             if (java.nio.file.Files.isDirectory(ws)) {
-                history.add(new MigrationHistory.Entry(run.projectName(), null, ws.toString(), "ERROR", started, finished,
-                        "Not built", "Not checked", 0, 0));
+                history.add(new MigrationHistory.Entry(run.projectName(), null, ws.toString(),
+                        run.state().get() == MigrationRun.State.CANCELLED ? "CANCELLED" : "ERROR", started, finished,
+                        "Not built", "Not checked", 0, 0, null));
             }
         }
     }

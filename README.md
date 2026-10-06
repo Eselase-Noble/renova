@@ -19,6 +19,7 @@ AI model or a person, and the real build checks every change.
 - [Getting started](#getting-started)
 - [Playbooks](#playbooks)
 - [Extending Renova](#extending-renova)
+- [Deploying](#deploying)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
@@ -79,7 +80,7 @@ Every finding belongs to a change category, and plan steps run in the order A �
 | [`engine/ai-anthropic`](engine) | AI provider for Claude, using each user's own Anthropic API key | Working |
 | [`engine/ai-openai`](engine) | AI provider for OpenAI or any OpenAI-compatible server (Azure OpenAI, vLLM, Ollama), using the user's own key | Working |
 | [`cli`](cli) | `renova` command for terminals and CI pipelines | Working |
-| [`web`](web) | REST API (Spring Boot) and web console (Next.js) with accounts and organisations, on-premises | Working |
+| [`web`](web) | REST API (Spring Boot) and web console (Next.js): local mode for one machine, or accounts and organisations on your own server | Working |
 | [`desktop`](desktop) | JavaFX desktop app running the engine on your machine, packaged with jpackage | Working |
 | [`ide`](ide) | IntelliJ IDEA plugin and VS Code extension: findings in the editor, migrate from the IDE | Working |
 
@@ -293,6 +294,12 @@ classpath is enough.
 `engine/core/src/test/java/io/renova/core/EngineTest.java` implements a complete toy ecosystem in about
 twenty lines and is a good starting point. See [`engine/README.md`](engine/README.md) for details.
 
+## Deploying
+
+Renova runs on machines the customer controls; it is not a hosted service and needs no Docker. A version tag
+(`git tag v0.2.0 && git push origin v0.2.0`) builds and publishes a GitHub release with the desktop installers for
+Linux, Windows and macOS, the web bundle, the CLI and both IDE plugins. See [docs/deployment.md](docs/deployment.md).
+
 ## Roadmap
 
 1. **RAG:** phase 1 (structural code retrieval and curated knowledge, no key needed) is in and on by default.
@@ -302,7 +309,7 @@ twenty lines and is a good starting point. See [`engine/README.md`](engine/READM
    ([design](docs/behavioural-verification-design.md)).
 3. **Benchmark harness:** `renova benchmark` scores migrations of synthetic legacy apps (see
    [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.
-4. **Web console:** single sign-on and licensing (the audit log is in). **Desktop:** installers per OS.
+4. **Web console:** single sign-on and licensing (the audit log and local mode are in). **Desktop:** signed installers.
 5. **More playbooks and ecosystems:** Spring Boot 2 → 3, Java EE → Quarkus, then .NET and Python.
 
 ## Contributing

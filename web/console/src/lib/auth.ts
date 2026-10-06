@@ -11,6 +11,8 @@ export function useAuth() {
   return {
     ...state,
     role,
+    /** Renova is running for one person on this machine: nothing about accounts or members applies. */
+    local: !!state.data?.localMode,
     can: (needed: Role) => atLeast(role, needed),
   };
 }

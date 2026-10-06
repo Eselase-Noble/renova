@@ -56,7 +56,11 @@ export default function Overview() {
     <>
       <PageHeader
         title={firstName ? `Welcome back, ${firstName}` : "Overview"}
-        description={`Legacy projects, their assessments and migrations in ${auth.data?.organisation?.name ?? "your organisation"}.`}
+        description={
+          auth.local
+            ? "Legacy projects, their assessments and migrations on this machine. Your code and every migrated copy stay here."
+            : `Legacy projects, their assessments and migrations in ${auth.data?.organisation?.name ?? "your organisation"}.`
+        }
         actions={
           auth.can("ADMIN") && (
             <Link href="/projects?add=1" className={buttonVariants()}>
@@ -66,7 +70,7 @@ export default function Overview() {
         }
       />
       <div className="space-y-6">
-        {auth.can("ADMIN") && <GettingStarted projects={projects.data} migrations={migrations.data} />}
+        {auth.can("ADMIN") && <GettingStarted projects={projects.data} migrations={migrations.data} local={auth.local} />}
         <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
           <Stat label="Projects" icon={FolderGit2} value={projects.data?.length ?? "—"} hint={running.length ? `${plural(running.length, "migration")} in progress` : "None being migrated now"} />
           <Stat
@@ -85,7 +89,7 @@ export default function Overview() {
           >
             {automation !== null && <Meter value={automation} label="Average automation rate" />}
           </Stat>
-          <Stat label="AI tokens used" icon={Sparkles} value={tokens(tokensUsed)} hint={aiRequests ? `${plural(aiRequests, "request")} on your own key` : "On your organisation's own key"} />
+          <Stat label="AI tokens used" icon={Sparkles} value={tokens(tokensUsed)} hint={aiRequests ? `${plural(aiRequests, "request")} on your own key` : auth.local ? "On your own key" : "On your organisation's own key"} />
         </div>
         <div className="grid gap-6 xl:grid-cols-3">
           <Panel title="Migration activity" description="Migrations started in the last 14 days, by how they ended." className="xl:col-span-2">
@@ -203,20 +207,20 @@ function ProjectHealth({ projects, migrations }: { projects: Project[] | undefin
 }
 
 /** The steps from an empty organisation to a first verified migration; hidden once all are done. */
-function GettingStarted({ projects, migrations }: { projects: Project[] | undefined; migrations: Migration[] | undefined }) {
+function GettingStarted({ projects, migrations, local }: { projects: Project[] | undefined; migrations: Migration[] | undefined; local: boolean }) {
   const settings = useQuery({ queryKey: ["settings"], queryFn: api.settings });
   const org = useQuery({ queryKey: ["organisation"], queryFn: api.organisation });
   if (!projects || !migrations || !settings.data || !org.data) return null;
   const s = settings.data;
-  const steps = [
+  const all = [
     {
       title: "Connect an AI provider",
-      text: "Add your organisation's own Anthropic or OpenAI key. Without one, AI steps are listed for a person.",
+      text: `Add ${local ? "your" : "your organisation's"} own Anthropic or OpenAI key. Without one, AI steps are listed for a person.`,
       done: s.provider !== "none" && !!s.providers.find((p) => p.name === s.provider)?.keyConfigured,
       href: "/settings",
       action: "Open settings",
     },
-    { title: "Add a project", text: "Point Renova at a project folder on this server. It is only read.", done: projects.length > 0, href: "/projects?add=1", action: "Add project" },
+    { title: "Add a project", text: `Point Renova at a project folder on this ${local ? "machine" : "server"}. It is only read.`, done: projects.length > 0, href: "/projects?add=1", action: "Add project" },
     {
       title: "Run a migration",
       text: "Review the assessment, then migrate a copy and follow every stage.",
@@ -226,6 +230,8 @@ function GettingStarted({ projects, migrations }: { projects: Project[] | undefi
     },
     { title: "Invite your team", text: "Give colleagues a role: viewer, member or admin.", done: org.data.members.length > 1, href: "/organisation", action: "Invite people" },
   ];
+  // On one person's machine there is nobody to invite.
+  const steps = local ? all.slice(0, 3) : all;
   const done = steps.filter((x) => x.done).length;
   if (done === steps.length) return null;
   const next = steps.findIndex((x) => !x.done);
@@ -240,7 +246,7 @@ function GettingStarted({ projects, migrations }: { projects: Project[] | undefi
       }
       bodyClassName="p-0"
     >
-      <ol className="grid divide-y md:grid-cols-2 md:divide-x md:divide-y-0 xl:grid-cols-4">
+      <ol className={cn("grid divide-y md:grid-cols-2 md:divide-x md:divide-y-0", local ? "xl:grid-cols-3" : "xl:grid-cols-4")}>
         {steps.map((step, i) => (
           <li key={step.title} className={cn("flex flex-col gap-2 p-5", i >= 2 && "md:border-t xl:border-t-0")}>
             <div className="flex items-center gap-2.5">

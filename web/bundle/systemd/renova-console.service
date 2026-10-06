@@ -1,0 +1,20 @@
+# Renova web console. It listens on 127.0.0.1:3000; a reverse proxy in front of it terminates HTTPS (README.md).
+[Unit]
+Description=Renova web console
+After=network.target renova-api.service
+Wants=renova-api.service
+
+[Service]
+User=renova
+WorkingDirectory=/opt/renova-web/console
+Environment=RENOVA_API_URL=http://127.0.0.1:8787
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3000
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

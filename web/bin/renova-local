@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# From a source checkout: Renova's web console for one person on this machine. Builds the web bundle on first
+# use (or with --build after an update), then runs it in local mode: no accounts, nothing listening beyond
+# 127.0.0.1, and every project and migrated copy kept on this machine (data in ~/.renova/local).
+#
+#   web/bin/renova-local [--build] [--port 3000] [--api-port 8787] [--no-browser]
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+build=false
+args=()
+for arg in "$@"; do
+  if [ "$arg" = "--build" ]; then build=true; else args+=("$arg"); fi
+done
+
+bundle="$(ls -d "$root"/web/target/renova-web-*/ 2>/dev/null | head -1 || true)"
+if $build || [ -z "$bundle" ]; then
+  "$root/web/package.sh"
+  bundle="$(ls -d "$root"/web/target/renova-web-*/ | head -1)"
+fi
+exec "${bundle%/}/bin/renova-web" local "${args[@]}"

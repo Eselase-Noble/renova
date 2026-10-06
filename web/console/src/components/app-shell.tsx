@@ -10,6 +10,7 @@ import {
   ChevronsUpDown,
   FolderGit2,
   KeyRound,
+  Laptop,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -60,6 +61,8 @@ interface NavItem {
   icon: LucideIcon;
   /** The least role that sees the item. */
   role?: Role;
+  /** Only where there are other people: hidden in local mode. */
+  team?: boolean;
 }
 
 export const NAV: { title: string; items: NavItem[] }[] = [
@@ -75,8 +78,8 @@ export const NAV: { title: string; items: NavItem[] }[] = [
   {
     title: "Organisation",
     items: [
-      { href: "/organisation", label: "Members", icon: Users },
-      { href: "/audit", label: "Audit log", icon: ScrollText, role: "ADMIN" },
+      { href: "/organisation", label: "Members", icon: Users, team: true },
+      { href: "/audit", label: "Audit log", icon: ScrollText, role: "ADMIN", team: true },
       { href: "/settings", label: "Settings", icon: Settings },
     ],
   },
@@ -118,7 +121,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!auth.data?.user) {
     return (
       <div className="flex min-h-svh">
-        <div className="hidden w-60 shrink-0 bg-sidebar lg:block" />
+        <div className="hidden w-60 shrink-0 border-r border-sidebar-border bg-sidebar lg:block" />
         <div className="flex-1 space-y-4 p-8">
           <Skeleton className="h-8 w-56" />
           <Skeleton className="h-28 w-full max-w-5xl" />
@@ -133,7 +136,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-svh">
       <aside
         className={cn(
-          "sticky top-0 hidden h-svh shrink-0 flex-col bg-sidebar text-sidebar-foreground transition-[width] duration-200 lg:flex",
+          "sticky top-0 hidden h-svh shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 lg:flex",
           narrow ? "w-[60px]" : "w-60",
         )}
       >
@@ -208,18 +211,32 @@ function SidebarContent({ narrow, onNavigate }: { narrow: boolean; onNavigate?: 
           {!narrow && <Wordmark className="text-sidebar-accent-foreground" />}
         </Link>
       </div>
-      <div className={cn("px-2 pb-2", narrow && "flex justify-center")}>
-        <OrganisationSwitcher narrow={narrow} />
-      </div>
+      {auth.local ? (
+        !narrow && (
+          <div className="mx-2 mb-2 flex items-center gap-2.5 rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-2.5 py-2">
+            <Laptop className="size-4 shrink-0 text-sidebar-accent-foreground" />
+            <span className="min-w-0">
+              <span className="block text-[13px] leading-4 font-medium text-sidebar-accent-foreground">Local mode</span>
+              <span className="block text-[11px] leading-4 text-sidebar-foreground/60">Your code stays on this machine</span>
+            </span>
+          </div>
+        )
+      ) : (
+        <div className={cn("px-2 pb-2", narrow && "flex justify-center")}>
+          <OrganisationSwitcher narrow={narrow} />
+        </div>
+      )}
       <nav className="scroll-thin flex-1 space-y-5 overflow-y-auto px-2 py-2" aria-label="Main">
         {NAV.map((group) => {
-          const items = group.items.filter((i) => !i.role || auth.can(i.role));
+          const items = group.items.filter((i) => (!i.role || auth.can(i.role)) && !(i.team && auth.local));
           return (
             <div key={group.title} className="space-y-0.5">
               {narrow ? (
                 <div className="mx-2 mb-2 border-t border-sidebar-border first:hidden" />
               ) : (
-                <div className="px-2.5 pb-1 text-[11px] font-medium tracking-wider text-sidebar-foreground/50 uppercase">{group.title}</div>
+                <div className="px-2.5 pb-1 text-[11px] font-medium tracking-wider text-sidebar-foreground/60 uppercase">
+                  {auth.local && group.title === "Organisation" ? "This computer" : group.title}
+                </div>
               )}
               {items.map(({ href, label, icon: Icon }) => {
                 const current = isActive(pathname, href);
@@ -230,7 +247,7 @@ function SidebarContent({ narrow, onNavigate }: { narrow: boolean; onNavigate?: 
                     onClick={onNavigate}
                     aria-current={current ? "page" : undefined}
                     className={cn(
-                      "relative flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+                      "relative flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring",
                       current && "bg-sidebar-accent text-sidebar-accent-foreground",
                       narrow && "justify-center px-0",
                     )}
@@ -254,8 +271,8 @@ function SidebarContent({ narrow, onNavigate }: { narrow: boolean; onNavigate?: 
         })}
       </nav>
       {!narrow && system.data && (
-        <div className="px-4 pb-3 text-[11px] text-sidebar-foreground/45">
-          Renova {system.data.version.replace("-SNAPSHOT", "")} · on-premises
+        <div className="px-4 pb-3 text-[11px] text-sidebar-foreground/60">
+          Renova {system.data.version.replace("-SNAPSHOT", "")} · {auth.local ? "this machine only" : "on-premises"}
         </div>
       )}
     </>
@@ -294,7 +311,7 @@ function OrganisationSwitcher({ narrow }: { narrow: boolean }) {
             />
           }
         >
-          <span className="grid size-6 shrink-0 place-items-center rounded-md bg-sidebar-primary/25 text-[11px] font-semibold text-sidebar-accent-foreground">
+          <span className="grid size-6 shrink-0 place-items-center rounded-md bg-sidebar-primary/20 text-[11px] font-semibold text-sidebar-accent-foreground">
             {current.name.slice(0, 1).toUpperCase()}
           </span>
           {!narrow && (
@@ -464,16 +481,24 @@ function UserMenu() {
             <Avatar name={user.name} className="size-8 text-xs" />
             <div className="min-w-0">
               <div className="truncate text-sm font-medium">{user.name}</div>
-              <div className="truncate text-xs text-muted-foreground">{user.email}</div>
+              <div className="truncate text-xs text-muted-foreground">{auth.local ? "This computer" : user.email}</div>
             </div>
           </div>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setChanging(true)}>
-            <KeyRound /> Change password
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => signOut.mutate()}>
-            <LogOut /> Sign out
-          </DropdownMenuItem>
+          {auth.local ? (
+            <div className="px-2 py-2 text-xs text-muted-foreground">
+              Local mode: no sign-in. Renova answers only this machine, and projects and migrated copies stay on it.
+            </div>
+          ) : (
+            <>
+              <DropdownMenuItem onClick={() => setChanging(true)}>
+                <KeyRound /> Change password
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => signOut.mutate()}>
+                <LogOut /> Sign out
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       <ChangePasswordDialog open={changing} onOpenChange={setChanging} />

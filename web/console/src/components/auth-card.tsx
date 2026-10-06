@@ -12,7 +12,18 @@ const POINTS = [
 export function AuthCard({ title, description, children }: { title: string; description?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="grid min-h-svh lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-sidebar p-10 text-sidebar-foreground lg:flex">
+      {/* The brand panel is deep navy in both themes, whatever the sidebar's colours are. */}
+      <aside
+        className="relative hidden flex-col justify-between overflow-hidden bg-sidebar p-10 text-sidebar-foreground lg:flex"
+        style={
+          {
+            "--sidebar": "oklch(0.205 0.035 268)",
+            "--sidebar-foreground": "oklch(0.86 0.015 268)",
+            "--sidebar-primary": "oklch(0.62 0.19 268)",
+            "--sidebar-border": "oklch(1 0 0 / 9%)",
+          } as React.CSSProperties
+        }
+      >
         <div aria-hidden className="bg-grid absolute inset-0 [mask-image:radial-gradient(ellipse_at_top_left,black,transparent_75%)]" />
         <div aria-hidden className="absolute -top-40 -left-40 size-[32rem] rounded-full bg-sidebar-primary/25 blur-3xl" />
         <div className="relative flex items-center gap-2.5">

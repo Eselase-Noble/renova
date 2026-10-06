@@ -20,9 +20,14 @@ public final class MigrationHistory {
     private final Path file;
     private final ObjectMapper json = new ObjectMapper();
 
-    /** @param state PASSED, FAILED or ERROR */
+    /**
+     * @param state          PASSED, FAILED, ERROR or CANCELLED
+     * @param automationRate the share of the work that needed no human decision; null in entries written before
+     *                       it was recorded, and when the migration stopped before its report
+     */
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
     public record Entry(String projectName, String projectPath, String workspace, String state, String startedAt,
-                        String finishedAt, String build, String behaviour, int aiRequests, long tokens) {
+                        String finishedAt, String build, String behaviour, int aiRequests, long tokens, Double automationRate) {
     }
 
     public MigrationHistory() {

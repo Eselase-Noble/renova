@@ -74,6 +74,7 @@ public final class HomeView {
                 case PASSED -> Ui.badge("Passed", Ui.Tone.GOOD, Icons.CHECK);
                 case FAILED -> Ui.badge("Failed", Ui.Tone.BAD, Icons.CROSS);
                 case ERROR -> Ui.badge("Error", Ui.Tone.BAD, Icons.ALERT);
+                case CANCELLED -> Ui.badge("Cancelled", Ui.Tone.MUTED, Icons.STOP);
             }, () -> nav.showRun(run)));
         }
         List<String> shown = runs.stream().map(r -> r.workspace().toAbsolutePath().normalize().toString()).toList();
@@ -82,6 +83,7 @@ public final class HomeView {
                 .forEach(e -> list.getChildren().add(row(e.projectName(), e.workspace(), switch (e.state()) {
                     case "PASSED" -> Ui.badge("Passed", Ui.Tone.GOOD, Icons.CHECK);
                     case "FAILED" -> Ui.badge("Failed", Ui.Tone.BAD, Icons.CROSS);
+                    case "CANCELLED" -> Ui.badge("Cancelled", Ui.Tone.MUTED, Icons.STOP);
                     default -> Ui.badge("Error", Ui.Tone.BAD, Icons.ALERT);
                 }, () -> nav.showWorkspace(Path.of(e.workspace())))));
         if (!list.getChildren().isEmpty()) {
