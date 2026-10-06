@@ -22,6 +22,8 @@ import java.util.regex.Pattern;
  *   <li>{@code action: setScope, scope: provided}: dependencies matching the rule's detect coordinates</li>
  *   <li>{@code action: setPluginVersion, plugin: maven-war-plugin, version: "3.4.0", groupId?}</li>
  *   <li>{@code action: setProperty, name: maven.compiler.target, value: "${maven.compiler.source}"}</li>
+ *   <li>{@code action: addAnnotationProcessor, processor: "groupId:artifactId[:version]"}: adds it to the compiler
+ *       plugin's annotationProcessorPaths, when the pom has that list</li>
  *   <li>{@code action: setParentVersion, version: "3.5.7"}: the version of the pom's declared parent</li>
  *   <li>{@code action: setVersion, version: "6.1.0"}: that version for each dependency the rule's {@code dependency}
  *       detector reported; without {@code version}, the one each finding carries</li>
@@ -78,16 +80,22 @@ public final class MavenPomFixer implements Fixer {
                             params.string("plugin"), params.string("version"));
                     case "setProperty" -> PomEditor.setProperty(before, params.string("name"), params.string("value"));
                     case "setParentVersion" -> PomEditor.setParentVersion(before, params.string("version"));
+                    case "addAnnotationProcessor" -> {
+                        String[] gav = params.string("processor").split(":");
+                        yield PomEditor.addAnnotationProcessorPath(before, gav[0], gav[1], gav.length > 2 ? gav[2] : null);
+                    }
                     case "addDependency" -> {
                         String content = before;
                         int changes = 0;
                         Optional<String> fixed = params.optString("dependency");
                         if (fixed.isPresent()) {
+                            // Without a version, the build's parent or BOM manages it.
                             String[] gav = fixed.get().split(":");
-                            if (gav.length != 3) {
-                                throw new IllegalArgumentException("Rule '" + ruleId + "': dependency must be groupId:artifactId:version");
+                            if (gav.length != 3 && gav.length != 2) {
+                                throw new IllegalArgumentException("Rule '" + ruleId + "': dependency must be groupId:artifactId[:version]");
                             }
-                            yield PomEditor.addDependency(content, gav[0], gav[1], gav[2], params.optString("scope").orElse(null));
+                            yield PomEditor.addDependency(content, gav[0], gav[1], gav.length == 3 ? gav[2] : null,
+                                    params.optString("scope").orElse(null));
                         }
                         for (Finding f : step.findings()) {
                             if (!f.file().equals(file) || !f.data().containsKey("artifactId")) {
@@ -144,7 +152,7 @@ public final class MavenPomFixer implements Fixer {
                         yield new PomEditor.Result(added.content(), replaced.changes() + added.changes());
                     }
                     default -> throw new IllegalArgumentException("Rule '" + ruleId + "': unknown maven action '" + action
-                            + "'; use setScope, setPluginVersion, setProperty, setParentVersion, addDependency, setVersion, removeDuplicates or replaceDependency");
+                            + "'; use setScope, setPluginVersion, setProperty, setParentVersion, addAnnotationProcessor, addDependency, setVersion, removeDuplicates or replaceDependency");
                 };
                 if (result.changes() > 0) {
                     Files.writeString(path, result.content(), StandardCharsets.UTF_8);

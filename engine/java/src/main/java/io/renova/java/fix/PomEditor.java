@@ -326,9 +326,31 @@ final class PomEditor {
         return indent + "<dependency>\n"
                 + inner + "<groupId>" + groupId + "</groupId>\n"
                 + inner + "<artifactId>" + artifactId + "</artifactId>\n"
-                + inner + "<version>" + version + "</version>\n"
+                + (version == null ? "" : inner + "<version>" + version + "</version>\n")
                 + (scope == null || scope.equals("compile") ? "" : inner + "<scope>" + scope + "</scope>\n")
                 + indent + "</dependency>\n";
+    }
+
+    /**
+     * Adds an annotation processor to the compiler plugin's {@code annotationProcessorPaths}, when the pom has
+     * that list and the processor is not in it. A version is left out when the build's platform manages it.
+     */
+    static Result addAnnotationProcessorPath(String pom, String groupId, String artifactId, String version) {
+        Matcher paths = Pattern.compile("(?s)<annotationProcessorPaths[^>]*>(.*?)</annotationProcessorPaths>").matcher(pom);
+        if (!paths.find() || paths.group(1).contains("<artifactId>" + artifactId + "</artifactId>")) {
+            return new Result(pom, 0);
+        }
+        Matcher sibling = Pattern.compile("\\n([ \\t]*)<path>").matcher(paths.group(1));
+        String unit = indentUnit(pom);
+        String indent = sibling.find() ? sibling.group(1) : indentOf(pom, "<annotationProcessorPaths") + unit;
+        // Indent the new entry the way the entries beside it are indented.
+        Matcher child = Pattern.compile("\\n([ \\t]*)<groupId>").matcher(paths.group(1));
+        String inner = child.find() ? child.group(1) : indent + unit;
+        String path = indent + "<path>\n" + inner + "<groupId>" + groupId + "</groupId>\n" + inner + "<artifactId>"
+                + artifactId + "</artifactId>\n" + (version == null ? "" : inner + "<version>" + version + "</version>\n")
+                + indent + "</path>\n";
+        int lineStart = pom.lastIndexOf('\n', paths.end(1)) + 1;
+        return new Result(pom.substring(0, lineStart) + path + pom.substring(lineStart), 1);
     }
 
     /** Sets the version of the declared parent; a pom without a parent, or already on that version, is left alone. */

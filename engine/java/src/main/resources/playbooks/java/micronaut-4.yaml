@@ -1,0 +1,130 @@
+# Micronaut 2 or 3 applications → Micronaut 4, which needs Java 17 or later and uses jakarta.* throughout.
+
+id: micronaut-4
+name: "Micronaut 2 or 3 → 4 (Java 21)"
+ecosystem: java
+version: 0.1.0
+description: >
+  Moves a Micronaut 2 or 3 application to Micronaut 4 on Java 21: the platform parent and build plugins,
+  javax.validation and javax.inject to jakarta, the validation and serialisation modules that were split out,
+  and renamed configuration.
+targets:
+  java: "21"
+  micronaut: "4"
+
+settings:
+  openrewrite:
+    plugin: org.openrewrite.maven:rewrite-maven-plugin:6.46.1
+    artifacts:
+      - org.openrewrite.recipe:rewrite-migrate-java:3.42.1
+      - org.openrewrite.recipe:rewrite-testing-frameworks:3.44.0
+      - org.openrewrite.recipe:rewrite-micronaut:2.36.0
+
+include:
+  - packs/jdk-removed-apis.yaml
+  - packs/maven-build-guards.yaml
+
+rules:
+
+  - id: java-level
+    title: Raise the Java language level to 21
+    category: A
+    severity: BLOCKER
+    detect: { type: javaVersionBelow, version: 21 }
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.migrate.UpgradeToJava21]
+    rationale: Micronaut 4 needs Java 17 or later; 21 is the long-term-support release it is most used with.
+
+  - id: micronaut-4
+    title: Upgrade Micronaut to 4
+    category: A
+    severity: BLOCKER
+    detect:
+      type: mavenParent
+      coordinates: ["io.micronaut:micronaut-parent", "io.micronaut.platform:micronaut-parent"]
+      versionBelow: "4"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.micronaut.Micronaut2to3Migration, org.openrewrite.java.micronaut.Micronaut3to4Migration]
+    rationale: >
+      The parent moved to io.micronaut.platform, and the recipes update the build plugins, the annotation
+      processors and the modules Micronaut 4 split out of core (validation, Jackson, retry, websocket).
+
+  - id: micronaut-4-gradle
+    title: Upgrade the Micronaut Gradle plugins to 4
+    category: A
+    severity: BLOCKER
+    detect: { type: gradlePlugin, id: io.micronaut.application, versionBelow: "4" }
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.micronaut.Micronaut2to3Migration, org.openrewrite.java.micronaut.Micronaut3to4Migration]
+
+  - id: micronaut-javax-imports
+    title: Rename javax.validation and javax.inject to jakarta
+    category: B
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [javax.validation, javax.inject, javax.annotation, javax.persistence, javax.transaction]
+      exclude:
+        - javax.annotation.processing
+        - javax.annotation.Nonnull
+        - javax.annotation.Nullable
+        - javax.annotation.concurrent
+        - javax.annotation.meta
+        - javax.transaction.xa
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.micronaut.Micronaut3to4Migration]
+    rationale: Micronaut 3 moved injection to jakarta.inject; Micronaut 4 moves validation, persistence and the rest.
+
+  - id: guard-micronaut-validation-module
+    phase: guard
+    title: Micronaut 4 keeps validation in its own module
+    category: E
+    severity: BLOCKER
+    detect:
+      type: importWithoutDependency
+      provides:
+        - { package: jakarta.validation, dependency: "io.micronaut.validation:micronaut-validation:${micronaut.validation.version}" }
+    fix:
+      strategy: maven
+      params: { action: addDependency }
+    rationale: >
+      io.micronaut:micronaut-validation is gone from Micronaut 4; io.micronaut.validation:micronaut-validation
+      provides @Validated and the validator. The upgrade recipe leaves only the jakarta.validation API, and the
+      build then fails with "does not represent an annotation type: Validated".
+
+  - id: guard-micronaut-validation-processor
+    phase: guard
+    title: Validation needs its annotation processor in Micronaut 4
+    category: E
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/pom.xml"]
+      pattern: "<groupId>io\\.micronaut\\.validation</groupId>"
+      requires: "<annotationProcessorPaths"
+      unless: "micronaut-validation-processor"
+    fix:
+      strategy: maven
+      params: { action: addAnnotationProcessor, processor: "io.micronaut.validation:micronaut-validation-processor:${micronaut.validation.version}" }
+    rationale: >
+      Constraints on method parameters are woven in at compile time. Without the processor the code builds and
+      runs, and invalid requests are accepted without complaint.
+
+knowledge:
+
+  - id: micronaut-4-baseline
+    title: What Micronaut 4 requires and changed
+    triggers: ["io.micronaut", "micronaut-parent", "micronaut-validation", "@Validated", "javax.validation"]
+    body: |
+      Micronaut 4 requires Java 17 or later. The Maven parent is io.micronaut.platform:micronaut-parent and the
+      BOM io.micronaut.platform:micronaut-platform. Validation left core: use
+      io.micronaut.validation:micronaut-validation with the annotation processor
+      io.micronaut.validation:micronaut-validation-processor, and jakarta.validation imports. Jackson is no
+      longer brought in by the HTTP modules: add micronaut-jackson-databind or Micronaut Serialization.
+      @Validated moved to io.micronaut.validation.Validated in the validation module. SnakeYAML is optional:
+      add org.yaml:snakeyaml at runtime when configuration is in application.yml. javax.annotation
+      (@PostConstruct, @PreDestroy) becomes jakarta.annotation.

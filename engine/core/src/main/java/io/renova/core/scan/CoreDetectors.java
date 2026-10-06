@@ -39,10 +39,11 @@ public final class CoreDetectors {
     }
 
     /**
-     * {@code type: fileContains, include: [glob...], pattern: regex, exclude?: regex, requires?: regex} — one
-     * finding per matching line, skipping lines that also match {@code exclude}. With {@code requires},
+     * {@code type: fileContains, include: [glob...], pattern: regex, exclude?: regex, requires?: regex, unless?: regex}
+     * — one finding per matching line, skipping lines that also match {@code exclude}. With {@code requires},
      * only files containing a line that matches it are checked (for example an import that tells which
-     * {@code Assert} class a file uses).
+     * {@code Assert} class a file uses); with {@code unless}, files containing a line that matches it are
+     * skipped (the thing the rule asks for is already there).
      */
     static final class FileContains implements DetectorFactory {
         @Override
@@ -57,11 +58,15 @@ public final class CoreDetectors {
             Pattern pattern = Pattern.compile(params.string("pattern"));
             Pattern exclude = params.optString("exclude").map(Pattern::compile).orElse(null);
             Pattern requires = params.optString("requires").map(Pattern::compile).orElse(null);
+            Pattern unless = params.optString("unless").map(Pattern::compile).orElse(null);
             return ctx -> {
                 List<Finding> findings = new ArrayList<>();
                 for (Path file : ctx.files(include)) {
                     List<String> lines = ctx.lines(file);
                     if (requires != null && lines.stream().noneMatch(l -> requires.matcher(l).find())) {
+                        continue;
+                    }
+                    if (unless != null && lines.stream().anyMatch(l -> unless.matcher(l).find())) {
                         continue;
                     }
                     for (int i = 0; i < lines.size(); i++) {
