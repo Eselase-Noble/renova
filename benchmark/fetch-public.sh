@@ -18,3 +18,11 @@ if [ ! -d "$apps/public/petclinic-boot27" ]; then
 else
   echo "Already there: $apps/public/petclinic-boot27"
 fi
+
+# The same project as a Gradle-only build: PetClinic ships both, and Renova uses Maven where there is a pom.xml.
+if [ ! -d "$apps/public/petclinic-boot27-gradle" ]; then
+  cp -r "$apps/public/petclinic-boot27" "$apps/public/petclinic-boot27-gradle"
+  rm -rf "$apps/public/petclinic-boot27-gradle/pom.xml" "$apps/public/petclinic-boot27-gradle/mvnw" \
+         "$apps/public/petclinic-boot27-gradle/mvnw.cmd" "$apps/public/petclinic-boot27-gradle/.mvn"
+  echo "Made $apps/public/petclinic-boot27-gradle"
+fi

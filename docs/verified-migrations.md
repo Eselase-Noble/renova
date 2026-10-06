@@ -14,6 +14,7 @@ Last run: 6 October 2026, on Java 21 and Maven 3.8, Renova at the commit that ad
 |---|---|---|---|---|---|
 | Spring PetClinic (public, 34 Java files, 41 tests) | Maven | Spring Boot 2.7.3, Java 8 level | Spring Boot 3.5, Java 21, Jakarta EE 10 | Pass | 3/3 |
 | Spring PetClinic (same) | Maven | Spring Boot 2.7.3 | Spring Boot 4.1, Java 21, Spring Framework 7 | Pass (run on its own) | – |
+| Spring PetClinic (same), built with Gradle 7.5 | Gradle | Spring Boot 2.7.3 | Spring Boot 3.5, Java 21, Gradle 8.5 | Pass (run on its own) | – |
 | Orders service (web, JPA, validation, security) | Maven | Spring Boot 2.7.18, Java 8 | Spring Boot 3.5, Java 21 | Pass | 4/4 |
 | Orders service (same) | Maven | Spring Boot 2.7.18 | Spring Boot 4.1, Java 21 | Pass | 3/3 |
 | Notes web application (WAR, Spring MVC, Jackson) | Maven | Spring 5.3, javax.servlet 4, Java 11 | Spring Framework 7, Servlet 6.1 (Jakarta EE 11), Java 21 | Pass | 4/4 |
@@ -26,6 +27,10 @@ The suite's six runs took 4 minutes 34 seconds in total, with dependencies alrea
 PetClinic is the public sample at github.com/spring-projects/spring-petclinic (Apache-2.0), taken at the commit
 before its maintainers migrated it to Spring Boot 3 by hand. The other projects are synthetic and were written
 to exercise one path each; they are in `renova-test-apps`.
+
+The Gradle PetClinic run is the hardest of these: its wrapper is too old to start on Java 21, so Renova ran the
+recipes on an installed Java 17, the recipe moved the wrapper to a Gradle that runs on 21, a guard declared the
+JAXB API the renamed imports need, and the result was built and tested on Java 21.
 
 ## What the checks are
 

@@ -55,6 +55,18 @@ apps:
       - { file: "**/*.java", absent: "import javax.servlet", why: "Jakarta EE" }
 
   # A real project nobody wrote for Renova: the Spring PetClinic sample at its last Spring Boot 2.7 commit.
+  # The same project built with Gradle: its wrapper (7.5) does not start on Java 21, so the recipes run on an
+  # older installed JDK (17 or earlier) and the result is built on the target's.
+  - id: petclinic-gradle-boot-2-to-3
+    path: public/petclinic-boot27-gradle
+    playbook: spring-boot-3
+    checks:
+      - { file: build.gradle, matches: "id 'org.springframework.boot' version '3\\.5\\.", why: "on the target release" }
+      - { file: build.gradle, contains: "jakarta.xml.bind:jakarta.xml.bind-api", why: "the JAXB API the code imports is declared" }
+      - { file: build.gradle, absent: "javax.xml.bind", why: "no javax leftover" }
+      - { file: build.gradle, absent: "openrewrite", why: "the build files are not given a migration plugin" }
+      - { file: "**/*.java", absent: "import javax.persistence", why: "Jakarta EE" }
+
   - id: petclinic-boot-2-to-3
     path: public/petclinic-boot27
     playbook: spring-boot-3
