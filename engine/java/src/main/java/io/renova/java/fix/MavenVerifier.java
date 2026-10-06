@@ -31,6 +31,38 @@ public final class MavenVerifier implements Verifier {
     public static final String SKIP_TESTS_GOALS = "clean package -DskipTests";
     private static final Duration TIMEOUT = Duration.ofMinutes(60);
 
+    /** The build runs on the JDK in JAVA_HOME, or the one running Renova: it must be at least the target's. */
+    @Override
+    public void preflight(MigrationContext context) {
+        String target = context.playbook().targets().get("java");
+        if (target == null || !target.matches("\\d+")) {
+            return;
+        }
+        int installed = installedJava(System.getenv("JAVA_HOME"));
+        if (installed < Integer.parseInt(target)) {
+            throw new IllegalStateException("This migration targets Java " + target + ", but the build would run on Java " + installed
+                    + ". Install JDK " + target + " and point JAVA_HOME at it, or choose a target this machine can build "
+                    + "(for example with --playbook java-to-" + installed + "). Use --no-verify to migrate without building.");
+        }
+    }
+
+    /** The feature version of the JDK in {@code javaHome} (from its release file), or of the running one. */
+    static int installedJava(String javaHome) {
+        if (javaHome != null && !javaHome.isBlank()) {
+            try {
+                for (String line : java.nio.file.Files.readAllLines(Path.of(javaHome, "release"))) {
+                    Matcher m = java.util.regex.Pattern.compile("^JAVA_VERSION=\"(?:1\\.)?(\\d+)").matcher(line);
+                    if (m.find()) {
+                        return Integer.parseInt(m.group(1));
+                    }
+                }
+            } catch (java.io.IOException | RuntimeException e) {
+                // No release file: fall back to the JDK Renova itself runs on.
+            }
+        }
+        return Runtime.version().feature();
+    }
+
     @Override
     public VerifyResult verify(MigrationContext context) throws Exception {
         String goals = context.options().toolOptions().getOrDefault("maven.verifyGoals",

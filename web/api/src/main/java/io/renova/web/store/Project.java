@@ -11,6 +11,10 @@ package io.renova.web.store;
 public record Project(String id, String name, String path, String ecosystem, String playbook, String createdAt,
                       String organisationId) {
 
+    public Project withPlaybook(String playbookId) {
+        return new Project(id, name, path, ecosystem, playbookId, createdAt, organisationId);
+    }
+
     public Project withOrganisation(String id) {
         return new Project(this.id, name, path, ecosystem, playbook, createdAt, id);
     }

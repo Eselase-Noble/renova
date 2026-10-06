@@ -1,0 +1,131 @@
+# Spring Boot 2 or 3 applications → Spring Boot 4.0: Spring Framework 7, Spring Security 7, Jakarta EE 11.
+# A Spring Boot 2 application goes through everything spring-boot-3 does on the way.
+
+id: spring-boot-4
+name: "Spring Boot 2 or 3 → 4.0 (Java 21, Spring Framework 7)"
+ecosystem: java
+version: 0.1.0
+description: >
+  Moves a Spring Boot 2 or 3 application to Spring Boot 4.0, the latest major version, on Java 21: Spring
+  Framework 7, Spring Security 7, Hibernate 7 and Jakarta EE 11, the starters that were split or renamed,
+  and, coming from Spring Boot 2, the javax to jakarta rename and everything else Spring Boot 3 changed.
+targets:
+  java: "21"
+  springBoot: "4.0"
+  spring: "7.0"
+  jakartaEE: "11"
+
+settings:
+  openrewrite:
+    plugin: org.openrewrite.maven:rewrite-maven-plugin:6.46.1
+    artifacts:
+      - org.openrewrite.recipe:rewrite-migrate-java:3.42.1
+      - org.openrewrite.recipe:rewrite-spring:6.37.1
+
+include:
+  - packs/spring-boot-3-changes.yaml
+  - packs/spring-framework-6.yaml
+  - packs/jdk-removed-apis.yaml
+  - packs/maven-build-guards.yaml
+
+rules:
+
+  - id: java-level
+    title: Raise the Java language level to 21
+    category: A
+    severity: BLOCKER
+    detect: { type: javaVersionBelow, version: 21 }
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.migrate.UpgradeToJava21]
+    rationale: Spring Boot 4 needs Java 17 or later; 21 is the long-term-support release it is most used with.
+
+  - id: spring-boot-4
+    title: Upgrade Spring Boot to 4.0
+    category: A
+    severity: BLOCKER
+    detect:
+      type: mavenParent
+      coordinates: ["org.springframework.boot:spring-boot-starter-parent"]
+      versionBelow: "4"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.boot4.UpgradeSpringBoot_4_0]
+    rationale: >
+      The recipe steps through every Spring Boot release up to 4.0: the parent and plugin versions, the
+      starters that were split into modules or renamed, Spring Framework 7, Spring Security 7 and Hibernate 7.
+
+  - id: spring-boot-bom-4
+    title: Upgrade the Spring Boot dependency management (BOM) to 4.0
+    category: A
+    severity: BLOCKER
+    detect:
+      # For builds that import the BOM instead of inheriting from the Spring Boot parent.
+      type: dependency
+      coordinates: ["org.springframework.boot:spring-boot-dependencies"]
+      versionBelow: "4"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.boot4.UpgradeSpringBoot_4_0]
+
+  - id: spring-boot-4-test-doubles
+    title: Replace @MockBean and @SpyBean (removed in Spring Boot 4)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes:
+        - org.springframework.boot.test.mock.mockito.MockBean
+        - org.springframework.boot.test.mock.mockito.SpyBean
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.boot4.UpgradeSpringBoot_4_0]
+    rationale: They become Spring Framework's @MockitoBean and @MockitoSpyBean, which behave the same in tests.
+
+  - id: spring-boot-4-jackson-3
+    title: Jackson 3 is the default JSON library in Spring Boot 4
+    category: D
+    severity: WARNING
+    detect:
+      type: import
+      prefixes: [com.fasterxml.jackson.databind]
+    fix:
+      strategy: manual
+      hint: >
+        Spring Boot 4 configures Jackson 3 (packages tools.jackson.*, with annotations still in
+        com.fasterxml.jackson.annotation). Code that injects or customises ObjectMapper from
+        com.fasterxml.jackson.databind keeps compiling only while Jackson 2 is on the classpath: either move it
+        to tools.jackson.databind (JsonMapper), or add spring-boot-jackson2 and keep Jackson 2 for now. Check
+        date formats and unknown-property handling in API responses, whose defaults changed.
+
+  - id: guard-spring-boot-parent
+    phase: guard
+    title: The Spring Boot parent must be on 4.0
+    category: A
+    severity: BLOCKER
+    detect:
+      type: mavenParent
+      coordinates: ["org.springframework.boot:spring-boot-starter-parent"]
+      versionBelow: "4"
+    fix:
+      strategy: maven
+      params: { action: setParentVersion, version: "4.0.6" }
+    rationale: >
+      The upgrade recipe moves the parent one release at a time and looks each release up as it goes. When a
+      lookup fails (a slow or restricted network, a repository mirror that lags), it stops part-way and leaves
+      the parent on an earlier release than the starters and the code it has already moved, which do not work
+      together. Setting the parent finishes the step the recipe could not.
+
+knowledge:
+
+  - id: spring-boot-4-baseline
+    title: What Spring Boot 4 requires and changed
+    triggers: ["spring-boot", "MockBean", "SpyBean", "tools.jackson", "spring-boot-starter"]
+    body: |
+      Spring Boot 4 requires Java 17 or later, Spring Framework 7, Spring Security 7 and Jakarta EE 11
+      (Servlet 6.1). Auto-configuration was split into modules: a starter per technology, and test support
+      moved with it (for example @AutoConfigureMockMvc is in org.springframework.boot.webmvc.test.autoconfigure,
+      from spring-boot-starter-webmvc-test). @MockBean and @SpyBean were removed: use @MockitoBean and
+      @MockitoSpyBean from org.springframework.test.context.bean.override.mockito. Jackson 3 (tools.jackson.*)
+      is the default; Jackson 2 stays available through spring-boot-jackson2. Undertow is no longer supported
+      as an embedded server.

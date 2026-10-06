@@ -119,16 +119,28 @@ public final class PluginRegistry {
                         + playbooks.stream().map(Playbook::id).toList()));
     }
 
-    /** The playbook to use when none is named: the only one whose plugin accepts the project. */
-    public Playbook defaultPlaybook(Path root) {
-        List<Playbook> candidates = playbooks.stream()
+    /** The playbooks that can migrate the project: those of the ecosystems that recognise it. */
+    public List<Playbook> playbooksFor(Path root) {
+        return playbooks.stream()
                 .filter(p -> plugins.containsKey(p.ecosystem()) && plugins.get(p.ecosystem()).supports(root))
                 .toList();
-        if (candidates.size() != 1) {
-            throw new IllegalArgumentException(candidates.isEmpty()
-                    ? "No bundled playbook supports " + root
-                    : "Several playbooks apply, choose one with --playbook: " + candidates.stream().map(Playbook::id).toList());
+    }
+
+    /**
+     * The playbook to use when none is named: the one the project's ecosystem recommends for it. A project that
+     * two ecosystems recognise has no obvious answer, so the user is asked to choose.
+     */
+    public Playbook defaultPlaybook(Path root) {
+        List<Playbook> candidates = playbooksFor(root);
+        if (candidates.isEmpty()) {
+            throw new IllegalArgumentException("No bundled playbook supports " + root);
         }
-        return candidates.getFirst();
+        List<String> ecosystems = candidates.stream().map(Playbook::ecosystem).distinct().toList();
+        if (ecosystems.size() > 1) {
+            throw new IllegalArgumentException("Playbooks of several ecosystems apply " + ecosystems + ", choose one with --playbook: "
+                    + candidates.stream().map(Playbook::id).toList());
+        }
+        String id = plugins.get(ecosystems.getFirst()).recommendedPlaybook(root, candidates.stream().map(Playbook::id).toList());
+        return candidates.stream().filter(p -> p.id().equals(id)).findFirst().orElse(candidates.getFirst());
     }
 }

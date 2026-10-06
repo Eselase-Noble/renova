@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
  *   <li>{@code action: setScope, scope: provided}: dependencies matching the rule's detect coordinates</li>
  *   <li>{@code action: setPluginVersion, plugin: maven-war-plugin, version: "3.4.0", groupId?}</li>
  *   <li>{@code action: setProperty, name: maven.compiler.target, value: "${maven.compiler.source}"}</li>
+ *   <li>{@code action: setParentVersion, version: "3.5.7"}: the version of the pom's declared parent</li>
  *   <li>{@code action: addDependency}: adds the dependency each finding describes in its data
  *       (groupId, artifactId, version, scope), or the fixed {@code dependency: "g:a:v"} (and
  *       {@code scope}) given in the params</li>
@@ -74,6 +75,7 @@ public final class MavenPomFixer implements Fixer {
                             params.optString("groupId").orElse("org.apache.maven.plugins"),
                             params.string("plugin"), params.string("version"));
                     case "setProperty" -> PomEditor.setProperty(before, params.string("name"), params.string("value"));
+                    case "setParentVersion" -> PomEditor.setParentVersion(before, params.string("version"));
                     case "addDependency" -> {
                         String content = before;
                         int changes = 0;
@@ -128,7 +130,7 @@ public final class MavenPomFixer implements Fixer {
                         yield new PomEditor.Result(added.content(), replaced.changes() + added.changes());
                     }
                     default -> throw new IllegalArgumentException("Rule '" + ruleId + "': unknown maven action '" + action
-                            + "'; use setScope, setPluginVersion, setProperty, addDependency, setVersion, removeDuplicates or replaceDependency");
+                            + "'; use setScope, setPluginVersion, setProperty, setParentVersion, addDependency, setVersion, removeDuplicates or replaceDependency");
                 };
                 if (result.changes() > 0) {
                     Files.writeString(path, result.content(), StandardCharsets.UTF_8);

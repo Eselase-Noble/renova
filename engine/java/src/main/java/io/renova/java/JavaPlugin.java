@@ -15,6 +15,7 @@ import io.renova.java.detect.DuplicateDependencyDetector;
 import io.renova.java.detect.ImportDependencyDetector;
 import io.renova.java.detect.ImportDetector;
 import io.renova.java.detect.JavaVersionDetector;
+import io.renova.java.detect.MavenParentDetector;
 import io.renova.java.detect.MavenPluginDetector;
 import io.renova.java.detect.PomPropertyDetector;
 import io.renova.java.detect.UnversionedDependencyDetector;
@@ -127,7 +128,7 @@ public final class JavaPlugin implements EcosystemPlugin {
     public List<DetectorFactory> detectors() {
         return List.of(new ImportDetector(), new DependencyDetector(), new JavaVersionDetector(),
                 new MavenPluginDetector(), new PomPropertyDetector(), new ImportDependencyDetector(),
-                new UnversionedDependencyDetector(), new DuplicateDependencyDetector());
+                new UnversionedDependencyDetector(), new DuplicateDependencyDetector(), new MavenParentDetector());
     }
 
     @Override
@@ -207,7 +208,71 @@ public final class JavaPlugin implements EcosystemPlugin {
 
     @Override
     public List<String> bundledPlaybooks() {
-        return List.of("playbooks/java/java8-to-21-jakarta-ee10.yaml");
+        return List.of("playbooks/java/java8-to-21-jakarta-ee10.yaml", "playbooks/java/spring-boot-3.yaml", "playbooks/java/spring-boot-4.yaml",
+                "playbooks/java/java-to-17.yaml", "playbooks/java/java-to-21.yaml", "playbooks/java/java-to-25.yaml");
+    }
+
+    /**
+     * The path that fits what the project is: a Spring Boot 2 application goes to Spring Boot 3, and one already
+     * on 3 to Spring Boot 4; one that uses
+     * Java EE (javax) APIs or Spring 5 goes to Jakarta EE 10 and Spring 6; anything else only needs its Java
+     * level raised, to the current long-term-support release most projects settle on. The other playbooks stay
+     * available for whoever wants a different target.
+     */
+    @Override
+    public String recommendedPlaybook(Path root, List<String> candidates) {
+        boolean boot = false;
+        boolean boot3 = false;
+        boolean javaEe = false;
+        try {
+            for (Path buildFile : buildFiles(root)) {
+                if (!buildFile.getFileName().toString().startsWith("pom")) {
+                    String text = Files.readString(buildFile);
+                    boot |= text.contains("org.springframework.boot");
+                    javaEe |= text.contains("javax.") || text.contains("org.springframework:spring-");
+                    continue;
+                }
+                PomReader.Pom pom = PomReader.read(buildFile);
+                if (pom.parent() != null && pom.parent().startsWith("org.springframework.boot:")) {
+                    boot = true;
+                    // Already on Spring Boot 3: the next step is 4.
+                    boot3 |= pom.parentVersion() != null && !pom.parentVersion().contains("${")
+                            && !io.renova.core.util.Versions.isBelow(pom.parentVersion(), "3");
+                }
+                for (PomReader.Dependency d : pom.dependencies()) {
+                    boot |= d.groupId().equals("org.springframework.boot");
+                    javaEe |= d.groupId().startsWith("javax") || d.groupId().equals("jstl")
+                            || (d.groupId().equals("org.springframework") && d.version() != null && !d.version().contains("${")
+                            && io.renova.core.util.Versions.isBelow(d.version(), "6"));
+                }
+                javaEe |= pom.packaging().equals("war") && !boot;
+            }
+            // Java EE APIs can come from a parent or the server without being declared here: look at the code too.
+            javaEe = javaEe || (!boot && importsJavaEe(root));
+        } catch (IOException | RuntimeException e) {
+            // An unreadable build file: fall through to the plain Java path, which the analysis will report on.
+        }
+        String wanted = boot3 ? "spring-boot-4" : boot ? "spring-boot-3" : javaEe ? "java8-to-21-jakarta-ee10" : "java-to-21";
+        return candidates.contains(wanted) ? wanted : candidates.getFirst();
+    }
+
+    private static final java.util.regex.Pattern JAVA_EE_IMPORT = java.util.regex.Pattern.compile(
+            "^import\\s+javax\\.(servlet|persistence|ejb|ws\\.rs|faces|jms|enterprise|validation|xml\\.bind|xml\\.ws)\\.");
+    private static final int SOURCES_TO_SAMPLE = 1500;
+
+    /** Whether the code uses Java EE (javax) APIs, from the imports of a bounded number of source files. */
+    private static boolean importsJavaEe(Path root) throws IOException {
+        try (java.util.stream.Stream<Path> files = Files.find(root, 12, (p, attrs) -> attrs.isRegularFile()
+                && p.toString().endsWith(".java") && !p.toString().contains("/target/") && !p.toString().contains("/build/"))) {
+            return files.limit(SOURCES_TO_SAMPLE).anyMatch(file -> {
+                try (java.util.stream.Stream<String> lines = Files.lines(file)) {
+                    // Imports sit at the top of a file; the class body is not read.
+                    return lines.limit(80).anyMatch(line -> JAVA_EE_IMPORT.matcher(line).find());
+                } catch (IOException | java.io.UncheckedIOException e) {
+                    return false;
+                }
+            });
+        }
     }
 
     /** pom.xml, build.gradle and build.gradle.kts files outside build output, sorted by path. */

@@ -25,6 +25,7 @@ const ACTIONS: Record<string, string> = {
   "auth.password_changed": "Changed their password",
   "project.added": "Added a project",
   "project.removed": "Removed a project",
+  "project.retargeted": "Changed a project's target",
   "migration.started": "Started a migration",
   "migration.cancelled": "Cancelled a migration",
   "settings.changed": "Changed AI settings",

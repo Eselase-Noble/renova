@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -97,6 +98,35 @@ public class ProjectController {
     @GetMapping("/{id}")
     public Project get(@PathVariable String id, HttpServletRequest request) {
         return project(id, access.caller(request));
+    }
+
+    /** The migration paths that can be applied to the project, and the one Renova suggests for it. */
+    public record Targets(String current, String recommended, List<CatalogueController.PlaybookView> playbooks) {
+    }
+
+    public record TargetChange(String playbook) {
+    }
+
+    @GetMapping("/{id}/playbooks")
+    public Targets targets(@PathVariable String id, HttpServletRequest request) {
+        Project project = project(id, access.caller(request));
+        Path root = Path.of(project.path());
+        return new Targets(project.playbook(), registry.defaultPlaybook(root).id(),
+                registry.playbooksFor(root).stream().map(CatalogueController::view).toList());
+    }
+
+    /** Chooses the migration path the project's assessment and migrations use from now on. */
+    @PatchMapping("/{id}")
+    public Project retarget(@PathVariable String id, @RequestBody TargetChange body, HttpServletRequest request) {
+        Access.Caller caller = access.require(request, Role.ADMIN);
+        Project project = project(id, caller);
+        Playbook playbook = registry.playbooksFor(Path.of(project.path())).stream()
+                .filter(p -> p.id().equals(body.playbook())).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("No such migration path for this project: " + body.playbook()));
+        Project changed = project.withPlaybook(playbook.id());
+        store.saveProject(changed);
+        audit.record(caller, "project.retargeted", project.name(), "Now " + playbook.name());
+        return changed;
     }
 
     @DeleteMapping("/{id}")

@@ -42,7 +42,7 @@ class GuardRulesTest {
         Files.writeString(controller, Files.readString(controller).replace("javax.annotation.", "jakarta.annotation."));
 
         PluginRegistry registry = PluginRegistry.load();
-        Playbook playbook = registry.defaultPlaybook(project);
+        Playbook playbook = registry.playbook("java8-to-21-jakarta-ee10");
         AnalysisResult analysis = new Analyzer(registry).analyze(project, playbook);
         assertThat(analysis.findings()).noneMatch(f -> f.ruleId().startsWith("guard-"));
 
@@ -94,7 +94,7 @@ class GuardRulesTest {
         Files.writeString(src.resolve("Feed.java"), "package x;\nimport jakarta.xml.bind.JAXBContext;\nclass Feed {}\n");
 
         PluginRegistry registry = PluginRegistry.load();
-        Playbook playbook = registry.defaultPlaybook(project);
+        Playbook playbook = registry.playbook("java8-to-21-jakarta-ee10");
         AnalysisResult analysis = new Analyzer(registry).analyze(project, playbook);
         Path out = tmp.resolve("out");
         MigrationOutcome outcome = new Migrator(registry, m -> { }).migrate(analysis, new Planner().plan(analysis),
@@ -190,7 +190,7 @@ class GuardRulesTest {
         Files.writeString(src.resolve("Other.java"), ownAssert);
 
         PluginRegistry registry = PluginRegistry.load();
-        Playbook playbook = registry.defaultPlaybook(project);
+        Playbook playbook = registry.playbook("java8-to-21-jakarta-ee10");
         AnalysisResult analysis = new Analyzer(registry).analyze(project, playbook);
         Path out = tmp.resolve("out");
         new Migrator(registry, m -> { }).migrate(analysis, new Planner().plan(analysis),
@@ -256,7 +256,7 @@ class GuardRulesTest {
                 </project>
                 """);
         PluginRegistry registry = PluginRegistry.load();
-        Playbook playbook = registry.defaultPlaybook(project);
+        Playbook playbook = registry.playbook("java8-to-21-jakarta-ee10");
         AnalysisResult check = new Analyzer(registry).check(new Analyzer(registry).analyze(project, playbook).project(), playbook,
                 playbook.rules().stream().filter(r -> r.id().equals("guard-dependency-version")).toList());
         assertThat(check.findings()).isEmpty();
@@ -312,7 +312,7 @@ class GuardRulesTest {
                 """);
 
         PluginRegistry registry = PluginRegistry.load();
-        Playbook playbook = registry.defaultPlaybook(project);
+        Playbook playbook = registry.playbook("java8-to-21-jakarta-ee10");
         AnalysisResult analysis = new Analyzer(registry).analyze(project, playbook);
         Path out = tmp.resolve("out");
         new Migrator(registry, m -> { }).migrate(analysis, new Planner().plan(analysis),

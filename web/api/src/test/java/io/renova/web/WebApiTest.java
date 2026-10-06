@@ -108,6 +108,17 @@ class WebApiTest {
                 .andExpect(jsonPath("$.error").value(containsString("renova.project-roots")));
         mvc.perform(get("/api/projects/" + projectId + "/assessment").session(owner))
                 .andExpect(jsonPath("$.schema").value("renova/report/v1"));
+
+        // The project can be pointed at another target; its assessment then follows that path.
+        mvc.perform(get("/api/projects/" + projectId + "/playbooks").session(owner))
+                .andExpect(jsonPath("$.current").value("java8-to-21-jakarta-ee10"))
+                .andExpect(jsonPath("$.recommended").value("java8-to-21-jakarta-ee10"))
+                .andExpect(jsonPath("$.playbooks[?(@.id == 'java-to-25')]").exists());
+        call(patch("/api/projects/" + projectId), owner, "{\"playbook\":\"java-to-25\"}").andExpect(jsonPath("$.playbook").value("java-to-25"));
+        mvc.perform(get("/api/projects/" + projectId + "/assessment").session(owner))
+                .andExpect(jsonPath("$.playbook.id").value("java-to-25"));
+        call(patch("/api/projects/" + projectId), owner, "{\"playbook\":\"no-such-path\"}").andExpect(status().isBadRequest());
+        call(patch("/api/projects/" + projectId), owner, "{\"playbook\":\"java8-to-21-jakarta-ee10\"}").andExpect(status().isOk());
     }
 
     @Test

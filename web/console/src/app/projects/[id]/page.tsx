@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpenCheck, CalendarDays, FolderGit2, MoreHorizontal, Play, Trash2, Workflow } from "lucide-react";
+import { BookOpenCheck, CalendarDays, FolderGit2, MoreHorizontal, Play, Target, Trash2, Workflow } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useState } from "react";
@@ -14,6 +14,7 @@ import { StartMigrationDialog } from "@/components/start-migration-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { active, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -28,6 +29,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     queryFn: () => api.projectMigrations(id),
     refetchInterval: (q) => (q.state.data?.some((m) => active(m.status)) ? 3000 : false),
   });
+  const targets = useQuery({ queryKey: ["targets", id], queryFn: () => api.projectTargets(id), staleTime: 60_000 });
   const auth = useAuth();
   const [migrating, setMigrating] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -39,6 +41,18 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       toast.success("Project removed");
       router.push("/projects");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const retarget = useMutation({
+    mutationFn: (playbook: string) => api.retargetProject(id, playbook),
+    onSuccess: (changed) => {
+      queryClient.setQueryData(["project", id], changed);
+      queryClient.invalidateQueries({ queryKey: ["targets", id] });
+      queryClient.invalidateQueries({ queryKey: ["assessment", id] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("Target changed; the assessment is being redone");
     },
     onError: (e) => toast.error(e.message),
   });
@@ -95,6 +109,36 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           </>
         }
       />
+      {targets.data && targets.data.playbooks.length > 1 && (
+        <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border bg-card px-5 py-3 shadow-(--shadow-card)">
+          <Target className="size-4 shrink-0 text-brand" />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium">Target</div>
+            <p className="text-[13px] text-muted-foreground">
+              What this project is migrated to. The assessment, the plan and new migrations follow it.
+              {targets.data.current !== targets.data.recommended && " Renova suggests another target for this project."}
+            </p>
+          </div>
+          <Select
+            value={targets.data.current}
+            onValueChange={(v) => v && v !== targets.data.current && retarget.mutate(v)}
+            items={Object.fromEntries(targets.data.playbooks.map((t) => [t.id, t.name]))}
+            disabled={!auth.can("ADMIN") || retarget.isPending}
+          >
+            <SelectTrigger className="w-full sm:w-96" aria-label="Target">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {targets.data.playbooks.map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.name}
+                  {t.id === targets.data.recommended && <span className="ml-2 text-xs text-muted-foreground">suggested</span>}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <Tabs defaultValue="assessment">
         <TabsList variant="line" className="w-full justify-start border-b">
           <TabsTrigger value="assessment" className="flex-none px-3">Assessment</TabsTrigger>

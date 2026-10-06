@@ -1,0 +1,121 @@
+# Rule pack: what changes in an application's own code and configuration between Spring Boot 2 and 3.
+# Included by the playbooks in the folder above; a pack holds only rules and knowledge cards.
+#
+# Spring Boot manages dependency versions and runs its own embedded server, so Spring Boot playbooks do not
+# include the Jakarta pack's guards for WAR deployments (provided scopes, explicitly declared APIs): they would
+# fight the starters. The javax to jakarta rename itself is part of the Spring Boot recipe.
+
+rules:
+
+  - id: javax-ee-imports
+    title: Rename javax.* Java EE packages to jakarta.*
+    category: B
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes:
+        - javax.servlet
+        - javax.annotation
+        - javax.persistence
+        - javax.validation
+        - javax.xml.bind
+        - javax.ws.rs
+        - javax.inject
+        - javax.jms
+        - javax.mail
+        - javax.websocket
+        - javax.transaction
+        - javax.activation
+        - javax.json
+      exclude:
+        # Still in the JDK, or not Java EE at all (JSR-305).
+        - javax.annotation.processing
+        - javax.annotation.Nonnull
+        - javax.annotation.Nullable
+        - javax.annotation.CheckForNull
+        - javax.annotation.concurrent
+        - javax.annotation.meta
+        - javax.transaction.xa
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_5]
+    rationale: Spring Boot 3 is built on Jakarta EE 10; the starters no longer bring the javax APIs.
+
+  - id: spring-security-configurer-adapter
+    title: Replace WebSecurityConfigurerAdapter (removed in Spring Security 6)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter]
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_5]
+    rationale: >
+      Security configuration becomes SecurityFilterChain beans, and antMatchers becomes requestMatchers. The
+      recipe converts the common shapes; the build and the tests show what it could not.
+
+  - id: spring-boot-renamed-properties
+    title: Rename configuration properties that changed in Spring Boot 3
+    category: C
+    severity: WARNING
+    detect:
+      type: fileContains
+      include: ["**/application*.properties", "**/application*.yml", "**/application*.yaml"]
+      pattern: "spring\\.(redis|data\\.cassandra|jpa\\.hibernate\\.use-new-id-generator-mappings|mvc\\.pathmatch|security\\.saml2\\.relyingparty\\.registration\\.[^.]+\\.identityprovider)|management\\.metrics\\.export|server\\.max-http-header-size"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_5]
+
+  - id: spring-factories-autoconfiguration
+    title: Move auto-configuration registrations out of spring.factories
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/META-INF/spring.factories"]
+      pattern: "org\\.springframework\\.boot\\.autoconfigure\\.EnableAutoConfiguration"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_5]
+    rationale: >
+      Spring Boot 3 reads auto-configurations only from
+      META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports.
+
+  - id: spring-boot-trailing-slash
+    title: URLs with a trailing slash no longer match
+    category: D
+    severity: WARNING
+    detect:
+      type: dependency
+      coordinates: ["org.springframework.boot:spring-boot-starter-web", "org.springframework.boot:spring-boot-starter-webflux"]
+    fix:
+      strategy: manual
+      hint: >
+        Spring Boot 3 turned trailing-slash matching off: "/orders/" no longer answers where "/orders" is
+        mapped, and callers get 404. Either add the trailing-slash forms explicitly where clients use them, or
+        redirect them in one place with a filter. Check links, API clients and monitoring probes.
+
+knowledge:
+
+  - id: spring-boot-3-baseline
+    title: What Spring Boot 3 requires
+    triggers: ["spring-boot", "SpringBootApplication", "spring-boot-starter"]
+    body: |
+      Spring Boot 3 requires Java 17 or later, Spring Framework 6 and Jakarta EE 10: every javax.servlet,
+      javax.persistence, javax.validation, javax.annotation (PostConstruct, PreDestroy, Resource) and
+      javax.transaction import becomes jakarta.*. javax.sql, javax.crypto, javax.net and javax.naming stay:
+      they are part of the JDK. Hibernate is 6.x: org.hibernate.dialect names for specific versions
+      (MySQL8Dialect, PostgreSQL10Dialect) are gone, use the unversioned dialect or none. The starters manage
+      the jakarta API versions; do not add them with explicit versions.
+
+  - id: spring-security-6-configuration
+    title: Spring Security 6 configuration
+    triggers: ["WebSecurityConfigurerAdapter", "antMatchers", "authorizeRequests", "SecurityFilterChain"]
+    body: |
+      WebSecurityConfigurerAdapter was removed. Declare a @Bean SecurityFilterChain that takes HttpSecurity
+      and returns http.build(). authorizeRequests() becomes authorizeHttpRequests(), and antMatchers(),
+      mvcMatchers() and regexMatchers() become requestMatchers(). An AuthenticationManager comes from
+      AuthenticationConfiguration.getAuthenticationManager(), not from overriding authenticationManagerBean().
+      @EnableGlobalMethodSecurity becomes @EnableMethodSecurity. Keep the same rules in the same order, so
+      access decisions do not change.

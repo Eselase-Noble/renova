@@ -1,0 +1,38 @@
+# Any Java project → Java 17, and nothing else: frameworks and Java EE or Jakarta EE APIs stay as they are.
+# For moving a web application to Jakarta EE 10 and Spring 6 as well, use java8-to-21-jakarta-ee10; for a
+# Spring Boot 2 application, spring-boot-3.
+
+id: java-to-17
+name: "Java → 17"
+ecosystem: java
+version: 0.1.0
+description: >
+  Raises a project's Java level to 17 (a long-term-support release) and deals with what the JDK removed or closed off on
+  the way: internal sun.* APIs, the Java EE modules, Nashorn. Frameworks, application servers and javax or jakarta APIs are left as they are.
+targets:
+  java: "17"
+
+settings:
+  openrewrite:
+    plugin: org.openrewrite.maven:rewrite-maven-plugin:6.46.1
+    artifacts:
+      - org.openrewrite.recipe:rewrite-migrate-java:3.42.1
+
+include:
+  - packs/jdk-removed-apis.yaml
+  - packs/maven-build-guards.yaml
+
+rules:
+
+  - id: java-level
+    title: Raise the Java language level to 17
+    category: A
+    severity: BLOCKER
+    detect: { type: javaVersionBelow, version: 17 }
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.migrate.UpgradeToJava17]
+    rationale: >
+      The build must compile for the target JDK. The recipe also updates build plugins that do not run on it,
+      adds the Java EE modules the JDK dropped in Java 11 (JAXB, JAX-WS, annotations) as dependencies where the
+      code uses them, and replaces APIs removed up to Java 17.

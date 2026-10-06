@@ -270,13 +270,44 @@ rules:
 |---|---|
 | `recipe` | An ecosystem rewrite tool (OpenRewrite for Java), deterministic and type-aware |
 | `replace` | Text replacement driven by the playbook, for files without a parser |
-| `maven` | Format-preserving pom.xml edits: `setScope`, `setPluginVersion`, `setProperty`, `addDependency`, `setVersion`, `removeDuplicates` |
+| `maven` | Format-preserving pom.xml edits: `setScope`, `setPluginVersion`, `setProperty`, `setParentVersion`, `addDependency`, `setVersion`, `removeDuplicates` |
 | `ai` | The configured AI provider. The build verifies the result |
 | `manual` | A person, guided by the rule's `hint` in the report |
 
-Bundled playbook: **`java8-to-21-jakarta-ee10`**, which takes Java 8 / Java EE web applications to Java 21,
-Jakarta EE 10 and Spring 6, for Tomcat 10.1/11 and WildFly 27+ / JBoss EAP 8. Pass `--playbook path/to/file.yaml`
-to use your own.
+### Targets
+
+A playbook is a target: where the project should end up. Renova suggests the one that fits the project, and
+any other can be chosen (`--playbook ID`, the **Target** selector on a project in the console, or the playbook
+list in the desktop app):
+
+| Playbook | Takes | To | Suggested for |
+|---|---|---|---|
+| `java-to-17`, `java-to-21`, `java-to-25` | Any Java project | That Java version, and nothing else: frameworks and javax or jakarta APIs stay | Projects without Java EE or Spring Boot (`java-to-21`) |
+| `java8-to-21-jakarta-ee10` | Java EE (javax) web applications, Spring 5 or earlier | Java 21, Jakarta EE 10, Spring 6, for Tomcat 10.1/11 and WildFly 27+ / JBoss EAP 8 | WAR projects and projects using javax APIs |
+| `spring-boot-3` | Spring Boot 2 applications | Spring Boot 3.5, Java 21, Jakarta EE 10 | Spring Boot 2 applications |
+| `spring-boot-4` | Spring Boot 2 or 3 applications | Spring Boot 4.0, Java 21, Spring Framework 7 | Spring Boot 3 applications |
+
+The build is verified on the JDK in `JAVA_HOME`, so a target needs that JDK installed (Java 25 for `java-to-25`);
+Renova says so before it changes anything.
+
+Playbooks are made of **rule packs** (`include:`), so each concern is written once: the JDK's removed APIs,
+Jakarta EE 10, Spring Framework 6, what Spring Boot 3 changed, servlet containers, and guards on the build
+files. A playbook's own rules come first and replace an included rule with the same id. Your own playbook can
+include the bundled packs and add your organisation's conventions:
+
+```yaml
+id: acme-java-21
+ecosystem: java
+include:
+  - classpath:playbooks/java/packs/jdk-removed-apis.yaml
+  - classpath:playbooks/java/packs/maven-build-guards.yaml
+  - acme-conventions.yaml          # a pack of your own, beside this file
+rules:
+  - id: java-level
+    category: A
+    detect: { type: javaVersionBelow, version: 21 }
+    fix: { strategy: recipe, recipes: [org.openrewrite.java.migrate.UpgradeToJava21] }
+```
 
 ## Extending Renova
 
@@ -310,7 +341,8 @@ Linux, Windows and macOS, the web bundle, the CLI and both IDE plugins. See [doc
 3. **Benchmark harness:** `renova benchmark` scores migrations of synthetic legacy apps (see
    [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.
 4. **Web console:** single sign-on and licensing (the audit log and local mode are in). **Desktop:** signed installers.
-5. **More playbooks and ecosystems:** Spring Boot 2 → 3, Java EE → Quarkus, then .NET and Python.
+5. **More targets and ecosystems:** Java 17/21/25 and Spring Boot 3 and 4 are in. Next: Spring Framework 7
+   with Jakarta EE 11 for applications without Spring Boot, Gradle builds, Java EE → Quarkus, then .NET and Python.
 
 ## Contributing
 
