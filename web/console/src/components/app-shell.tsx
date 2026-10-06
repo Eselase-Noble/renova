@@ -121,7 +121,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!auth.data?.user) {
     return (
       <div className="flex min-h-svh">
-        <div className="hidden w-60 shrink-0 bg-sidebar lg:block" />
+        <div className="hidden w-60 shrink-0 border-r border-sidebar-border bg-sidebar lg:block" />
         <div className="flex-1 space-y-4 p-8">
           <Skeleton className="h-8 w-56" />
           <Skeleton className="h-28 w-full max-w-5xl" />
@@ -136,7 +136,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-svh">
       <aside
         className={cn(
-          "sticky top-0 hidden h-svh shrink-0 flex-col bg-sidebar text-sidebar-foreground transition-[width] duration-200 lg:flex",
+          "sticky top-0 hidden h-svh shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 lg:flex",
           narrow ? "w-[60px]" : "w-60",
         )}
       >
@@ -234,7 +234,7 @@ function SidebarContent({ narrow, onNavigate }: { narrow: boolean; onNavigate?: 
               {narrow ? (
                 <div className="mx-2 mb-2 border-t border-sidebar-border first:hidden" />
               ) : (
-                <div className="px-2.5 pb-1 text-[11px] font-medium tracking-wider text-sidebar-foreground/50 uppercase">
+                <div className="px-2.5 pb-1 text-[11px] font-medium tracking-wider text-sidebar-foreground/60 uppercase">
                   {auth.local && group.title === "Organisation" ? "This computer" : group.title}
                 </div>
               )}
@@ -247,7 +247,7 @@ function SidebarContent({ narrow, onNavigate }: { narrow: boolean; onNavigate?: 
                     onClick={onNavigate}
                     aria-current={current ? "page" : undefined}
                     className={cn(
-                      "relative flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground/80 outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+                      "relative flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring",
                       current && "bg-sidebar-accent text-sidebar-accent-foreground",
                       narrow && "justify-center px-0",
                     )}
@@ -271,7 +271,7 @@ function SidebarContent({ narrow, onNavigate }: { narrow: boolean; onNavigate?: 
         })}
       </nav>
       {!narrow && system.data && (
-        <div className="px-4 pb-3 text-[11px] text-sidebar-foreground/45">
+        <div className="px-4 pb-3 text-[11px] text-sidebar-foreground/60">
           Renova {system.data.version.replace("-SNAPSHOT", "")} · {auth.local ? "this machine only" : "on-premises"}
         </div>
       )}
@@ -311,7 +311,7 @@ function OrganisationSwitcher({ narrow }: { narrow: boolean }) {
             />
           }
         >
-          <span className="grid size-6 shrink-0 place-items-center rounded-md bg-sidebar-primary/25 text-[11px] font-semibold text-sidebar-accent-foreground">
+          <span className="grid size-6 shrink-0 place-items-center rounded-md bg-sidebar-primary/20 text-[11px] font-semibold text-sidebar-accent-foreground">
             {current.name.slice(0, 1).toUpperCase()}
           </span>
           {!narrow && (

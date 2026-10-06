@@ -2,13 +2,6 @@
    palette as the web console) and adds the app's own components. The root carries "renova-light" or "renova-dark". */
 
 .root {
-    /* The sidebar is the same deep navy in both themes. */
-    -renova-sidebar: #171c36;
-    -renova-sidebar-hover: #232a4d;
-    -renova-sidebar-fg: #c9cde0;
-    -renova-sidebar-fg-strong: #ffffff;
-    -renova-sidebar-fg-faint: #7f86a6;
-    -renova-sidebar-border: rgba(255, 255, 255, 0.09);
     -renova-brand: #5a6cf0;
     /* Chart marks: one colour per category or resolver, the same in every screen. */
     -renova-series-1: #2a78d6;
@@ -23,6 +16,13 @@
 }
 
 .root.renova-light {
+    /* The sidebar is white in the light theme, set off from the page by a hairline. */
+    -renova-sidebar: #ffffff;
+    -renova-sidebar-hover: #eef0fb;
+    -renova-sidebar-fg: #4d5375;
+    -renova-sidebar-fg-strong: #1b1f36;
+    -renova-sidebar-fg-faint: #8187a5;
+    -renova-sidebar-border: #e2e4ef;
     -color-bg-default: #ffffff;
     -color-bg-overlay: #ffffff;
     -color-bg-subtle: #f6f7fb;
@@ -55,6 +55,12 @@
 }
 
 .root.renova-dark {
+    -renova-sidebar: #0d101f;
+    -renova-sidebar-hover: #1c2238;
+    -renova-sidebar-fg: #c9cde0;
+    -renova-sidebar-fg-strong: #ffffff;
+    -renova-sidebar-fg-faint: #7f86a6;
+    -renova-sidebar-border: rgba(255, 255, 255, 0.09);
     -color-bg-default: #181d31;
     -color-bg-overlay: #1e2440;
     -color-bg-subtle: #101425;
@@ -116,6 +122,7 @@
 
 .sidebar {
     -fx-background-color: -renova-sidebar;
+    -fx-border-color: transparent -renova-sidebar-border transparent transparent;
     -fx-padding: 14 10 10 10;
     -fx-spacing: 2;
     -fx-min-width: 232;
