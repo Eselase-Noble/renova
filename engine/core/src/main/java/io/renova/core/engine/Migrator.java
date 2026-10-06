@@ -189,8 +189,13 @@ public final class Migrator {
     private void applyPlan(MigrationContext context, MigrationPlan plan, String stagePrefix, List<StageResult> stages)
             throws Exception {
         String ecosystem = plan.playbook().ecosystem();
+        // An ecosystem's own deterministic strategies run after the general ones and before AI, which is last
+        // so that it sees code everything else has already changed.
         Set<String> strategies = new LinkedHashSet<>(STAGE_ORDER);
+        strategies.remove(FixSpec.AI);
         plan.steps().forEach(s -> strategies.add(s.strategy()));
+        strategies.remove(FixSpec.AI);
+        strategies.add(FixSpec.AI);
         strategies.remove(FixSpec.MANUAL);
 
         for (String strategy : strategies) {

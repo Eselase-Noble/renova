@@ -136,3 +136,27 @@ apps:
       - { file: src/main/java/com/acme/payroll/PayslipServlet.java, contains: "import jakarta.servlet", why: "Jakarta EE" }
       - { file: src/test/java/com/acme/payroll/PayslipTest.java, contains: "class PayslipTest", why: "tests are in the standard place, and run" }
       - { file: src/main/resources/com/acme/payroll/labels.properties, contains: "net=", why: "resources beside the sources still reach the classpath" }
+
+  # A change of platform: off the application server (JBoss descriptors, EJB, CDI, JAX-RS, JPA) and onto
+  # Spring Boot. The generated test starts the whole application on an in-memory database.
+  - id: jakarta-ee-to-spring-boot
+    path: ledger-javaee
+    playbook: jakarta-ee-to-spring-boot
+    checks:
+      - { file: pom.xml, contains: "spring-boot-starter-jersey", why: "REST resources keep JAX-RS and run on Jersey" }
+      - { file: pom.xml, absent: "javaee-api", why: "no server supplies the platform API any more" }
+      - { file: pom.xml, contains: "<packaging>jar</packaging>", why: "it runs on its own" }
+      - { file: src/main/java/com/acme/ledger/service/AccountService.java, matches: '@Service\s+@Transactional', why: "a session bean's methods ran in a transaction" }
+      - { file: src/main/java/com/acme/ledger/service/AccountService.java, absent: "unitName", why: "Spring Boot's persistence unit is not the one persistence.xml named" }
+      - { file: src/main/java/com/acme/ledger/api/LedgerApplication.java, contains: "register(com.acme.ledger.api.AccountResource.class)", why: "a resource Jersey does not know is not served" }
+      - { file: src/main/resources/application.properties, contains: "server.servlet.context-path=/ledger", why: "the application answers at the address the server gave it" }
+      - { file: "**/*.java", absent: "import jakarta.ejb", why: "no EJB container" }
+
+  # Both at once: an Ant web application ends as a Spring Boot WAR, with its JUnit 4 tests still running.
+  - id: ant-to-spring-boot
+    path: payroll-ant
+    playbook: jakarta-ee-to-spring-boot
+    checks:
+      - { file: pom.xml, contains: "junit-vintage-engine", why: "the application's JUnit 4 tests run beside the new JUnit 5 one" }
+      - { file: pom.xml, contains: "<packaging>war</packaging>", why: "it has pages, so it stays a WAR that also runs on its own" }
+      - { file: src/main/java/com/acme/payroll/Application.java, contains: "@ServletComponentScan", why: "its servlets are found" }

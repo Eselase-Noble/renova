@@ -1,0 +1,220 @@
+# Java EE or Jakarta EE applications on an application server (JBoss/WildFly, WebLogic, WebSphere, GlassFish,
+# TomEE) → Spring Boot 3 on Java 21. A change of platform, not only of versions.
+
+id: jakarta-ee-to-spring-boot
+name: "Java EE / Jakarta EE → Spring Boot 3 (Java 21)"
+ecosystem: java
+version: 0.1.0
+description: >
+  Takes an application off its application server and onto Spring Boot 3.5 with Java 21. The standard APIs
+  Spring Boot runs are kept: REST resources stay JAX-RS (on Jersey), entities stay JPA, Bean Validation and
+  @Inject stay. What only a server provides is replaced: session beans and CDI scopes become Spring
+  components, the server's descriptors become application.properties, and the build gets Spring Boot's
+  starters. Timers, message-driven beans, CDI producers and events, interceptors and Faces pages need
+  judgement and go to AI or a person.
+targets:
+  java: "21"
+  springBoot: "3.5"
+  jakartaEE: "10 APIs, without an application server"
+
+settings:
+  openrewrite:
+    plugin: org.openrewrite.maven:rewrite-maven-plugin:6.46.1
+    artifacts:
+      - org.openrewrite.recipe:rewrite-migrate-java:3.42.1
+      - org.openrewrite.recipe:rewrite-testing-frameworks:3.44.0
+      - org.openrewrite.recipe:rewrite-spring:6.37.1
+      - org.openrewrite.recipe:rewrite-hibernate:2.25.0
+
+include:
+  - packs/jakarta-ee10.yaml
+  - packs/jdk-removed-apis.yaml
+  - packs/maven-build-guards.yaml
+
+# These keep a WAR fit for an application server: the APIs it supplies declared, and not packaged. Spring Boot
+# brings the APIs with its starters and packages them.
+exclude:
+  - guard-container-apis-provided
+  - guard-platform-apis-provided
+  - guard-imported-apis-declared
+  - guard-jaxb-implementation
+
+rules:
+
+  - id: java-level
+    title: Raise the Java language level to 21
+    category: A
+    severity: BLOCKER
+    detect: { type: javaVersionBelow, version: 21 }
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.migrate.UpgradeToJava21]
+    rationale: Spring Boot 3 needs Java 17 or later; 21 is the long-term-support release most projects settle on.
+
+  - id: spring-boot-replatform
+    title: Move the application from its server to Spring Boot
+    category: A
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [javax.ejb, jakarta.ejb, javax.enterprise, jakarta.enterprise, javax.ws.rs, jakarta.ws.rs,
+                 javax.persistence, jakarta.persistence, javax.servlet, jakarta.servlet, javax.inject, jakarta.inject]
+    fix:
+      strategy: replatform
+      params: { bootVersion: "3.5.7" }
+    rationale: >
+      Session beans and CDI scopes become Spring components (session beans transactional, as the container
+      made them); JAX-RS resources are registered with Jersey; persistence.xml and the server's descriptors
+      become application.properties; the build imports Spring Boot's dependency management and its starters
+      in place of the platform API. An application class and a test that the application starts are added.
+
+  - id: ejb-timers
+    title: EJB timers become Spring scheduled methods
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [javax.ejb.Schedule, javax.ejb.Schedules, javax.ejb.Timeout, javax.ejb.Timer, javax.ejb.TimerService,
+                 jakarta.ejb.Schedule, jakarta.ejb.Schedules, jakarta.ejb.Timeout, jakarta.ejb.Timer, jakarta.ejb.TimerService]
+    fix:
+      strategy: ai
+      hint: >
+        Replace @Schedule(hour, minute, second, dayOfWeek, ...) with Spring's @Scheduled(cron = "sec min hour
+        day-of-month month day-of-week"); EJB defaults are second=0, minute=0, hour=0, and "*" elsewhere. The
+        method takes no Timer argument. Programmatic timers (TimerService.createTimer) become a TaskScheduler
+        call. EJB timers were persistent by default and ran once in a cluster; Spring's are neither: say so in
+        a comment where persistent=true or a cluster matters. Add @EnableScheduling to the application class.
+
+  - id: message-driven-beans
+    title: Message-driven beans become JMS listeners
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [javax.ejb.MessageDriven, jakarta.ejb.MessageDriven, javax.jms, jakarta.jms]
+    fix:
+      strategy: ai
+      hint: >
+        Replace @MessageDriven(activationConfig = destination ...) on a MessageListener with a Spring @Component
+        whose method is annotated @JmsListener(destination = "<the destination>"); keep the method body. Add
+        spring-boot-starter-artemis (or the starter for the broker in use) to the pom and leave the broker
+        address to spring.artemis.* or spring.jms.* properties. Injected JMSContext becomes JmsTemplate.
+
+  - id: cdi-producers-and-events
+    title: CDI producers, events and programmatic lookup
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [javax.enterprise.inject.Produces, jakarta.enterprise.inject.Produces, javax.enterprise.inject.Disposes,
+                 jakarta.enterprise.inject.Disposes, javax.enterprise.event, jakarta.enterprise.event,
+                 javax.enterprise.inject.Instance, jakarta.enterprise.inject.Instance, javax.enterprise.inject.spi,
+                 jakarta.enterprise.inject.spi, javax.enterprise.inject.Alternative, jakarta.enterprise.inject.Alternative]
+    fix:
+      strategy: ai
+      hint: >
+        A @Produces method becomes a @Bean method in a @Configuration class (a producer field becomes a @Bean
+        method returning it); @Disposes becomes the bean's destroyMethod. Event<T>.fire(x) becomes
+        ApplicationEventPublisher.publishEvent(x) and @Observes T becomes an @EventListener method taking T
+        (@Observes(during = AFTER_SUCCESS) is @TransactionalEventListener). Instance<T> becomes ObjectProvider<T>
+        (get() is getObject(), iteration is stream()). @Alternative becomes @Primary or a @Profile.
+        CDI.current() and BeanManager lookups become an injected ApplicationContext.
+
+  - id: interceptors-and-decorators
+    title: Interceptors and decorators become Spring aspects
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [javax.interceptor, jakarta.interceptor, javax.decorator, jakarta.decorator]
+    fix:
+      strategy: ai
+      hint: >
+        An @Interceptor class with @AroundInvoke becomes an @Aspect @Component with an @Around advice bound to
+        the interceptor-binding annotation (@Around("@annotation(x.Binding) || @within(x.Binding)")):
+        InvocationContext.proceed() is ProceedingJoinPoint.proceed(), getMethod() comes from the signature.
+        Keep the binding annotation, without @InterceptorBinding. Add spring-boot-starter-aop to the pom.
+        @Interceptors(X.class) on a class becomes a binding annotation of your own that the aspect matches.
+
+  - id: ejb-context-and-jndi
+    title: EJB context objects and JNDI lookups
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [javax.ejb.SessionContext, jakarta.ejb.SessionContext, javax.ejb.EJBContext, jakarta.ejb.EJBContext,
+                 javax.naming, javax.ejb.EJBException, jakarta.ejb.EJBException]
+    fix:
+      strategy: ai
+      hint: >
+        There is no JNDI tree in a Spring Boot application. A lookup of a bean becomes constructor or field
+        injection; a lookup of a DataSource becomes an injected DataSource; an environment entry becomes
+        @Value("${name}"). SessionContext.setRollbackOnly() is
+        TransactionAspectSupport.currentTransactionStatus().setRollbackOnly(); getCallerPrincipal() is
+        SecurityContextHolder or an injected Principal; getBusinessObject(X.class) (a self-call through the
+        proxy) becomes an injected reference to the bean itself marked @Lazy. EJBException becomes an
+        unchecked exception of the application's own or IllegalStateException; note that Spring rolls back on
+        any RuntimeException, as the container did for system exceptions.
+
+  - id: faces-on-spring-boot
+    title: Faces pages need a Faces runtime inside Spring Boot
+    category: D
+    severity: WARNING
+    detect:
+      type: import
+      prefixes: [javax.faces, jakarta.faces]
+    fix:
+      strategy: manual
+      hint: >
+        Spring Boot has no Faces support of its own. Add JoinFaces (org.joinfaces:faces-spring-boot-starter)
+        for the Faces implementation in use; backing beans annotated @Named with a CDI scope then work as
+        Spring beans, and @ViewScoped needs JoinFaces' view scope. Check each page: this is not verified by
+        the build.
+
+  - id: security-roles
+    title: Container security becomes Spring Security
+    category: D
+    severity: WARNING
+    detect:
+      type: import
+      prefixes: [javax.annotation.security, jakarta.annotation.security, javax.security.enterprise, jakarta.security.enterprise]
+    fix:
+      strategy: manual
+      hint: >
+        @RolesAllowed, @PermitAll and @DenyAll are honoured by Spring Security once
+        @EnableMethodSecurity(jsr250Enabled = true) is set, but the users and roles came from the server's
+        security domain. Add spring-boot-starter-security and configure where they come from now (LDAP, a
+        database, OAuth2). Until then the annotations do nothing.
+
+  - id: server-data-source
+    title: Configure the database the server used to supply
+    category: D
+    severity: WARNING
+    detect:
+      type: fileContains
+      include: ["**/META-INF/persistence.xml"]
+      pattern: "<(jta|non-jta)-data-source>"
+    fix:
+      strategy: manual
+      hint: >
+        The data source was defined on the application server and found by its JNDI name. Set
+        spring.datasource.url, username and password (application.properties or the environment) and add the
+        database's JDBC driver to the pom. The generated tests run on an in-memory H2 database; production
+        does not.
+
+knowledge:
+
+  - id: jakarta-ee-on-spring-boot
+    title: How Jakarta EE code runs on Spring Boot
+    triggers: ["jakarta.ejb", "jakarta.enterprise", "jakarta.ws.rs", "@Stateless", "@Inject", "ResourceConfig", "@SpringBootApplication"]
+    body: |
+      In this application, after the move to Spring Boot: JAX-RS resources are Spring @Component classes
+      registered in a Jersey ResourceConfig (a new resource must be registered there; a class Jersey does not
+      know is not served). Former session beans are @Service @Transactional: every public method runs in a
+      transaction, as the EJB container made it. Calls from one method to another of the same class do not
+      pass through the proxy, in Spring as in EJB. @Inject, @Named, @PostConstruct, @PreDestroy, @Resource and
+      jakarta.transaction.Transactional are understood by Spring as they are; there is no need to rewrite
+      them. EntityManager is injected with @PersistenceContext, without a unit name. Spring beans are
+      singletons by default, where CDI @Dependent made a new instance per injection point: a class that keeps
+      per-caller state in fields needs @Scope("prototype") or request scope. There is no JNDI: nothing is
+      looked up by name. Configuration is in application.properties, not in server descriptors.

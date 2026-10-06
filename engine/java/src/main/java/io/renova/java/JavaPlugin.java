@@ -203,7 +203,8 @@ public final class JavaPlugin implements EcosystemPlugin {
 
     @Override
     public List<Fixer> fixers() {
-        return List.of(new OpenRewriteFixer(), new MavenPomFixer(), new GradleBuildFixer());
+        return List.of(new OpenRewriteFixer(), new MavenPomFixer(), new GradleBuildFixer(),
+                new io.renova.java.fix.SpringBootReplatformer());
     }
 
     @Override
@@ -280,6 +281,7 @@ public final class JavaPlugin implements EcosystemPlugin {
     public List<String> bundledPlaybooks() {
         return List.of("playbooks/java/java8-to-21-jakarta-ee10.yaml", "playbooks/java/java-to-21-jakarta-ee11-spring7.yaml",
                 "playbooks/java/spring-boot-3.yaml", "playbooks/java/spring-boot-4.yaml", "playbooks/java/micronaut-4.yaml", "playbooks/java/quarkus-3.yaml",
+                "playbooks/java/jakarta-ee-to-spring-boot.yaml",
                 "playbooks/java/java-to-17.yaml", "playbooks/java/java-to-21.yaml", "playbooks/java/java-to-25.yaml",
                 // Add-ons: optional, combined with a target (java-to-21+junit5).
                 "playbooks/java/addons/junit5.yaml", "playbooks/java/addons/mockito5.yaml", "playbooks/java/addons/log4j2.yaml",

@@ -289,6 +289,102 @@ final class PomEditor {
         return addPlugin(pom, groupId, artifactId, version);
     }
 
+    /** Removes the project's real dependencies (not managed ones, not plugins') that match. */
+    static Result removeDependencies(String pom, BiPredicate<String, String> matches) {
+        List<Span> excluded = spans(pom, "dependencyManagement");
+        excluded.addAll(spans(pom, "plugin"));
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        int changes = 0;
+        Matcher block = Pattern.compile("(?s)[ \\t]*<dependency>.*?</dependency>[ \\t]*\\r?\\n?").matcher(pom);
+        while (block.find()) {
+            String own = block.group().replaceAll("(?s)<exclusions>.*?</exclusions>", "");
+            String g = tag(own, "groupId");
+            String a = tag(own, "artifactId");
+            if (inside(excluded, block.start()) || g == null || a == null || !matches.test(g, a)) {
+                continue;
+            }
+            out.append(pom, last, block.start());
+            last = block.end();
+            changes++;
+        }
+        out.append(pom.substring(last));
+        return new Result(out.toString(), changes);
+    }
+
+    /** Removes the version of the project's real dependencies that match, for a platform that manages it. */
+    static Result removeDependencyVersions(String pom, BiPredicate<String, String> matches) {
+        List<Span> excluded = spans(pom, "dependencyManagement");
+        excluded.addAll(spans(pom, "plugin"));
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        int changes = 0;
+        Matcher block = Pattern.compile("(?s)<dependency>.*?</dependency>").matcher(pom);
+        while (block.find()) {
+            String text = block.group();
+            int exclusions = text.indexOf("<exclusions>");
+            String head = exclusions < 0 ? text : text.substring(0, exclusions);
+            String g = tag(head, "groupId");
+            String a = tag(head, "artifactId");
+            if (inside(excluded, block.start()) || g == null || a == null || tag(head, "version") == null || !matches.test(g, a)) {
+                continue;
+            }
+            out.append(pom, last, block.start()).append(head.replaceFirst("[ \\t]*<version>[^<]*</version>[ \\t]*\\r?\\n?", ""))
+                    .append(exclusions < 0 ? "" : text.substring(exclusions));
+            last = block.end();
+            changes++;
+        }
+        out.append(pom.substring(last));
+        return new Result(out.toString(), changes);
+    }
+
+    /** Imports a bill of materials into {@code <dependencyManagement>}, unless the pom already imports it. */
+    static Result importBom(String pom, String groupId, String artifactId, String version) {
+        if (Pattern.compile("(?s)<artifactId>\\s*" + Pattern.quote(artifactId) + "\\s*</artifactId>").matcher(pom).find()) {
+            return new Result(pom, 0);
+        }
+        String unit = indentUnit(pom);
+        String entry = unit.repeat(3) + "<dependency>\n" + unit.repeat(4) + "<groupId>" + groupId + "</groupId>\n" + unit.repeat(4)
+                + "<artifactId>" + artifactId + "</artifactId>\n" + unit.repeat(4) + "<version>" + version + "</version>\n"
+                + unit.repeat(4) + "<type>pom</type>\n" + unit.repeat(4) + "<scope>import</scope>\n" + unit.repeat(3)
+                + "</dependency>\n";
+        List<Span> profiles = spans(pom, "profiles");
+        Span management = firstSpanOutside(pom, "dependencyManagement", profiles);
+        if (management != null) {
+            int open = pom.indexOf("<dependencies>", management.start());
+            if (open >= 0 && open < management.end()) {
+                int lineEnd = pom.indexOf('\n', open) + 1;
+                // First, so that it does not override versions the project manages itself after it.
+                return new Result(pom.substring(0, lineEnd) + entry + pom.substring(lineEnd), 1);
+            }
+        }
+        String block = unit + "<dependencyManagement>\n" + unit.repeat(2) + "<dependencies>\n" + entry + unit.repeat(2)
+                + "</dependencies>\n" + unit + "</dependencyManagement>\n\n";
+        return insertBeforeFirst(pom, block, profiles, "<dependencies>", "<build>", "<profiles>", "</project>");
+    }
+
+    /** Sets {@code <packaging>}; a pom without the element (a jar) gets one only for another packaging. */
+    static Result setPackaging(String pom, String packaging) {
+        Matcher m = Pattern.compile("<packaging>\\s*([^<]*?)\\s*</packaging>").matcher(pom);
+        if (m.find()) {
+            return m.group(1).equals(packaging) ? new Result(pom, 0)
+                    : new Result(pom.substring(0, m.start()) + "<packaging>" + packaging + "</packaging>" + pom.substring(m.end()), 1);
+        }
+        return new Result(pom, 0);
+    }
+
+    /** Adds a build plugin given as XML (indented for {@code <plugins>}), unless one with that artifactId is declared. */
+    static Result addPluginXml(String pom, String artifactId, String xml) {
+        if (pom.contains("<artifactId>" + artifactId + "</artifactId>")) {
+            return new Result(pom, 0);
+        }
+        // Declare it the usual way, then give it the body.
+        Result added = addPlugin(pom, "renova.placeholder", artifactId, "0");
+        Matcher placeholder = Pattern.compile("(?s)[ \\t]*<plugin>\\s*<groupId>renova\\.placeholder</groupId>.*?</plugin>\\n").matcher(added.content());
+        return placeholder.find() ? new Result(added.content().substring(0, placeholder.start()) + xml
+                + added.content().substring(placeholder.end()), 1) : new Result(pom, 0);
+    }
+
     /**
      * Adds a dependency to the project's {@code <dependencies>} (creating the section if needed),
      * unless a real dependency with the same groupId and artifactId is already declared.

@@ -38,12 +38,17 @@ public final class PlaybookLoader {
      * A playbook may {@code include} rule packs: files with {@code rules} and {@code knowledge} that several
      * playbooks share, so a migration path is a short list of the packs it is made of. The playbook's own rules
      * come first, then the included ones in the order of the list; a rule or knowledge card the playbook defines
-     * itself replaces an included one with the same id, so a path can adjust a shared rule without copying the pack.
+     * itself replaces an included one with the same id, so a path can adjust a shared rule without copying the pack,
+     * and {@code exclude} lists ids of included rules to leave out.
      */
     private static Playbook load(InputStream in, String source, Includes includes) {
         try {
             ObjectNode tree = object(YAML.readTree(in), source);
             JsonNode include = tree.remove("include");
+            JsonNode exclude = tree.remove("exclude");
+            if (exclude != null && include == null) {
+                throw new IllegalArgumentException("'exclude' names rules of included packs, and nothing is included");
+            }
             if (include != null) {
                 Map<String, JsonNode> rules = new LinkedHashMap<>();
                 Map<String, JsonNode> knowledge = new LinkedHashMap<>();
@@ -58,6 +63,14 @@ public final class PlaybookLoader {
                         });
                         collect(packTree.path("rules"), rules, "rule", reference.asText());
                         collect(packTree.path("knowledge"), knowledge, "knowledge card", reference.asText());
+                    }
+                }
+                // A path can leave out a pack's rule that does not fit it, by id.
+                if (exclude != null) {
+                    for (JsonNode id : exclude) {
+                        if (rules.remove(id.asText()) == null) {
+                            throw new IllegalArgumentException("excluded rule '" + id.asText() + "' is in none of the included packs");
+                        }
                     }
                 }
                 tree.set("rules", merged(tree.path("rules"), rules));
