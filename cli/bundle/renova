@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# The Renova command line. Needs Java 21 or later; renova.jar sits beside this script.
+set -e
+DIR=$(cd "$(dirname "$0")" && pwd)
+exec java ${RENOVA_JAVA_OPTS:-} -jar "$DIR/renova.jar" "$@"

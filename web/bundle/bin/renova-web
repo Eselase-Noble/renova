@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# Starts Renova's web API and console from this folder. Needs Java 21+ and Node.js 20+; nothing else.
+#
+#   bin/renova-web local  [--port 3000] [--api-port 8787] [--no-browser]
+#       One person on this machine: no sign-in, nothing listens beyond 127.0.0.1, data in ~/.renova/local.
+#   bin/renova-web server [--port 3000] [--api-port 8787] [--host 127.0.0.1] [--data-dir DIR] [--project-roots A,B]
+#       A team: accounts and organisations, data in ~/.renova/server. Put the console behind HTTPS
+#       (see README.md); --host 0.0.0.0 only on a network you trust.
+#
+# For a server that starts with the machine, use the systemd units in systemd/ instead of this script.
+set -euo pipefail
+
+home="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+mode="${1:-}"
+case "$mode" in
+  local|server) shift ;;
+  -h|--help|"") sed -n '2,10p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  *) echo "Say 'local' or 'server' (try --help)" >&2; exit 2 ;;
+esac
+
+port=3000
+api_port=8787
+host=127.0.0.1
+browser=true
+api_args=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --port) port="$2"; shift 2 ;;
+    --api-port) api_port="$2"; shift 2 ;;
+    --host) host="$2"; shift 2 ;;
+    --data-dir) api_args+=("--renova.data-dir=$2"); shift 2 ;;
+    --project-roots) api_args+=("--renova.project-roots=$2"); shift 2 ;;
+    --no-browser) browser=false; shift ;;
+    *) echo "Unknown option: $1 (try --help)" >&2; exit 2 ;;
+  esac
+done
+
+command -v java >/dev/null || { echo "Renova needs Java 21 or later on the PATH" >&2; exit 1; }
+command -v node >/dev/null || { echo "Renova's console needs Node.js 20 or later on the PATH" >&2; exit 1; }
+
+if [ "$mode" = local ]; then
+  # Local mode has no sign-in, so neither part may listen beyond this machine.
+  host=127.0.0.1
+  api_args+=("--spring.profiles.active=local")
+else
+  browser=false
+fi
+
+api_pid=""
+console_pid=""
+stop() {
+  trap - EXIT INT TERM
+  [ -n "$console_pid" ] && kill "$console_pid" 2>/dev/null || true
+  [ -n "$api_pid" ] && kill "$api_pid" 2>/dev/null || true
+  wait 2>/dev/null || true
+}
+trap stop EXIT INT TERM
+
+log="${RENOVA_LOG_DIR:-${TMPDIR:-/tmp}/renova-web-${USER:-user}}"
+mkdir -p "$log"
+java ${RENOVA_JAVA_OPTS:-} -jar "$home/api/renova-web-api.jar" --server.port="$api_port" "${api_args[@]}" > "$log/api.log" 2>&1 &
+api_pid=$!
+for _ in $(seq 1 120); do
+  curl -fs -o /dev/null "http://127.0.0.1:$api_port/api/auth/state" 2>/dev/null && break
+  kill -0 "$api_pid" 2>/dev/null || { echo "The API did not start; see $log/api.log" >&2; tail -5 "$log/api.log" >&2; exit 1; }
+  sleep 0.5
+done
+
+(cd "$home/console" && RENOVA_API_URL="http://127.0.0.1:$api_port" HOSTNAME="$host" PORT="$port" exec node server.js) > "$log/console.log" 2>&1 &
+console_pid=$!
+for _ in $(seq 1 60); do
+  curl -fs -o /dev/null "http://127.0.0.1:$port/login" 2>/dev/null && break
+  kill -0 "$console_pid" 2>/dev/null || { echo "The console did not start; see $log/console.log" >&2; tail -5 "$log/console.log" >&2; exit 1; }
+  sleep 0.5
+done
+
+url="http://localhost:$port"
+if [ "$mode" = local ]; then
+  echo "Renova is running in local mode at $url"
+  echo "  Projects and migrated copies stay on this machine: ~/.renova/local"
+else
+  echo "Renova is running in server mode: console on $host:$port, API on 127.0.0.1:$api_port"
+  echo "  Open $url to set up the first account. To serve a team, put the console behind HTTPS."
+fi
+echo "  Logs: $log   ·   Ctrl C to stop"
+if $browser; then
+  (xdg-open "$url" || open "$url") >/dev/null 2>&1 || true
+fi
+wait "$api_pid"

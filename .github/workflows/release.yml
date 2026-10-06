@@ -1,0 +1,122 @@
+# Publishes a release when a version tag is pushed:
+#
+#   git tag v0.2.0 && git push origin v0.2.0
+#
+# Every part is built at that version and attached to a GitHub release: the desktop installers for Linux,
+# Windows and macOS, the web bundle, the CLI, the VS Code extension and the IntelliJ plugin. Nothing is
+# published anywhere else, and no container image is involved.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+env:
+  VERSION: ${{ github.ref_name }}
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - run: mvn -B verify
+
+  bundles:
+    name: Web bundle, CLI and IDE plugins
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Set the version from the tag
+        run: |
+          v="${VERSION#v}"
+          mvn -B -q versions:set -DnewVersion="$v" -DgenerateBackupPoms=false
+          sed -i "s/^renovaVersion=.*/renovaVersion=$v/; s/^pluginVersion=.*/pluginVersion=$v/" ide/intellij/gradle.properties
+          (cd ide/vscode && npm version "$v" --no-git-tag-version --allow-same-version)
+      - name: Install the engine into the local Maven repository
+        run: mvn -B -q install -DskipTests
+      - name: Web bundle
+        run: web/package.sh
+      - name: CLI
+        run: cli/package.sh
+      - name: VS Code extension
+        working-directory: ide/vscode
+        run: npm ci && npm run package
+      - uses: gradle/actions/setup-gradle@v4
+      - name: IntelliJ plugin
+        working-directory: ide/intellij
+        run: ./gradlew buildPlugin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bundles
+          if-no-files-found: error
+          path: |
+            web/target/renova-web-*.tar.gz
+            cli/target/renova-cli-*.zip
+            ide/vscode/renova-*.vsix
+            ide/intellij/build/distributions/*.zip
+
+  desktop:
+    name: Desktop installer (${{ matrix.name }})
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Linux, os: ubuntu-latest, type: deb }
+          - { name: Windows, os: windows-latest, type: msi }
+          - { name: macOS, os: macos-latest, type: dmg }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - name: Set the version from the tag
+        shell: bash
+        run: mvn -B -q versions:set -DnewVersion="${VERSION#v}" -DgenerateBackupPoms=false
+      - name: Build the installer
+        shell: bash
+        run: desktop/package.sh --type ${{ matrix.type }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.name }}
+          if-no-files-found: error
+          path: desktop/target/dist/*
+
+  publish:
+    name: Publish the release
+    needs: [bundles, desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Checksums
+        working-directory: assets
+        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$VERSION" assets/* --title "Renova ${VERSION#v}" --generate-notes --verify-tag

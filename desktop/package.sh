@@ -12,6 +12,8 @@ if [[ "${1:-}" == "--type" ]]; then TYPE="$2"; fi
 
 mvn -B -q -pl desktop -am package -DskipTests
 VERSION=$(mvn -B -q -pl desktop help:evaluate -Dexpression=project.version -DforceStdout | sed 's/-SNAPSHOT//')
+# macOS installers may not have a version that starts with 0: 0.3.1 becomes 1.3.1 there, and only there.
+if [[ "$(uname)" == "Darwin" && "$VERSION" == 0.* ]]; then VERSION="1.${VERSION#0.}"; fi
 INPUT=desktop/target/jpackage-input
 rm -rf "$INPUT" desktop/target/dist
 mkdir -p "$INPUT"

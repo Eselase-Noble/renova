@@ -34,11 +34,17 @@ console hides everything about members, invitations and the audit log. Because t
   cannot reach it by pointing its own host name at `127.0.0.1` (DNS rebinding);
 - still requires the CSRF token on every change, so no other site can make the browser act on it.
 
-By hand: `java -jar web/api/target/renova-web-api-0.1.0-SNAPSHOT.jar --spring.profiles.active=local`, then the
-console as below with `npx next start -H 127.0.0.1`. The [desktop app](../desktop) does the same job in one window
+From a release, the same thing is `bin/renova-web local` in the unpacked web bundle. The [desktop app](../desktop) does the same job in one window
 with no ports at all, and is the simplest way to keep everything on one machine.
 
-## Run it (server mode)
+## Deploy it
+
+`web/package.sh` builds `web/target/renova-web-VERSION.tar.gz`: the API jar, the console as a self-contained Node
+server, the `bin/renova-web local|server` launcher, systemd units and a deployment guide
+([`bundle/README.md`](bundle/README.md)). It needs Java 21 and Node.js 20 on the target machine, and no Docker.
+Releases attach the same file; see [docs/deployment.md](../docs/deployment.md).
+
+## Run it from source (server mode)
 
 ```sh
 # API on http://127.0.0.1:8787 (data in ~/.renova/server)
@@ -48,7 +54,7 @@ java -jar web/api/target/renova-web-api-0.1.0-SNAPSHOT.jar
 # Console on http://localhost:3000, proxying /api to the API
 cd web/console
 npm install
-npm run dev            # or: npm run build && npm start
+npm run dev            # or: npm run build && node .next/standalone/server.js (after copying .next/static beside it)
 ```
 
 Open the console and **set up** the first account and organisation. Everyone else joins by invitation.
