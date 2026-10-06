@@ -1,17 +1,17 @@
-# Spring Boot 2 or 3 applications → Spring Boot 4.0: Spring Framework 7, Spring Security 7, Jakarta EE 11.
+# Spring Boot 2 or 3 applications → Spring Boot 4.1: Spring Framework 7, Spring Security 7, Jakarta EE 11.
 # A Spring Boot 2 application goes through everything spring-boot-3 does on the way.
 
 id: spring-boot-4
-name: "Spring Boot 2 or 3 → 4.0 (Java 21, Spring Framework 7)"
+name: "Spring Boot 2 or 3 → 4.1 (Java 21, Spring Framework 7)"
 ecosystem: java
 version: 0.1.0
 description: >
-  Moves a Spring Boot 2 or 3 application to Spring Boot 4.0, the latest major version, on Java 21: Spring
+  Moves a Spring Boot 2 or 3 application to Spring Boot 4.1, the latest release, on Java 21: Spring
   Framework 7, Spring Security 7, Hibernate 7 and Jakarta EE 11, the starters that were split or renamed,
   and, coming from Spring Boot 2, the javax to jakarta rename and everything else Spring Boot 3 changed.
 targets:
   java: "21"
-  springBoot: "4.0"
+  springBoot: "4.1"
   spring: "7.0"
   jakartaEE: "11"
 
@@ -41,22 +41,47 @@ rules:
     rationale: Spring Boot 4 needs Java 17 or later; 21 is the long-term-support release it is most used with.
 
   - id: spring-boot-4
-    title: Upgrade Spring Boot to 4.0
+    title: Upgrade Spring Boot to 4.1
     category: A
     severity: BLOCKER
     detect:
       type: mavenParent
       coordinates: ["org.springframework.boot:spring-boot-starter-parent"]
-      versionBelow: "4"
+      versionBelow: "4.1"
     fix:
       strategy: recipe
-      recipes: [org.openrewrite.java.spring.boot4.UpgradeSpringBoot_4_0]
+      recipes:
+        - org.openrewrite.java.spring.boot4.UpgradeSpringBoot_4_0
+        - org.openrewrite.java.spring.boot4.SpringBootProperties_4_1
     rationale: >
-      The recipe steps through every Spring Boot release up to 4.0: the parent and plugin versions, the
-      starters that were split into modules or renamed, Spring Framework 7, Spring Security 7 and Hibernate 7.
+      The recipes step through every Spring Boot release up to 4.0: the parent and plugin versions, the
+      starters that were split into modules or renamed, Spring Framework 7, Spring Security 7 and Hibernate 7;
+      then rename the configuration properties 4.1 changed. The guard below moves the parent on to 4.1.
+
+  - id: spring-boot-gradle-plugin
+    title: Upgrade the Spring Boot Gradle plugin to 4.1
+    category: A
+    severity: BLOCKER
+    detect: { type: gradlePlugin, id: org.springframework.boot, versionBelow: "4.1" }
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.boot4.UpgradeSpringBoot_4_0, org.openrewrite.java.spring.boot4.SpringBootProperties_4_1]
+    rationale: In a Gradle build the plugin's version is the Spring Boot version; the recipe also updates the Gradle wrapper when the new release needs a newer Gradle.
+
+  - id: spring-boot-gradle-classpath
+    title: Upgrade the Spring Boot Gradle plugin declared on the buildscript classpath
+    category: A
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates: ["org.springframework.boot:spring-boot-gradle-plugin"]
+      versionBelow: "4.1"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.boot4.UpgradeSpringBoot_4_0, org.openrewrite.java.spring.boot4.SpringBootProperties_4_1]
 
   - id: spring-boot-bom-4
-    title: Upgrade the Spring Boot dependency management (BOM) to 4.0
+    title: Upgrade the Spring Boot dependency management (BOM) to 4.1
     category: A
     severity: BLOCKER
     detect:
@@ -100,21 +125,20 @@ rules:
 
   - id: guard-spring-boot-parent
     phase: guard
-    title: The Spring Boot parent must be on 4.0
+    title: The Spring Boot parent must be on 4.1
     category: A
     severity: BLOCKER
     detect:
       type: mavenParent
       coordinates: ["org.springframework.boot:spring-boot-starter-parent"]
-      versionBelow: "4"
+      versionBelow: "4.1"
     fix:
       strategy: maven
-      params: { action: setParentVersion, version: "4.0.6" }
+      params: { action: setParentVersion, version: "4.1.1" }
     rationale: >
-      The upgrade recipe moves the parent one release at a time and looks each release up as it goes. When a
-      lookup fails (a slow or restricted network, a repository mirror that lags), it stops part-way and leaves
-      the parent on an earlier release than the starters and the code it has already moved, which do not work
-      together. Setting the parent finishes the step the recipe could not.
+      The upgrade recipe ends on Spring Boot 4.0, and on a slow or restricted network it can stop on an
+      earlier release than the starters and the code it has already moved. 4.1 is a minor release over 4.0, so
+      once the recipes have run, setting the parent completes the upgrade; the build and the tests then verify it.
 
 knowledge:
 

@@ -68,7 +68,7 @@ class JavaTargetsTest {
     void springBootPathsLookAtTheParentVersion(@TempDir Path root) throws Exception {
         project(root.resolve("boot2"), bootParent("2.7.18"));
         project(root.resolve("boot3"), bootParent("3.3.4"));
-        project(root.resolve("boot4"), bootParent("4.0.1"));
+        project(root.resolve("boot4"), bootParent("4.1.1"));
         project(root.resolve("other"), "<parent><groupId>com.acme</groupId><artifactId>acme-parent</artifactId><version>1</version>"
                 + "</parent><artifactId>svc</artifactId>");
 
@@ -102,6 +102,28 @@ class JavaTargetsTest {
                 .doesNotContain("3.3.13");
         assertThat(io.renova.java.fix.MavenVerifierAccess.setParentVersion("<project><version>1</version></project>", "9"))
                 .isEqualTo("<project><version>1</version></project>");
+    }
+
+    @Test
+    void springBootInAGradleBuildIsReadFromItsPlugin(@TempDir Path root) throws Exception {
+        Files.createDirectories(root.resolve("groovy"));
+        Files.writeString(root.resolve("groovy/build.gradle"), """
+                plugins {
+                    id 'java'
+                    id 'org.springframework.boot' version '2.7.18'
+                }
+                """);
+        Files.createDirectories(root.resolve("kotlin"));
+        Files.writeString(root.resolve("kotlin/build.gradle.kts"), """
+                plugins {
+                    java
+                    id("org.springframework.boot") version "3.3.4"
+                }
+                """);
+        assertThat(parents(root, "spring-boot-3", "spring-boot-gradle-plugin")).containsExactly("groovy/build.gradle");
+        assertThat(parents(root, "spring-boot-4", "spring-boot-gradle-plugin")).containsExactly("groovy/build.gradle", "kotlin/build.gradle.kts");
+        assertThat(REGISTRY.defaultPlaybook(root.resolve("groovy")).id()).isEqualTo("spring-boot-3");
+        assertThat(REGISTRY.defaultPlaybook(root.resolve("kotlin")).id()).isEqualTo("spring-boot-4");
     }
 
     private static List<String> parents(Path root, String playbookId, String ruleId) throws Exception {

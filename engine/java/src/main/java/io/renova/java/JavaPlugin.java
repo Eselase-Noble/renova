@@ -14,6 +14,7 @@ import io.renova.java.detect.DependencyDetector;
 import io.renova.java.detect.DuplicateDependencyDetector;
 import io.renova.java.detect.ImportDependencyDetector;
 import io.renova.java.detect.ImportDetector;
+import io.renova.java.detect.GradlePluginDetector;
 import io.renova.java.detect.JavaVersionDetector;
 import io.renova.java.detect.MavenParentDetector;
 import io.renova.java.detect.MavenPluginDetector;
@@ -128,7 +129,7 @@ public final class JavaPlugin implements EcosystemPlugin {
     public List<DetectorFactory> detectors() {
         return List.of(new ImportDetector(), new DependencyDetector(), new JavaVersionDetector(),
                 new MavenPluginDetector(), new PomPropertyDetector(), new ImportDependencyDetector(),
-                new UnversionedDependencyDetector(), new DuplicateDependencyDetector(), new MavenParentDetector());
+                new UnversionedDependencyDetector(), new DuplicateDependencyDetector(), new MavenParentDetector(), new GradlePluginDetector());
     }
 
     @Override
@@ -229,6 +230,10 @@ public final class JavaPlugin implements EcosystemPlugin {
                 if (!buildFile.getFileName().toString().startsWith("pom")) {
                     String text = Files.readString(buildFile);
                     boot |= text.contains("org.springframework.boot");
+                    Matcher bootPlugin = GradlePluginDetector.declaration("org.springframework.boot").matcher(text);
+                    // Already on Spring Boot 3: the next step is 4.
+                    boot3 |= bootPlugin.find() && bootPlugin.group(1).matches("\\d.*")
+                            && !io.renova.core.util.Versions.isBelow(bootPlugin.group(1), "3");
                     javaEe |= text.contains("javax.") || text.contains("org.springframework:spring-");
                     continue;
                 }

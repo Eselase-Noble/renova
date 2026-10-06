@@ -285,7 +285,7 @@ list in the desktop app):
 | `java-to-17`, `java-to-21`, `java-to-25` | Any Java project | That Java version, and nothing else: frameworks and javax or jakarta APIs stay | Projects without Java EE or Spring Boot (`java-to-21`) |
 | `java8-to-21-jakarta-ee10` | Java EE (javax) web applications, Spring 5 or earlier | Java 21, Jakarta EE 10, Spring 6, for Tomcat 10.1/11 and WildFly 27+ / JBoss EAP 8 | WAR projects and projects using javax APIs |
 | `spring-boot-3` | Spring Boot 2 applications | Spring Boot 3.5, Java 21, Jakarta EE 10 | Spring Boot 2 applications |
-| `spring-boot-4` | Spring Boot 2 or 3 applications | Spring Boot 4.0, Java 21, Spring Framework 7 | Spring Boot 3 applications |
+| `spring-boot-4` | Spring Boot 2, 3 or 4.0 applications | Spring Boot 4.1, Java 21, Spring Framework 7 | Spring Boot 3 applications |
 
 The build is verified on the JDK in `JAVA_HOME`, so a target needs that JDK installed (Java 25 for `java-to-25`);
 Renova says so before it changes anything.

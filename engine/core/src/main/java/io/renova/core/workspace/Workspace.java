@@ -56,7 +56,9 @@ public final class Workspace {
             ws.git("init", "-q");
             ws.git("config", "user.name", "Renova");
             ws.git("config", "user.email", "renova@localhost");
-            Files.writeString(dst.resolve(".git/info/exclude"), ".renova/\ntarget/\n");
+            // Build output is never part of a stage: Maven's target, Gradle's .gradle and build (but a source
+            // package that happens to be called build is kept).
+            Files.writeString(dst.resolve(".git/info/exclude"), ".renova/\ntarget/\n.gradle/\nbuild/\n!**/src/**/build/\n");
             ws.commitAll("renova: baseline (unmodified copy of " + src.getFileName() + ")");
         }
         return ws;

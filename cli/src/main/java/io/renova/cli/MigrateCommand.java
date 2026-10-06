@@ -116,9 +116,8 @@ final class MigrateCommand implements Callable<Integer> {
             System.err.println("  behaviour  " + outcome.behaviour().status() + ": " + outcome.behaviour().summary()
                     + "  (" + reportDir.resolve("behaviour.md") + ")");
         }
-        boolean buildOk = outcome.verification() == null || outcome.verification().success();
-        boolean behaviourOk = outcome.behaviour() == null || outcome.behaviour().status() == BehaviourReport.Status.SAME
-                || outcome.behaviour().status() == BehaviourReport.Status.SKIPPED;
-        return buildOk && behaviourOk ? 0 : 1;
+        outcome.failedStages().forEach(stage -> System.err.println("  The " + stage.stage() + " stage could not run, so its changes "
+                + "were not made; see the report for what its tool said."));
+        return outcome.passed() ? 0 : 1;
     }
 }
