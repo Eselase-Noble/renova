@@ -69,6 +69,23 @@ rules:
         iBATIS 2 is used, cglib is only needed for nested-select lazy loading; when no SQL map uses
         it, removing cglib makes iBATIS fall back to reflection with identical results.
 
+  - id: mockito-to-5
+    title: Upgrade Mockito to 5 (older versions do not run on Java 17 and later)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates: ["org.mockito:mockito-core", "org.mockito:mockito-all", "org.mockito:mockito-junit-jupiter", "org.mockito:mockito-inline"]
+      versionBelow: "5"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.testing.mockito.Mockito1to5Migration]
+    rationale: >
+      Mockito 1 creates mocks with cglib and Mockito 2 to 4 with a Byte Buddy that does not know current class
+      files: on Java 17 and later every test that mocks fails with NoClassDefFoundError or "Java 21 is not
+      supported". Mockito 5 is the first line that works; Matchers became ArgumentMatchers and mockito-all was
+      replaced by mockito-core.
+
 knowledge:
 
   - id: nashorn-removed

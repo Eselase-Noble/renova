@@ -27,6 +27,7 @@ settings:
     plugin: org.openrewrite.maven:rewrite-maven-plugin:6.46.1
     artifacts:
       - org.openrewrite.recipe:rewrite-migrate-java:3.42.1
+      - org.openrewrite.recipe:rewrite-testing-frameworks:3.44.0
       - org.openrewrite.recipe:rewrite-spring:6.37.1
       - org.openrewrite.recipe:rewrite-hibernate:2.25.0
   # Behavioural verification (--verify-behaviour): where the original and the migrated app run side by side.

@@ -59,6 +59,26 @@ public final class JavaPlugin implements EcosystemPlugin {
         return "Java (Maven/Gradle)";
     }
 
+    /** Java code without a Maven or Gradle build: Ant, an IDE project, or loose sources. */
+    @Override
+    public Optional<String> unsupportedReason(Path root) {
+        boolean ant = Files.isRegularFile(root.resolve("build.xml"));
+        boolean sources;
+        try (java.util.stream.Stream<Path> files = Files.find(root, 6, (p, attrs) -> attrs.isRegularFile() && p.toString().endsWith(".java"))) {
+            sources = files.findAny().isPresent();
+        } catch (IOException | java.io.UncheckedIOException e) {
+            sources = false;
+        }
+        if (!ant && !sources) {
+            return Optional.empty();
+        }
+        return Optional.of((ant ? "This is an Ant project (build.xml)" : "This Java project has no build file Renova recognises")
+                + ". Renova runs its recipes and verifies the result through a Maven or Gradle build, which knows the project's "
+                + "dependencies; " + (ant ? "Ant builds do not declare them in a form it can use" : "without one it cannot resolve them")
+                + ". Add a pom.xml or build.gradle that builds the same sources with the same libraries (it can sit beside the "
+                + (ant ? "Ant build" : "existing setup") + "), check that it compiles, then assess the project again.");
+    }
+
     @Override
     public List<String> projectMarkers() {
         return List.of("pom.xml", "build.gradle", "build.gradle.kts");

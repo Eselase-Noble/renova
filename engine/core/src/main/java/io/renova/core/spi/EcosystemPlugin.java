@@ -32,6 +32,14 @@ public interface EcosystemPlugin {
     }
 
     /**
+     * Why a folder that looks like one of this ecosystem's projects cannot be migrated, with what to do about
+     * it; empty when the folder is simply not this ecosystem's. Shown instead of "nothing supports this".
+     */
+    default Optional<String> unsupportedReason(Path root) {
+        return Optional.empty();
+    }
+
+    /**
      * Which of this ecosystem's playbooks to use for the project when the user has not chosen one.
      *
      * @param candidates ids of the installed playbooks of this ecosystem, never empty

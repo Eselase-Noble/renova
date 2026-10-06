@@ -167,7 +167,9 @@ public final class PluginRegistry {
     public Playbook defaultPlaybook(Path root) {
         List<Playbook> candidates = playbooksFor(root);
         if (candidates.isEmpty()) {
-            throw new IllegalArgumentException("No bundled playbook supports " + root);
+            throw new IllegalArgumentException(plugins.values().stream().map(p -> p.unsupportedReason(root)).flatMap(Optional::stream)
+                    .findFirst().orElse("No bundled playbook supports " + root
+                            + ": Renova found no build file it recognises (installed ecosystems: " + plugins.keySet() + ")"));
         }
         List<String> ecosystems = candidates.stream().map(Playbook::ecosystem).distinct().toList();
         if (ecosystems.size() > 1) {
