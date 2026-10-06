@@ -56,6 +56,11 @@ public final class JavaPlugin implements EcosystemPlugin {
     }
 
     @Override
+    public List<String> projectMarkers() {
+        return List.of("pom.xml", "build.gradle", "build.gradle.kts");
+    }
+
+    @Override
     public boolean supports(Path root) {
         try {
             return !buildFiles(root).isEmpty();

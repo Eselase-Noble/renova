@@ -7,6 +7,7 @@ import io.renova.web.account.Invitation;
 import io.renova.web.account.Organisation;
 import io.renova.web.account.Role;
 import io.renova.web.account.User;
+import io.renova.web.audit.AuditLog;
 import io.renova.web.store.DataStore;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -36,9 +37,11 @@ public class AuthController {
     private final Access access;
     private final DataStore data;
     private final SecurityContextRepository contexts;
+    private final AuditLog audit;
 
     public AuthController(AccountService accounts, AccountStore store, Access access, DataStore data,
-                          SecurityContextRepository contexts) {
+                          SecurityContextRepository contexts, AuditLog audit) {
+        this.audit = audit;
         this.accounts = accounts;
         this.store = store;
         this.access = access;
@@ -88,7 +91,9 @@ public class AuthController {
         Organisation organisation = accounts.setup(body.organisation(), body.name(), body.email(), body.password());
         // Projects and migrations from before accounts existed belong to the first organisation.
         data.adoptUnowned(organisation.id());
-        signIn(store.userByEmail(body.email()).orElseThrow(), request, response);
+        User user = store.userByEmail(body.email()).orElseThrow();
+        signIn(user, request, response);
+        audit.record(organisation.id(), user, "organisation.created", organisation.name(), "First account and organisation set up");
         return state(request);
     }
 
@@ -97,6 +102,8 @@ public class AuthController {
         User user = accounts.authenticate(body.email(), body.password())
                 .orElseThrow(() -> new IllegalArgumentException("Wrong email or password"));
         signIn(user, request, response);
+        // Recorded in every organisation the user belongs to: each one's admins see who signed in.
+        store.organisationsOf(user.id()).forEach(o -> audit.record(o.id(), user, "auth.signed_in", user.email(), null));
         return state(request);
     }
 
@@ -126,6 +133,8 @@ public class AuthController {
         User user = accounts.accept(token, body.name(), body.password());
         signIn(user, request, response);
         access.choose(request, invitation.organisationId());
+        audit.record(invitation.organisationId(), user, "invitation.accepted", invitation.email(),
+                "Joined as " + invitation.role().name().toLowerCase());
         return state(request);
     }
 
@@ -137,7 +146,9 @@ public class AuthController {
 
     @PostMapping("/password")
     public void changePassword(@RequestBody PasswordChange body, HttpServletRequest request) {
-        accounts.changePassword(access.caller(request).user().id(), body.current(), body.replacement());
+        Access.Caller caller = access.caller(request);
+        accounts.changePassword(caller.user().id(), body.current(), body.replacement());
+        audit.record(caller, "auth.password_changed", caller.user().email(), null);
     }
 
     /** A new session (against session fixation) holding the signed-in user. */

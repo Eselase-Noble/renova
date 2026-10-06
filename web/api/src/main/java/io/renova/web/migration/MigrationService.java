@@ -32,8 +32,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * Runs migrations as background jobs, a limited number at a time, recording progress as it happens.
@@ -47,6 +50,9 @@ public class MigrationService {
     private final DataStore store;
     private final AiSettingsService ai;
     private final ExecutorService executor;
+    /** Jobs that are queued or running, so they can be cancelled. */
+    private final Map<String, Future<?>> jobs = new ConcurrentHashMap<>();
+    private final Set<String> cancelled = ConcurrentHashMap.newKeySet();
 
     public MigrationService(PluginRegistry registry, DataStore store, AiSettingsService ai,
                             @Value("${renova.parallel-migrations:1}") int parallel) {
@@ -88,12 +94,49 @@ public class MigrationService {
                 project.organisationId(), userId);
         store.saveMigration(record);
         store.appendProgress(id, "Queued");
-        executor.submit(() -> run(record, project, playbook));
+        jobs.put(id, executor.submit(() -> {
+            try {
+                run(record, project, playbook);
+            } finally {
+                jobs.remove(id);
+                cancelled.remove(id);
+            }
+        }));
         return record;
+    }
+
+    /**
+     * Stops a queued or running migration. A queued one never starts; a running one is interrupted, which also
+     * stops the build it is waiting for. The workspace is kept, with the stages committed so far.
+     */
+    public MigrationRecord cancel(MigrationRecord record) {
+        Future<?> job = jobs.get(record.id());
+        if (job == null) {
+            throw new IllegalStateException("This migration has already finished");
+        }
+        cancelled.add(record.id());
+        if (job.cancel(true) && record.status() == MigrationRecord.Status.QUEUED) {
+            // Cancelled before a worker picked it up: run() will not record anything.
+            MigrationRecord latest = store.migration(record.id()).orElse(record);
+            if (latest.status() == MigrationRecord.Status.QUEUED) {
+                jobs.remove(record.id());
+                cancelled.remove(record.id());
+                store.appendProgress(record.id(), "Cancelled before it started");
+                MigrationRecord stopped = latest.with(MigrationRecord.Status.CANCELLED, null, now(), null, null);
+                store.saveMigration(stopped);
+                return stopped;
+            }
+        }
+        return store.migration(record.id()).orElse(record);
     }
 
     private void run(MigrationRecord queued, Project project, Playbook playbook) {
         String id = queued.id();
+        if (cancelled.contains(id)) {
+            store.appendProgress(id, "Cancelled before it started");
+            store.saveMigration(queued.with(MigrationRecord.Status.CANCELLED, null, now(), null, null));
+            return;
+        }
         MigrationRecord running = queued.with(MigrationRecord.Status.RUNNING, now(), null, null, null);
         store.saveMigration(running);
         try {
@@ -114,7 +157,13 @@ public class MigrationService {
             MigrationPlan plan = new Planner().plan(analysis);
             store.appendProgress(id, "Plan: " + plan.steps().size() + " steps for " + analysis.findings().size() + " findings, "
                     + Math.round(plan.automationRate() * 100) + "% automated");
-            MigrationOutcome outcome = new Migrator(registry, line -> store.appendProgress(id, line)).migrate(analysis, plan, options);
+            MigrationOutcome outcome = new Migrator(registry, line -> {
+                if (cancelled.contains(id)) {
+                    // In-process stages do not notice an interrupt; stop at the next progress line.
+                    throw new java.util.concurrent.CancellationException("Cancelled");
+                }
+                store.appendProgress(id, line);
+            }).migrate(analysis, plan, options);
             Path reports = outcome.workspace().resolve(".renova");
             Files.writeString(reports.resolve("report.md"), MarkdownReport.render(analysis, plan, outcome));
             Files.writeString(reports.resolve("report.json"), JsonReport.render(analysis, plan, outcome));
@@ -132,6 +181,13 @@ public class MigrationService {
             store.saveMigration(running.with(passed ? MigrationRecord.Status.PASSED : MigrationRecord.Status.FAILED, null, now(),
                     summary, null));
         } catch (Exception e) {
+            if (cancelled.contains(id)) {
+                // The interrupt belongs to this job only; the worker thread goes on to the next one.
+                Thread.interrupted();
+                store.appendProgress(id, "Cancelled");
+                store.saveMigration(running.with(MigrationRecord.Status.CANCELLED, null, now(), null, null));
+                return;
+            }
             String message = e.getMessage() == null ? e.toString() : e.getMessage();
             store.appendProgress(id, "Error: " + message);
             store.saveMigration(running.with(MigrationRecord.Status.ERROR, null, now(), null, message));

@@ -143,6 +143,48 @@ class WebApiTest {
 
     @Test
     @Order(4)
+    void migrationsCanBeCancelledAndChangesAreAudited() throws Exception {
+        // One migration runs at a time, so the second is still queued when it is cancelled.
+        String first = json.readTree(call(post("/api/projects/" + projectId + "/migrations"), owner, "{\"skipTests\":true}")
+                .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString()).get("id").asText();
+        String second = json.readTree(call(post("/api/projects/" + projectId + "/migrations"), owner, "{\"skipTests\":true}")
+                .andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString()).get("id").asText();
+        call(post("/api/migrations/" + second + "/cancel"), owner, null).andExpect(status().isOk());
+        call(post("/api/migrations/" + first + "/cancel"), owner, null).andExpect(status().isOk());
+        for (String id : new String[] {second, first}) {
+            String state = "";
+            for (int i = 0; i < 300 && !state.equals("CANCELLED"); i++) {
+                Thread.sleep(100);
+                state = json.readTree(mvc.perform(get("/api/migrations/" + id).session(owner)).andReturn().getResponse()
+                        .getContentAsString()).at("/migration/status").asText();
+            }
+            assertThat(state).as("migration " + id).isEqualTo("CANCELLED");
+        }
+        call(post("/api/migrations/" + second + "/cancel"), owner, null).andExpect(status().isConflict());
+
+        String log = mvc.perform(get("/api/org/audit").session(owner)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(json.readTree(log).findValuesAsText("action"))
+                .contains("organisation.created", "project.added", "invitation.created", "invitation.accepted",
+                        "member.role_changed", "migration.started", "migration.cancelled", "auth.signed_in");
+        assertThat(log).doesNotContain("correct horse battery");
+        mvc.perform(get("/api/org/audit?area=migration").session(owner)).andExpect(jsonPath("$", hasSize(4)));
+
+        mvc.perform(get("/api/system").session(owner))
+                .andExpect(jsonPath("$.ecosystems[0].id").value("java"))
+                .andExpect(jsonPath("$.projectRoots", hasSize(1)));
+        mvc.perform(get("/api/system/directories").session(owner)).andExpect(jsonPath("$.entries", hasSize(1)));
+        mvc.perform(get("/api/system/directories").param("path", projects.toString()).session(owner))
+                .andExpect(jsonPath("$.entries", hasSize(2)))
+                .andExpect(jsonPath("$.entries[0].name").value("legacy-app"))
+                .andExpect(jsonPath("$.entries[0].project").value(true))
+                .andExpect(jsonPath("$.parent").doesNotExist());
+        mvc.perform(get("/api/system/directories").param("path", data.resolve("outside").toString()).session(owner))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @Order(5)
     void organisationsAreIsolatedAndKeysStayMasked() throws Exception {
         String secret = "sk-ant-test-0123456789abcdefWXYZ";
         String saved = call(put("/api/settings/keys/anthropic"), owner, "{\"apiKey\":\"" + secret + "\"}")

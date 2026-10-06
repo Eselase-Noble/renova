@@ -2,6 +2,7 @@ package io.renova.web.api;
 
 import io.renova.web.account.Access;
 import io.renova.web.account.Role;
+import io.renova.web.audit.AuditLog;
 import io.renova.web.settings.AiSettingsService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -27,10 +28,12 @@ public class SettingsController {
 
     private final AiSettingsService ai;
     private final Access access;
+    private final AuditLog audit;
 
-    public SettingsController(AiSettingsService ai, Access access) {
+    public SettingsController(AiSettingsService ai, Access access, AuditLog audit) {
         this.ai = ai;
         this.access = access;
+        this.audit = audit;
     }
 
     public record KeyRequest(String apiKey) {
@@ -47,23 +50,32 @@ public class SettingsController {
     /** Values: ai.provider, ai.model, ai.effort, rag.enabled, PROVIDER.baseUrl; an empty value clears it. */
     @PutMapping
     public AiSettingsService.View update(@RequestBody Map<String, String> values, HttpServletRequest request) throws Exception {
-        String org = access.require(request, Role.ADMIN).organisationId();
+        Access.Caller caller = access.require(request, Role.ADMIN);
+        String org = caller.organisationId();
         ai.update(org, values);
+        // Setting names and values: none of them is a secret (keys have their own endpoint).
+        audit.record(caller, "settings.changed", "AI settings", values.entrySet().stream()
+                .map(e -> e.getKey() + " = " + (e.getValue() == null || e.getValue().isBlank() ? "(default)" : e.getValue()))
+                .sorted().collect(java.util.stream.Collectors.joining(", ")));
         return ai.view(org);
     }
 
     @PutMapping("/keys/{provider}")
     public AiSettingsService.View setKey(@PathVariable String provider, @RequestBody KeyRequest body, HttpServletRequest request)
             throws Exception {
-        String org = access.require(request, Role.ADMIN).organisationId();
+        Access.Caller caller = access.require(request, Role.ADMIN);
+        String org = caller.organisationId();
         ai.setKey(org, provider, body.apiKey());
+        audit.record(caller, "settings.key_set", provider, "API key saved");
         return ai.view(org);
     }
 
     @DeleteMapping("/keys/{provider}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeKey(@PathVariable String provider, HttpServletRequest request) throws Exception {
-        ai.removeKey(access.require(request, Role.ADMIN).organisationId(), provider);
+        Access.Caller caller = access.require(request, Role.ADMIN);
+        ai.removeKey(caller.organisationId(), provider);
+        audit.record(caller, "settings.key_removed", provider, "API key removed");
     }
 
     /** Verifies the key and model without generating anything (free). */

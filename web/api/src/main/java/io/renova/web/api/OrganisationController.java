@@ -7,6 +7,7 @@ import io.renova.web.account.Invitation;
 import io.renova.web.account.Organisation;
 import io.renova.web.account.Role;
 import io.renova.web.account.User;
+import io.renova.web.audit.AuditLog;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -30,8 +31,10 @@ public class OrganisationController {
     private final Access access;
     private final AccountService accounts;
     private final AccountStore store;
+    private final AuditLog audit;
 
-    public OrganisationController(Access access, AccountService accounts, AccountStore store) {
+    public OrganisationController(Access access, AccountService accounts, AccountStore store, AuditLog audit) {
+        this.audit = audit;
         this.access = access;
         this.accounts = accounts;
         this.store = store;
@@ -65,7 +68,9 @@ public class OrganisationController {
     public OrganisationView create(@RequestBody NewOrganisation body, HttpServletRequest request) {
         Organisation organisation = accounts.createOrganisation(body.name(), access.caller(request).user().id());
         access.choose(request, organisation.id());
-        return view(access.caller(request));
+        Access.Caller caller = access.caller(request);
+        audit.record(caller, "organisation.created", organisation.name(), null);
+        return view(caller);
     }
 
     @GetMapping("/org")
@@ -80,6 +85,7 @@ public class OrganisationController {
             throw new IllegalArgumentException("Give a role");
         }
         accounts.changeRole(caller.organisationId(), caller.role(), userId, body.role());
+        audit.record(caller, "member.role_changed", memberName(userId), "Now " + body.role().name().toLowerCase());
         return view(access.caller(request));
     }
 
@@ -90,6 +96,7 @@ public class OrganisationController {
             caller.require(Role.ADMIN);
         }
         accounts.removeMember(caller.organisationId(), caller.role(), userId);
+        audit.record(caller, userId.equals(caller.user().id()) ? "member.left" : "member.removed", memberName(userId), null);
         return userId.equals(caller.user().id()) ? null : view(access.caller(request));
     }
 
@@ -109,6 +116,7 @@ public class OrganisationController {
             throw new SecurityException("Only an owner can invite an owner");
         }
         AccountService.Issued issued = accounts.invite(caller.organisationId(), body.email(), role, caller.user().id());
+        audit.record(caller, "invitation.created", issued.invitation().email(), "Invited as " + role.name().toLowerCase());
         return InvitationView.of(issued.invitation(), issued.token());
     }
 
@@ -120,6 +128,11 @@ public class OrganisationController {
                 .filter(i -> i.id().equals(id) && i.organisationId().equals(caller.organisationId())).findFirst()
                 .orElseThrow(() -> new NoSuchElementException("No invitation " + id));
         store.deleteInvitation(invitation.id());
+        audit.record(caller, "invitation.revoked", invitation.email(), null);
+    }
+
+    private String memberName(String userId) {
+        return store.user(userId).map(User::name).orElse(userId);
     }
 
     private OrganisationView view(Access.Caller caller) {

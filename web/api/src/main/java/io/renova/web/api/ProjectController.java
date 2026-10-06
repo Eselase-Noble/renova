@@ -4,6 +4,7 @@ import io.renova.core.engine.PluginRegistry;
 import io.renova.core.playbook.Playbook;
 import io.renova.web.account.Access;
 import io.renova.web.account.Role;
+import io.renova.web.audit.AuditLog;
 import io.renova.web.migration.MigrationService;
 import io.renova.web.store.DataStore;
 import io.renova.web.store.MigrationRecord;
@@ -37,15 +38,17 @@ public class ProjectController {
     private final PluginRegistry registry;
     private final MigrationService migrations;
     private final Access access;
+    private final AuditLog audit;
     private final List<Path> roots;
 
     /** @param roots directories projects may be added from (renova.project-roots, comma-separated) */
-    public ProjectController(DataStore store, PluginRegistry registry, MigrationService migrations, Access access,
+    public ProjectController(DataStore store, PluginRegistry registry, MigrationService migrations, Access access, AuditLog audit,
                              @Value("${renova.project-roots:${user.home}}") String roots) {
         this.store = store;
         this.registry = registry;
         this.migrations = migrations;
         this.access = access;
+        this.audit = audit;
         this.roots = java.util.Arrays.stream(roots.split(",")).map(String::strip).filter(r -> !r.isEmpty())
                 .map(r -> Path.of(r).toAbsolutePath().normalize()).toList();
     }
@@ -87,6 +90,7 @@ public class ProjectController {
         Project project = new Project(UUID.randomUUID().toString().substring(0, 8), name, path.toString(), playbook.ecosystem(),
                 playbook.id(), Instant.now().toString(), caller.organisationId());
         store.saveProject(project);
+        audit.record(caller, "project.added", project.name(), project.path());
         return project;
     }
 
@@ -98,7 +102,10 @@ public class ProjectController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String id, HttpServletRequest request) {
-        store.deleteProject(project(id, access.require(request, Role.ADMIN)).id());
+        Access.Caller caller = access.require(request, Role.ADMIN);
+        Project project = project(id, caller);
+        store.deleteProject(project.id());
+        audit.record(caller, "project.removed", project.name(), project.path());
     }
 
     /** Findings, plan and automation rate (the JSON report without a migration). */
@@ -124,9 +131,14 @@ public class ProjectController {
         if (iterations < 0 || iterations > 10) {
             throw new IllegalArgumentException("maxAiIterations must be between 0 and 10");
         }
-        return migrations.start(project(id, caller), r.playbook(), new MigrationRecord.Options(
+        MigrationRecord started = migrations.start(project(id, caller), r.playbook(), new MigrationRecord.Options(
                 Boolean.TRUE.equals(r.ai()), r.rag() == null || r.rag(), Boolean.TRUE.equals(r.verifyBehaviour()),
                 Boolean.TRUE.equals(r.skipTests()), iterations), caller.user().id());
+        MigrationRecord.Options o = started.options();
+        audit.record(caller, "migration.started", started.projectName(), "Migration " + started.id() + " with " + started.playbook()
+                + (o.ai() ? ", AI on" : ", AI off") + (o.verifyBehaviour() ? ", behaviour verified" : "")
+                + (o.skipTests() ? ", tests skipped" : ""));
+        return started;
     }
 
     /** The project, if it belongs to the caller's organisation; others are reported as missing. */

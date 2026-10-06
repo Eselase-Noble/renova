@@ -12,7 +12,7 @@ public record MigrationRecord(String id, String projectId, String projectName, S
                               Status status, String createdAt, String startedAt, String finishedAt, String workspace,
                               Summary summary, String error, String organisationId, String startedBy) {
 
-    public enum Status { QUEUED, RUNNING, PASSED, FAILED, ERROR }
+    public enum Status { QUEUED, RUNNING, PASSED, FAILED, ERROR, CANCELLED }
 
     /** What the user asked for. */
     public record Options(boolean ai, boolean rag, boolean verifyBehaviour, boolean skipTests, int maxAiIterations) {
