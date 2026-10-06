@@ -1,12 +1,9 @@
-package io.renova.desktop.service;
+package io.renova.core.config;
 
 import io.renova.core.ai.AiProvider;
 import io.renova.core.ai.AiProviderFactory;
 import io.renova.core.ai.AiSettings;
 import io.renova.core.ai.NoAiProvider;
-import io.renova.core.config.Secret;
-import io.renova.core.config.Settings;
-import io.renova.core.config.UserConfig;
 import io.renova.core.engine.PluginRegistry;
 import io.renova.core.rag.RagSettings;
 
@@ -18,7 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * AI settings for this user, from the same places and keys as the CLI: environment variables first, then the
+ * AI settings for one user (desktop app, IDE plugins), from the same places and keys as the CLI: environment variables first, then the
  * Renova user config file ({@code ~/.config/renova/config.properties}), where this app saves them. The key is
  * the user's own and only ever shown masked.
  */

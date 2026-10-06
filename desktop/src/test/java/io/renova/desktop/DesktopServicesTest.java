@@ -3,7 +3,7 @@ package io.renova.desktop;
 import io.renova.core.ai.AiSettings;
 import io.renova.core.config.UserConfig;
 import io.renova.core.engine.PluginRegistry;
-import io.renova.desktop.service.AiPreferences;
+import io.renova.core.config.AiPreferences;
 import io.renova.desktop.service.RecentProjects;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

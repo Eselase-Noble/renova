@@ -4,7 +4,7 @@ import atlantafx.base.controls.Message;
 import atlantafx.base.controls.PasswordTextField;
 import atlantafx.base.theme.Styles;
 import io.renova.core.ai.NoAiProvider;
-import io.renova.desktop.service.AiPreferences;
+import io.renova.core.config.AiPreferences;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
 import javafx.scene.Node;

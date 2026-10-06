@@ -12,7 +12,7 @@ import io.renova.core.engine.PlanStep;
 import io.renova.core.model.Category;
 import io.renova.core.rag.RagSettings;
 import io.renova.desktop.Navigator;
-import io.renova.desktop.service.AiPreferences;
+import io.renova.core.config.AiPreferences;
 import io.renova.desktop.service.Engine;
 import io.renova.desktop.service.MigrationRun;
 import javafx.beans.property.SimpleObjectProperty;

@@ -1,0 +1,38 @@
+<idea-plugin>
+    <id>io.renova.intellij</id>
+    <name>Renova</name>
+    <vendor>Renova</vendor>
+    <description><![CDATA[
+<p>Assess and migrate legacy Java projects (Java 8 → 21, Java EE → Jakarta EE 10, Spring 5 → 6) from the IDE.</p>
+<ul>
+  <li><b>Assess</b>: findings by category, the automation rate, and the plan with who resolves each step;
+      findings appear in the editor and the Problems view.</li>
+  <li><b>Migrate</b>: a copy of the project is migrated with recipes, rules, guards and, optionally, AI on your own
+      key; the build and tests verify it, and Renova can compare the original and migrated application side by side.
+      The project itself is never changed.</li>
+</ul>
+<p>The Renova engine runs inside the IDE. Only AI requests leave the machine, with your own key.</p>
+]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.java</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Renova" anchor="bottom" icon="AllIcons.Actions.Lightning"
+                    factoryClass="io.renova.intellij.RenovaToolWindowFactory"/>
+        <localInspection shortName="RenovaFinding" displayName="Renova migration finding"
+                         groupName="Renova" enabledByDefault="true" level="WARNING"
+                         implementationClass="io.renova.intellij.RenovaInspection"/>
+        <applicationConfigurable parentId="tools" id="io.renova.intellij.settings" displayName="Renova"
+                                 instance="io.renova.intellij.RenovaConfigurable"/>
+        <notificationGroup id="Renova" displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <group id="Renova.Menu" text="Renova" popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="Renova.Assess" class="io.renova.intellij.AssessAction"/>
+            <action id="Renova.Migrate" class="io.renova.intellij.MigrateAction"/>
+        </group>
+    </actions>
+</idea-plugin>

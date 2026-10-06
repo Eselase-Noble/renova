@@ -3,7 +3,7 @@ package io.renova.desktop;
 import atlantafx.base.theme.PrimerDark;
 import atlantafx.base.theme.PrimerLight;
 import atlantafx.base.theme.Styles;
-import io.renova.desktop.service.AiPreferences;
+import io.renova.core.config.AiPreferences;
 import io.renova.desktop.service.Engine;
 import io.renova.desktop.service.MigrationRun;
 import io.renova.desktop.service.RecentProjects;
