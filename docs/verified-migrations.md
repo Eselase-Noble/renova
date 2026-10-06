@@ -21,8 +21,14 @@ Last run: 6 October 2026, on Java 21 and Maven 3.8, Renova at the commit that ad
 | Billing library | Maven | Java 17 | Java 21 | Pass | 2/2 |
 | Billing library | Gradle | Java 17 | Java 21 | Pass | 2/2 |
 | Billing library | Maven | Java 17 | Java 25 | Pass (run on its own, on JDK 25) | – |
+| Warehouse (two Gradle modules) | Gradle | Java 17 | Java 21 | Pass | 1/1 |
+| Legacy libraries (JUnit 4, Mockito 1, Log4j 1, Commons Lang 2, Commons Collections 3, HttpClient 4) | Maven | Java 6 source level | Java 21 with six add-ons: JUnit 5, Mockito 5, Log4j 2, Commons Lang 3, Commons Collections 4, HttpClient 5 | Pass | 5/5 |
+| Stock (Hibernate, JPA) | Maven | Hibernate 5.6, javax.persistence | Hibernate 6.6, Jakarta EE 10, Java 21 | Pass | 2/2 |
+| Stock (same) | Maven | Hibernate 5.6 | Hibernate 7.1, Jakarta EE 11, Java 21 | Pass | 2/2 |
+| Greeter service (validation) | Maven | Micronaut 3.10, Java 11 | Micronaut 4.10, Java 21 | Pass | 3/3 |
+| Catalog service (REST, CDI, validation) | Maven | Quarkus 2.16, Java 11 | Quarkus 3.33, Java 21 | Pass | 4/4 |
 
-The suite's seven runs take about seven minutes in total, with dependencies already downloaded.
+The suite's thirteen runs take about twelve minutes in total, with dependencies already downloaded.
 
 PetClinic is the public sample at github.com/spring-projects/spring-petclinic (Apache-2.0), taken at the commit
 before its maintainers migrated it to Spring Boot 3 by hand. The other projects are synthetic and were written
@@ -42,6 +48,12 @@ rules, and that a Gradle build was not given a migration plugin. They are listed
 
 ## What is not covered here
 
+- **Struts 2 → 7 does not finish by itself.** On the Struts sample the recipes move the actions to the new
+  `*Aware` interfaces (`withSession` for `setSession`), but not the code that calls them; the run ends with one
+  build error and that step listed for a person. It is reported as failed, not passed.
+- **Ant builds, and projects with no build file,** are refused with the reason: Renova needs Maven or Gradle
+  to resolve the classpath and to build the result.
+- **Gradle builds of Micronaut and Quarkus applications** have not been run; the Maven ones have.
 - **Changes that need judgement.** The original suite ([`benchmark/suite.yaml`](../benchmark/suite.yaml)) has
   four applications built so that the last changes need AI or a person: removed JDK APIs whose replacement
   depends on other code, upload limits that must not change, runtime-only failures. Without AI those builds fail,

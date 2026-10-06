@@ -275,7 +275,7 @@ rules:
 | `recipe` | An ecosystem rewrite tool (OpenRewrite for Java), deterministic and type-aware |
 | `replace` | Text replacement driven by the playbook, for files without a parser |
 | `gradle` | Edits to Gradle build files in the file's own style: `addDependency`, `removeDependency` |
-| `maven` | Format-preserving pom.xml edits: `setScope`, `setPluginVersion`, `setProperty`, `setParentVersion`, `addDependency`, `setVersion`, `removeDuplicates` |
+| `maven` | Format-preserving pom.xml edits: `setScope`, `setPluginVersion`, `setProperty`, `setParentVersion`, `addDependency`, `addAnnotationProcessor`, `setVersion`, `removeDuplicates` |
 | `ai` | The configured AI provider. The build verifies the result |
 | `manual` | A person, guided by the rule's `hint` in the report |
 
@@ -295,6 +295,31 @@ list in the desktop app):
 | `java-to-21-jakarta-ee11-spring7` | The same applications, or ones already on Jakarta EE 10 | Java 21, Jakarta EE 11 (Servlet 6.1), Spring Framework 7, for Tomcat 11 and WildFly 37+ | Chosen by hand: the latest of each |
 | `spring-boot-3` | Spring Boot 2 applications | Spring Boot 3.5, Java 21, Jakarta EE 10 | Spring Boot 2 applications |
 | `spring-boot-4` | Spring Boot 2, 3 or 4.0 applications | Spring Boot 4.1, Java 21, Spring Framework 7 | Spring Boot 3 applications |
+| `micronaut-4` | Micronaut 2 or 3 applications | Micronaut 4, Java 21 | Micronaut applications |
+| `quarkus-3` | Quarkus 1 or 2 applications | Quarkus 3.33, Java 21, Jakarta EE 10 | Quarkus applications |
+
+The Jakarta targets also move Hibernate (to 6.6 with Jakarta EE 10, to 7.1 with Jakarta EE 11) and the
+namespaces of Faces pages. Every target replaces Mockito 1 to 4 with Mockito 5, because the older ones do not
+run on Java 21.
+
+**Add-ons** are optional library upgrades added to a target with `+` (`--playbook java-to-21+junit5+log4j2`, or
+`--with junit5,log4j2`; switches on the project page in the console and the desktop app):
+
+| Add-on | Does |
+|---|---|
+| `junit5` | JUnit 4 → JUnit 5 (Jupiter), and a Surefire that runs it |
+| `mockito5` | Mockito 1 to 4 → 5 (already part of every target; here for a project staying on its Java level) |
+| `log4j2` | Log4j 1 → Log4j 2 API; the configuration file is listed for a person |
+| `commons-lang3` | Apache Commons Lang 2 → 3 |
+| `commons-collections4` | Apache Commons Collections 3 → 4 |
+| `httpclient5` | Apache HttpClient 4 → 5 |
+| `struts7` | Struts 2 → 7 (suggested with the Jakarta target for Struts projects); callers of the changed `*Aware` interfaces are listed for a person |
+
+A build that passes without running a single test is reported as failed: a migration that silently stops the
+tests from running has not been verified.
+
+Projects built with Ant, or with no build file, are not migrated: Renova needs a Maven or Gradle build to
+resolve the classpath and to prove the result, and says so when it is pointed at one.
 
 Maven and Gradle builds are both supported: recipes run through the project's own wrapper (`mvnw`, `gradlew`)
 when it has one, and Gradle builds are changed without adding anything to their build files. Build-file
@@ -359,7 +384,9 @@ Linux, Windows and macOS, the web bundle, the CLI and both IDE plugins. See [doc
    [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.
 4. **Web console:** single sign-on and licensing (the audit log and local mode are in). **Desktop:** signed installers.
 5. **More targets and ecosystems:** Java 17/21/25, Spring Boot 3 and 4.1, Spring Framework 7 with Jakarta EE 11,
-   and Gradle builds are in. Next: build-file guards for Gradle, Java EE → Quarkus, then .NET and Python.
+   Micronaut 4, Quarkus 3, Hibernate 6 and 7, Struts 7, library add-ons and Gradle builds are in. Next for Java:
+   more build-file guards for Gradle, Ant builds. Then .NET (C# and VB: .NET Framework → modern .NET), then
+   PHP (a chosen PHP version, a chosen Laravel version).
 
 ## Contributing
 

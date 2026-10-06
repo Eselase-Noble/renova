@@ -74,3 +74,52 @@ apps:
       - { file: pom.xml, matches: '<artifactId>spring-boot-starter-parent</artifactId>\s*<version>3\.5\.', why: "on the target release" }
       - { file: "**/*.java", absent: "import javax.persistence", why: "Jakarta EE" }
       - { file: "**/*.java", absent: "import javax.validation", why: "Jakarta EE" }
+
+  # Six library add-ons on one project that also starts at the Java 6 source level.
+  - id: legacy-libraries
+    path: legacy-libs
+    playbook: java-to-21+junit5+mockito5+log4j2+commons-lang3+commons-collections4+httpclient5
+    checks:
+      - { file: "**/*.java", absent: "import org.junit.Test", why: "JUnit 5" }
+      - { file: "**/*.java", absent: "import org.apache.commons.lang.", why: "Commons Lang 3" }
+      - { file: "**/*.java", absent: "import org.apache.commons.collections.", why: "Commons Collections 4" }
+      - { file: "**/*.java", absent: "import org.apache.log4j.", why: "Log4j 2" }
+      - { file: "**/*.java", absent: "import org.apache.http.", why: "HttpClient 5" }
+
+  - id: hibernate-5-to-6
+    path: stock-hibernate5
+    playbook: java8-to-21-jakarta-ee10
+    checks:
+      - { file: pom.xml, matches: '(?s)<artifactId>hibernate-core</artifactId>\s*<version>6\.6\.', why: "Hibernate 6.6" }
+      - { file: "**/*.java", absent: "import javax.persistence", why: "Jakarta EE" }
+
+  - id: hibernate-5-to-7
+    path: stock-hibernate5
+    playbook: java-to-21-jakarta-ee11-spring7
+    checks:
+      - { file: pom.xml, matches: '(?s)<artifactId>hibernate-core</artifactId>\s*<version>7\.', why: "Hibernate 7" }
+      - { file: "**/*.java", absent: "import javax.persistence", why: "Jakarta EE" }
+
+  - id: gradle-multi-project
+    path: warehouse-gradle
+    playbook: java-to-21
+    checks:
+      - { file: "**/*.gradle", absent: "openrewrite", why: "the build files are not given a migration plugin" }
+
+  # The recipes the Quarkus project publishes for each release, run in release order up to the target.
+  - id: quarkus-2-to-3
+    path: catalog-quarkus2
+    playbook: quarkus-3
+    checks:
+      - { file: pom.xml, matches: '<quarkus.platform.version>3\.', why: "on Quarkus 3" }
+      - { file: pom.xml, contains: "quarkus-rest-jackson", why: "the REST extensions were renamed in 3.9" }
+      - { file: "**/*.java", absent: "import javax.ws.rs", why: "Jakarta REST" }
+      - { file: "**/*.java", absent: "import javax.enterprise", why: "Jakarta CDI" }
+
+  - id: micronaut-3-to-4
+    path: greeter-micronaut3
+    playbook: micronaut-4
+    checks:
+      - { file: pom.xml, matches: '(?s)<groupId>io.micronaut.platform</groupId>\s*<artifactId>micronaut-parent</artifactId>\s*<version>4\.', why: "the Micronaut 4 platform parent" }
+      - { file: pom.xml, contains: "micronaut-validation-processor", why: "without the processor, invalid requests are accepted silently" }
+      - { file: "**/*.java", absent: "import javax.validation", why: "Jakarta" }
