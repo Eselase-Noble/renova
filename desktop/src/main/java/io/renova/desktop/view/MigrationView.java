@@ -2,15 +2,12 @@ package io.renova.desktop.view;
 
 import atlantafx.base.controls.Message;
 import atlantafx.base.theme.Styles;
-import io.renova.core.behaviour.BehaviourReport;
-import io.renova.core.behaviour.ScenarioResult;
-import io.renova.core.engine.BuildError;
-import io.renova.core.engine.MigrationOutcome;
-import io.renova.core.engine.PlanStep;
-import io.renova.core.engine.StageResult;
+import com.fasterxml.jackson.databind.JsonNode;
 import io.renova.core.workspace.WorkspaceHistory;
 import io.renova.desktop.Navigator;
+import io.renova.desktop.service.MigrationResult;
 import io.renova.desktop.service.MigrationRun;
+import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.concurrent.Task;
 import javafx.geometry.Pos;
@@ -23,88 +20,146 @@ import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TitledPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
-/** One migration: live progress while it runs, then its results, behaviour and every stage's changes. */
+/**
+ * One migration: live progress while it runs; then, from the files in the migrated copy, its results, behaviour,
+ * every stage's changes, the report, the AI exchanges and the log. Past migrations open the same way.
+ */
 public final class MigrationView {
 
     private final Navigator nav;
     private final MigrationRun run;
+    private final Path workspace;
     private final VBox page = Ui.page();
     private final TabPane tabs = new TabPane();
-    private final ListView<String> log = new ListView<>();
+    private String note;
 
+    /** A migration running now. */
     public MigrationView(Navigator nav, MigrationRun run) {
         this.nav = nav;
         this.run = run;
+        this.workspace = run.workspace();
+    }
+
+    /** A finished migration, from its migrated copy. */
+    public MigrationView(Navigator nav, Path workspace) {
+        this.nav = nav;
+        this.run = null;
+        this.workspace = workspace;
     }
 
     public Node build() {
-        log.setItems(run.log());
-        log.getStyleClass().addAll("log", Styles.DENSE);
-        log.setPrefHeight(520);
-        run.log().addListener((ListChangeListener<String>) c -> log.scrollTo(run.log().size() - 1));
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         tabs.getStyleClass().add(Styles.TABS_FLOATING);
         render();
-        run.state().addListener((obs, old, now) -> render());
+        if (run != null) {
+            run.state().addListener((obs, old, now) -> render());
+        }
         return page;
     }
 
-    private void render() {
-        boolean done = run.state().get() != MigrationRun.State.RUNNING;
-        Button folder = new Button("Open migrated folder");
-        folder.setOnAction(e -> nav.openPath(run.workspace()));
-        folder.setDisable(!Files.isDirectory(run.workspace()));
-        Button report = new Button("Open report");
-        report.setOnAction(e -> nav.openPath(run.workspace().resolve(".renova/report.md")));
-        report.setDisable(!done || run.outcome() == null);
+    private boolean running() {
+        return run != null && run.state().get() == MigrationRun.State.RUNNING;
+    }
 
-        HBox status = new HBox(8, stateBadge());
-        status.setAlignment(Pos.CENTER_LEFT);
-        if (!done) {
-            ProgressIndicator spinner = new ProgressIndicator();
-            spinner.setMaxSize(18, 18);
+    private void render() {
+        if (running() || (run != null && run.outcome() == null)) {
+            renderRunning();
+            return;
+        }
+        MigrationResult result;
+        try {
+            result = MigrationResult.load(workspace);
+        } catch (Exception e) {
+            page.getChildren().setAll(Ui.header("Migration", workspace.toString()),
+                    new Message("Cannot show this migration", e.getMessage()));
+            return;
+        }
+        renderFinished(result);
+    }
+
+    private void renderRunning() {
+        ListView<String> log = new ListView<>(run.log());
+        log.getStyleClass().addAll("log", Styles.DENSE);
+        log.setPrefHeight(560);
+        run.log().addListener((ListChangeListener<String>) c -> log.scrollTo(run.log().size() - 1));
+        ProgressIndicator spinner = new ProgressIndicator();
+        spinner.setMaxSize(18, 18);
+        HBox status = new HBox(8, run.state().get() == MigrationRun.State.ERROR ? Ui.badge("Error", Ui.Tone.BAD)
+                : Ui.badge("Running", Ui.Tone.INFO));
+        if (running()) {
             status.getChildren().add(spinner);
         }
-        String elapsed = elapsed();
-        page.getChildren().setAll(Ui.header("Migration of " + run.projectName(), run.workspace() + "  ·  " + elapsed, folder, report),
-                status);
-
-        Tab logTab = new Tab("Log", log);
-        if (!done || run.outcome() == null) {
-            if (run.error() != null) {
-                page.getChildren().add(new Message("The migration stopped", run.error()));
-            }
-            tabs.getTabs().setAll(logTab);
-        } else {
-            MigrationOutcome o = run.outcome();
-            page.getChildren().add(summary(o));
-            tabs.getTabs().setAll(new Tab("Overview", overview(o)));
-            if (o.behaviour() != null) {
-                tabs.getTabs().add(new Tab("Behaviour", behaviour(o.behaviour())));
-            }
-            tabs.getTabs().addAll(new Tab("Changes", changes()), logTab);
-            String wanted = nav.startTab();
-            tabs.getTabs().stream().filter(t -> t.getText().equalsIgnoreCase(String.valueOf(wanted))).findFirst()
-                    .ifPresent(t -> tabs.getSelectionModel().select(t));
+        status.setAlignment(Pos.CENTER_LEFT);
+        page.getChildren().setAll(Ui.header("Migration of " + run.projectName(), workspace + "  ·  " + elapsed()), status);
+        if (run.error() != null) {
+            page.getChildren().add(new Message("The migration stopped", run.error()));
         }
+        tabs.getTabs().setAll(new Tab("Log", log));
         page.getChildren().add(tabs);
     }
 
-    private Node stateBadge() {
-        return switch (run.state().get()) {
-            case RUNNING -> Ui.badge("Running", Ui.Tone.INFO);
-            case PASSED -> Ui.badge("Passed", Ui.Tone.GOOD);
-            case FAILED -> Ui.badge("Failed", Ui.Tone.BAD);
-            case ERROR -> Ui.badge("Error", Ui.Tone.BAD);
-        };
+    private void renderFinished(MigrationResult r) {
+        Button folder = new Button("Open migrated folder");
+        folder.setOnAction(e -> nav.openPath(workspace));
+        Button report = new Button("Open report");
+        report.setOnAction(e -> nav.openPath(r.reportMarkdown()));
+        Button verify = new Button("Verify behaviour again");
+        verify.setOnAction(e -> verifyAgain(r, verify));
+        Button forget = new Button("Remove from history");
+        forget.getStyleClass().add(Styles.FLAT);
+        forget.setOnAction(e -> nav.forget(workspace));
+
+        String state = r.state();
+        HBox status = new HBox(8, Ui.badge(state.equals("PASSED") ? "Passed" : "Failed",
+                state.equals("PASSED") ? Ui.Tone.GOOD : Ui.Tone.BAD));
+        status.setAlignment(Pos.CENTER_LEFT);
+        page.getChildren().setAll(Ui.header("Migration of " + r.projectName(),
+                        workspace + (run != null ? "  ·  " + elapsed() : ""), folder, report, verify, forget),
+                status);
+        if (note != null) {
+            page.getChildren().add(new Message("Behaviour verified again", note));
+        }
+        page.getChildren().add(summary(r));
+
+        tabs.getTabs().setAll(tab("Overview", overview(r)));
+        if (r.behaviour() != null) {
+            tabs.getTabs().add(tab("Behaviour", behaviour(r.behaviour())));
+        }
+        tabs.getTabs().add(tab("Changes", changes()));
+        tabs.getTabs().add(tab("Report", reportTab(r)));
+        try {
+            List<MigrationResult.AiExchange> ai = r.aiExchanges();
+            if (!ai.isEmpty()) {
+                tabs.getTabs().add(tab("AI exchanges (" + ai.size() + ")", aiTab(ai)));
+            }
+        } catch (Exception ignored) {
+            // No AI log.
+        }
+        tabs.getTabs().add(tab("Log", logTab(r)));
+        String wanted = nav.startTab();
+        tabs.getTabs().stream().filter(t -> t.getText().toLowerCase().startsWith(String.valueOf(wanted).toLowerCase()))
+                .findFirst().ifPresent(t -> tabs.getSelectionModel().select(t));
+        page.getChildren().add(tabs);
+    }
+
+    private static Tab tab(String title, Node content) {
+        VBox box = new VBox(content);
+        box.setPadding(new javafx.geometry.Insets(12, 0, 0, 0));
+        VBox.setVgrow(content, Priority.ALWAYS);
+        return new Tab(title, box);
     }
 
     private String elapsed() {
@@ -113,88 +168,253 @@ public final class MigrationView {
         return s < 60 ? s + "s" : (s / 60) + "m " + (s % 60) + "s";
     }
 
-    private Node summary(MigrationOutcome o) {
-        String build = o.verification() == null ? "Not built" : o.verification().success() ? "Passes" : "Fails";
-        String buildHint = o.verification() == null ? null : o.verification().errors().size() + " error(s)";
-        BehaviourReport b = o.behaviour();
-        String behaviour = b == null ? "Not checked" : switch (b.status()) {
-            case SAME -> "Same";
-            case DIFFERENT -> "Differs";
-            case SKIPPED -> "Not compared";
-            case FAILED -> "Comparison failed";
+    private Node summary(MigrationResult r) {
+        JsonNode m = r.migration();
+        JsonNode v = m.path("verification");
+        String build = v.isMissingNode() || v.isNull() ? "Not built" : v.path("success").asBoolean() ? "Passes" : "Fails";
+        String buildHint = v.isMissingNode() || v.isNull() ? null : v.path("errors").size() + " error(s)";
+        JsonNode b = r.behaviour();
+        String behaviour = b == null ? "Not checked" : switch (b.path("status").asText()) {
+            case "SAME" -> "Same";
+            case "DIFFERENT" -> "Differs";
+            case "SKIPPED" -> "Not compared";
+            default -> "Comparison failed";
         };
-        boolean aiUsed = o.aiUsage().requests() > 0;
+        JsonNode ai = m.path("aiUsage");
+        int requests = ai.path("requests").asInt();
         return new HBox(12,
                 Ui.stat("Build and tests", build, buildHint),
-                Ui.stat("Behaviour", behaviour, b == null ? null : b.summary()),
-                Ui.stat("AI", aiUsed ? o.aiUsage().requests() + " requests" : "Not used",
-                        aiUsed ? Ui.tokens(o.aiUsage().inputTokens()) + " in · " + Ui.tokens(o.aiUsage().outputTokens()) + " out · "
-                                + o.repairRounds() + " repair round(s)" : null),
-                Ui.stat("For a person", String.valueOf(o.manualSteps().size()), "steps with guidance"));
+                Ui.stat("Behaviour", behaviour, b == null ? null : b.path("summary").asText()),
+                Ui.stat("AI", requests > 0 ? requests + " requests" : "Not used", requests > 0
+                        ? Ui.tokens(ai.path("inputTokens").asLong()) + " in · " + Ui.tokens(ai.path("outputTokens").asLong())
+                        + " out · " + m.path("repairRounds").asInt() + " repair round(s)" : null),
+                Ui.stat("For a person", String.valueOf(m.path("manualSteps").size()), "steps with guidance"));
     }
 
-    private Node overview(MigrationOutcome o) {
-        VBox stages = new VBox(6);
-        for (StageResult s : o.stages()) {
-            Ui.Tone tone = switch (s.status()) {
-                case APPLIED -> Ui.Tone.GOOD;
-                case PARTIAL -> Ui.Tone.WARN;
-                case FAILED -> Ui.Tone.BAD;
-                case SKIPPED -> Ui.Tone.MUTED;
+    private Node overview(MigrationResult r) {
+        JsonNode m = r.migration();
+        VBox stages = new VBox(4);
+        for (JsonNode s : m.path("stages")) {
+            String status = s.path("status").asText();
+            Ui.Tone tone = switch (status) {
+                case "APPLIED" -> Ui.Tone.GOOD;
+                case "PARTIAL" -> Ui.Tone.WARN;
+                case "FAILED" -> Ui.Tone.BAD;
+                default -> Ui.Tone.MUTED;
             };
-            Label name = Ui.label(s.stage(), Styles.TEXT_BOLD);
-            name.setMinWidth(220);
-            HBox row = new HBox(12, Ui.badge(s.status().name().toLowerCase(), tone), name, Ui.label(s.summary(), Styles.TEXT_MUTED));
-            row.setAlignment(Pos.CENTER_LEFT);
-            stages.getChildren().add(row);
-        }
-        VBox body = new VBox(16, Ui.section("Stages", "Each stage is one commit in the migrated folder; see Changes.", stages));
-        if (o.verification() != null && !o.verification().errors().isEmpty()) {
-            VBox errors = new VBox(6);
-            for (BuildError e : o.verification().errors().stream().limit(40).toList()) {
-                errors.getChildren().add(new VBox(2,
-                        Ui.label((e.file() == null ? "(build)" : e.file()) + (e.line() > 0 ? ":" + e.line() : ""), "mono", Styles.TEXT_SMALL),
-                        Ui.label(e.message(), Styles.TEXT_MUTED)));
+            Label name = Ui.label(s.path("stage").asText(), Styles.TEXT_BOLD);
+            name.setMinWidth(230);
+            Label summary = Ui.label(s.path("summary").asText(), Styles.TEXT_MUTED);
+            summary.setPrefWidth(560);
+            summary.setMinWidth(0);
+            HBox head = new HBox(12, Ui.badge(status.toLowerCase(), tone), name, summary);
+            head.setAlignment(Pos.CENTER_LEFT);
+            if (s.path("details").isEmpty()) {
+                head.setPadding(new javafx.geometry.Insets(4, 0, 4, 26));
+                stages.getChildren().add(head);
+            } else {
+                StringBuilder details = new StringBuilder();
+                s.path("details").forEach(d -> details.append(d.asText()).append('\n'));
+                TextArea text = new TextArea(details.toString());
+                text.setEditable(false);
+                text.getStyleClass().add("log");
+                text.setPrefRowCount(Math.min(14, s.path("details").size() + 1));
+                TitledPane pane = new TitledPane(null, text);
+                pane.setGraphic(head);
+                pane.setExpanded(false);
+                pane.getStyleClass().add(Styles.DENSE);
+                stages.getChildren().add(pane);
             }
-            body.getChildren().add(Ui.section("Build errors", null, errors));
         }
-        if (!o.manualSteps().isEmpty()) {
-            VBox manual = new VBox(10);
-            for (PlanStep step : o.manualSteps()) {
-                manual.getChildren().add(new VBox(2, Ui.label(step.rule().title(), Styles.TEXT_BOLD),
-                        Ui.label(step.rule().fix().hint() == null ? "" : step.rule().fix().hint().strip(), Styles.TEXT_MUTED)));
+        VBox body = new VBox(16, Ui.section("Stages", "Each stage is one commit in the migrated folder. Expand a stage for its details.", stages));
+        JsonNode errors = m.path("verification").path("errors");
+        if (errors.size() > 0) {
+            VBox list = new VBox(8);
+            int shown = 0;
+            for (JsonNode e : errors) {
+                if (shown++ == 40) {
+                    break;
+                }
+                String file = e.path("file").isNull() ? "(build)" : e.path("file").asText();
+                int line = e.path("line").asInt();
+                list.getChildren().add(new VBox(2, Ui.label(file + (line > 0 ? ":" + line : ""), "mono", Styles.TEXT_SMALL),
+                        Ui.label(e.path("message").asText(), Styles.TEXT_MUTED)));
+            }
+            body.getChildren().add(Ui.section("Build errors", null, list));
+        }
+        if (m.path("manualSteps").size() > 0) {
+            VBox manual = new VBox(12);
+            for (JsonNode step : m.path("manualSteps")) {
+                VBox item = new VBox(2, Ui.label(step.path("rule").path("title").asText(), Styles.TEXT_BOLD));
+                String hint = step.path("rule").path("fix").path("hint").asText("");
+                if (!hint.isBlank()) {
+                    item.getChildren().add(Ui.label(hint.strip(), Styles.TEXT_MUTED));
+                }
+                StringBuilder files = new StringBuilder();
+                int n = 0;
+                for (JsonNode f : step.path("files")) {
+                    if (n++ < 6) {
+                        files.append(f.asText()).append("   ");
+                    }
+                }
+                item.getChildren().add(Ui.label(files.toString().strip(), "mono", Styles.TEXT_SMALL));
+                manual.getChildren().add(item);
             }
             body.getChildren().add(Ui.section("For a person", "Decisions Renova leaves to your team, with guidance.", manual));
         }
         return body;
     }
 
-    private Node behaviour(BehaviourReport b) {
-        VBox body = new VBox(12, Ui.label(b.summary(), Styles.TEXT_MUTED));
-        if (b.baselinePlatform() != null) {
-            body.getChildren().add(Ui.label("Original: " + b.baselinePlatform() + "    Migrated: " + b.candidatePlatform(), Styles.TEXT_SMALL));
+    private Node behaviour(JsonNode b) {
+        VBox body = new VBox(12);
+        body.getChildren().add(Ui.label(b.path("summary").asText(), Styles.TEXT_MUTED));
+        if (!b.path("original").isNull() && !b.path("original").isMissingNode()) {
+            body.getChildren().add(new HBox(12,
+                    Ui.stat("Original", b.path("original").asText(), null),
+                    Ui.stat("Migrated", b.path("migrated").asText(), null),
+                    Ui.stat("Requests compared", String.valueOf(b.path("results").size()), null)));
         }
-        for (ScenarioResult r : b.results()) {
-            HBox head = new HBox(10, r.same() ? Ui.badge("Same", Ui.Tone.GOOD) : Ui.badge("Different", Ui.Tone.WARN),
-                    Ui.label(r.label(), "mono"),
-                    Ui.label(status(r.baseline().status()) + " → " + status(r.candidate().status()), Styles.TEXT_MUTED));
+        VBox requests = new VBox(6);
+        for (JsonNode r : b.path("results")) {
+            boolean same = r.path("same").asBoolean();
+            String label = r.path("scenario").asText().startsWith("file.")
+                    ? r.path("scenario").asText().substring(5) + " · step " + r.path("step").asInt() + ": " + r.path("method").asText() + " " + r.path("path").asText()
+                    : r.path("method").asText() + " " + r.path("path").asText();
+            HBox head = new HBox(10, same ? Ui.badge("Same", Ui.Tone.GOOD) : Ui.badge("Different", Ui.Tone.WARN),
+                    Ui.label(label, "mono"),
+                    Ui.label(status(r.path("original")) + " → " + status(r.path("migrated")), Styles.TEXT_MUTED));
             head.setAlignment(Pos.CENTER_LEFT);
-            VBox item = new VBox(4, head);
-            r.differences().forEach(d -> item.getChildren().add(Ui.label("• " + d, Styles.TEXT_SMALL)));
-            if (r.handlerFile() != null && !r.same()) {
-                item.getChildren().add(Ui.label("Handled in " + r.handlerFile(), Styles.TEXT_MUTED, Styles.TEXT_SMALL, "mono"));
-            }
-            body.getChildren().add(item);
+            VBox detail = new VBox(6);
+            detail.getChildren().add(Ui.label("From " + r.path("source").asText()
+                    + (r.path("handler").isTextual() ? "  ·  handled in " + r.path("handler").asText() : ""), Styles.TEXT_SMALL, Styles.TEXT_MUTED));
+            r.path("differences").forEach(d -> detail.getChildren().add(Ui.label("• " + d.asText(), Styles.TEXT_SMALL)));
+            r.path("notes").forEach(d -> detail.getChildren().add(Ui.label("Note: " + d.asText(), Styles.TEXT_SMALL, Styles.TEXT_MUTED)));
+            HBox answers = new HBox(8, answer("Original", r.path("original")), answer("Migrated", r.path("migrated")));
+            detail.getChildren().add(answers);
+            TitledPane pane = new TitledPane(null, detail);
+            pane.setGraphic(head);
+            pane.setExpanded(!same);
+            pane.getStyleClass().add(Styles.DENSE);
+            requests.getChildren().add(pane);
         }
-        b.databases().forEach((id, diffs) -> body.getChildren().add(new HBox(10,
-                diffs.isEmpty() ? Ui.badge("Same rows", Ui.Tone.GOOD) : Ui.badge("Different rows", Ui.Tone.WARN),
-                Ui.label(id + (diffs.isEmpty() ? "" : ": " + String.join("; ", diffs)), Styles.TEXT_SMALL))));
-        b.accepted().forEach(a -> body.getChildren().add(Ui.label("Accepted change: " + a, Styles.TEXT_MUTED)));
+        body.getChildren().add(Ui.section("Requests", "Expand a request to see both answers.", requests));
+        if (b.path("databases").size() > 0) {
+            VBox db = new VBox(6);
+            b.path("databases").fields().forEachRemaining(e -> {
+                List<String> diffs = new java.util.ArrayList<>();
+                e.getValue().forEach(d -> diffs.add(d.asText()));
+                db.getChildren().add(new HBox(10, diffs.isEmpty() ? Ui.badge("Same rows", Ui.Tone.GOOD) : Ui.badge("Different rows", Ui.Tone.WARN),
+                        Ui.label(e.getKey().replaceFirst("^file\\.", "") + (diffs.isEmpty() ? "" : ": " + String.join("; ", diffs)), Styles.TEXT_SMALL)));
+            });
+            body.getChildren().add(Ui.section("Database changes", "Rows each version added and removed during the same scenario.", db));
+        }
+        if (b.path("accepted").size() > 0) {
+            VBox accepted = new VBox(4);
+            b.path("accepted").forEach(a -> accepted.getChildren().add(Ui.label(a.asText(), Styles.TEXT_SMALL)));
+            body.getChildren().add(Ui.section("Accepted changes", "Listed under accept: in the scenario file as intended.", accepted));
+        }
         return body;
     }
 
-    private static String status(int code) {
-        return code < 0 ? "no answer" : String.valueOf(code);
+    private static Node answer(String side, JsonNode e) {
+        String meta = side + "  " + status(e) + (e.path("contentType").isTextual() ? "  " + e.path("contentType").asText() : "");
+        TextArea body = new TextArea(e.path("error").isTextual() ? e.path("error").asText() : e.path("body").asText(""));
+        body.setEditable(false);
+        body.setWrapText(true);
+        body.getStyleClass().add("log");
+        body.setPrefRowCount(8);
+        VBox box = new VBox(4, Ui.label(meta, Styles.TEXT_SMALL, Styles.TEXT_BOLD), body);
+        HBox.setHgrow(box, Priority.ALWAYS);
+        return box;
+    }
+
+    private static String status(JsonNode exchange) {
+        int code = exchange.path("status").asInt(-1);
+        return code <= 0 ? "no answer" : String.valueOf(code);
+    }
+
+    private Node reportTab(MigrationResult r) {
+        try {
+            return MarkdownView.of(r.markdown());
+        } catch (Exception e) {
+            return new Message("No report", String.valueOf(e.getMessage()));
+        }
+    }
+
+    private Node aiTab(List<MigrationResult.AiExchange> exchanges) {
+        ListView<MigrationResult.AiExchange> list = new ListView<>(FXCollections.observableArrayList(exchanges));
+        list.setCellFactory(l -> new ListCell<>() {
+            @Override
+            protected void updateItem(MigrationResult.AiExchange x, boolean empty) {
+                super.updateItem(x, empty);
+                if (empty || x == null) {
+                    setText(null);
+                    return;
+                }
+                String outcome = x.markdown().lines().filter(line -> line.startsWith("- **Outcome:**")).findFirst()
+                        .map(line -> line.replace("- **Outcome:** ", "")).orElse("");
+                String target = x.markdown().lines().filter(line -> line.contains("(target)")).findFirst()
+                        .map(line -> line.replaceAll(".*`([^`]+)`.*", "$1")).orElse("");
+                setText("Exchange " + Integer.parseInt(x.name()) + "  ·  " + outcome + "\n" + target);
+            }
+        });
+        VBox right = new VBox();
+        list.getSelectionModel().selectedItemProperty().addListener((obs, old, x) -> {
+            if (x != null) {
+                var view = MarkdownView.of(x.markdown());
+                VBox.setVgrow(view, Priority.ALWAYS);
+                right.getChildren().setAll(view);
+            }
+        });
+        list.getSelectionModel().selectFirst();
+        SplitPane split = new SplitPane(list, right);
+        split.setDividerPositions(0.34);
+        split.setPrefHeight(640);
+        return new VBox(8, Ui.label("Every request Renova sent to the AI provider: the files offered and their roles, the rules or "
+                + "errors, what the model answered and the tokens used.", Styles.TEXT_MUTED, Styles.TEXT_SMALL), split);
+    }
+
+    private Node logTab(MigrationResult r) {
+        List<String> lines;
+        try {
+            lines = run != null ? List.copyOf(run.log()) : r.progressLog();
+        } catch (Exception e) {
+            lines = List.of();
+        }
+        ListView<String> log = new ListView<>(FXCollections.observableArrayList(lines));
+        log.getStyleClass().addAll("log", Styles.DENSE);
+        log.setPrefHeight(560);
+        log.setPlaceholder(new Label("No log was kept for this migration."));
+        return log;
+    }
+
+    private void verifyAgain(MigrationResult r, Button button) {
+        if (!Files.isDirectory(workspace.resolve(".git"))) {
+            note = "The migrated folder is not a Renova workspace.";
+            render();
+            return;
+        }
+        button.setDisable(true);
+        button.setText("Verifying…");
+        String playbook = r.report().path("playbook").path("id").asText();
+        Task<String> task = new Task<>() {
+            @Override
+            protected String call() throws Exception {
+                return nav.engine().verifyBehaviour(workspace, playbook, Map.of(), this::updateMessage).summary();
+            }
+        };
+        task.messageProperty().addListener((obs, old, message) -> button.setText(message.length() > 48 ? message.substring(0, 48) + "…" : message));
+        task.setOnSucceeded(e -> {
+            note = task.getValue();
+            render();
+        });
+        task.setOnFailed(e -> {
+            note = "Could not verify: " + task.getException().getMessage();
+            render();
+        });
+        Thread thread = new Thread(task, "renova-behaviour");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     /** The stages as commits on the left, the selected stage's diff on the right. */
@@ -232,12 +452,12 @@ public final class MigrationView {
         });
         commits.getSelectionModel().selectedItemProperty().addListener((obs, old, c) -> {
             if (c != null) {
-                background(() -> WorkspaceHistory.diff(run.workspace(), c.hash()).lines()
+                background(() -> WorkspaceHistory.diff(workspace, c.hash()).lines()
                         .filter(l -> !l.startsWith("index ") && !l.startsWith("--- ") && !l.startsWith("+++ ")).limit(20_000).toList(),
                         lines -> diff.getItems().setAll(lines));
             }
         });
-        background(() -> WorkspaceHistory.commits(run.workspace()), list -> {
+        background(() -> WorkspaceHistory.commits(workspace), list -> {
             commits.getItems().setAll(list.size() > 1 ? list.subList(1, list.size()) : List.of());
             if (!commits.getItems().isEmpty()) {
                 commits.getSelectionModel().selectFirst();
@@ -245,7 +465,7 @@ public final class MigrationView {
         });
         SplitPane split = new SplitPane(commits, diff);
         split.setDividerPositions(0.28);
-        split.setPrefHeight(560);
+        split.setPrefHeight(600);
         return split;
     }
 

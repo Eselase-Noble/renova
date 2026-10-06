@@ -31,7 +31,16 @@ import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TitledPane;
+import io.renova.core.behaviour.BehaviourVerifier;
+import io.renova.core.model.Finding;
+import io.renova.core.playbook.Playbook;
+import javafx.stage.FileChooser;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -57,6 +66,8 @@ public final class ProjectView {
     private final AiPreferences ai;
     private final Path path;
     private final VBox page;
+    /** A bundled playbook id or a playbook file; null for the one that applies. */
+    private String playbookRef;
 
     public ProjectView(Navigator nav, Engine engine, AiPreferences ai, Path path) {
         this.nav = nav;
@@ -67,6 +78,11 @@ public final class ProjectView {
     }
 
     public Node build() {
+        assess();
+        return page;
+    }
+
+    private void assess() {
         ProgressIndicator spinner = new ProgressIndicator();
         spinner.setMaxSize(40, 40);
         HBox loading = new HBox(12, spinner, Ui.label("Analysing " + path + "…", Styles.TEXT_MUTED));
@@ -76,16 +92,22 @@ public final class ProjectView {
         Task<Engine.Assessment> task = new Task<>() {
             @Override
             protected Engine.Assessment call() throws Exception {
-                return engine.assess(path);
+                return engine.assess(path, playbookRef);
             }
         };
         task.setOnSucceeded(e -> show(task.getValue()));
-        task.setOnFailed(e -> page.getChildren().setAll(Ui.header(path.getFileName().toString(), path.toString()),
-                new Message("Renova cannot assess this folder", String.valueOf(task.getException().getMessage()))));
+        task.setOnFailed(e -> {
+            Button back = new Button("Use the playbook that applies");
+            back.setOnAction(x -> {
+                playbookRef = null;
+                assess();
+            });
+            page.getChildren().setAll(Ui.header(path.getFileName().toString(), path.toString(), back),
+                    new Message("Renova cannot assess this folder", String.valueOf(task.getException().getMessage())));
+        });
         Thread thread = new Thread(task, "renova-assess");
         thread.setDaemon(true);
         thread.start();
-        return page;
     }
 
     private void show(Engine.Assessment a) {
@@ -115,11 +137,30 @@ public final class ProjectView {
                     Ui.label(c.getKey().description(), Styles.TEXT_MUTED), bar, Ui.label(String.valueOf(c.getValue())));
         }
 
+        Button reassess = new Button("Re-assess");
+        reassess.setOnAction(e -> assess());
+        MenuButton export = new MenuButton("Export");
+        MenuItem markdown = new MenuItem("Assessment as Markdown…");
+        markdown.setOnAction(e -> export(a, false));
+        MenuItem json = new MenuItem("Assessment as JSON…");
+        json.setOnAction(e -> export(a, true));
+        export.getItems().setAll(markdown, json);
+
+        TabPane tabs = new TabPane(
+                new Tab("Overview", new VBox(16,
+                        Ui.section("Findings by category", "Plan steps run in the order A → E → B → C → D.", bars),
+                        Ui.section("Playbook", null, playbookInfo(a.playbook())))),
+                new Tab("Plan (" + plan.size() + ")", Ui.section("Migration plan", "Select a step to see its guidance and files.", planTable(plan))),
+                new Tab("Findings (" + a.analysis().findings().size() + ")", findings(a)));
+        tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        tabs.getStyleClass().add(Styles.TABS_FLOATING);
+        String wanted = nav.startTab();
+        tabs.getTabs().stream().filter(t -> wanted != null && t.getText().toLowerCase().startsWith(wanted.toLowerCase()))
+                .findFirst().ifPresent(t -> tabs.getSelectionModel().select(t));
+
         page.getChildren().setAll(
-                Ui.header(path.getFileName().toString(), path + "  ·  " + a.playbook().name(), migrate),
-                stats,
-                Ui.section("Findings by category", "Plan steps run in the order A → E → B → C → D.", bars),
-                Ui.section("Migration plan", "Select a step to see its guidance and files.", planTable(plan)));
+                Ui.header(path.getFileName().toString(), path.toString(), playbookChooser(a), reassess, export, migrate),
+                stats, tabs);
         if (!a.analysis().warnings().isEmpty()) {
             page.getChildren().add(new Message("Analysis warnings", String.join("\n", a.analysis().warnings())));
         }
@@ -230,6 +271,27 @@ public final class ProjectView {
         form.add(option("Migrated copy", "Renova never changes the project itself; each stage is a commit here."), 0, r);
         form.add(new HBox(8, out, browse), 0, ++r, 2, 1);
 
+        Path defaultScenarios = path.resolve("renova-scenarios.yaml");
+        TextField scenarios = fileField(java.nio.file.Files.isRegularFile(defaultScenarios) ? defaultScenarios.toString() : "",
+                "renova-scenarios.yaml in the project, if present");
+        scenarios.disableProperty().bind(behaviour.selectedProperty().not());
+        ToggleSwitch repairBehaviour = toggle(true);
+        repairBehaviour.disableProperty().bind(behaviour.selectedProperty().not().or(useAi.selectedProperty().not()));
+        TextField settings = fileField("", "Maven's own settings");
+        ToggleSwitch offline = toggle(false);
+        GridPane advanced = new GridPane(16, 12);
+        int ar = 0;
+        advanced.add(option("Scenario file", "Requests and multi-step flows to compare, with accepted changes and database checks."), 0, ar);
+        advanced.add(browseRow(scenarios, "Scenario file", "*.yaml", "*.yml"), 0, ++ar, 2, 1);
+        advanced.addRow(++ar, option("Repair behaviour differences with AI", "Off: report differences without changing code for them."), repairBehaviour);
+        advanced.add(option("Maven settings.xml", "For a private repository such as Nexus or Artifactory."), 0, ++ar);
+        advanced.add(browseRow(settings, "Maven settings", "*.xml"), 0, ++ar, 2, 1);
+        advanced.addRow(++ar, option("Offline builds", "Use only the local Maven repository (mvn -o)."), offline);
+        TitledPane more = new TitledPane("Advanced", advanced);
+        more.setExpanded(false);
+        more.setAnimated(false);
+        form.add(more, 0, ++r, 2, 1);
+
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("Migrate " + path.getFileName());
         dialog.setHeaderText("Migrate " + path.getFileName());
@@ -245,6 +307,18 @@ public final class ProjectView {
             }
             if (behaviour.isSelected()) {
                 tools.put(Migrator.VERIFY_BEHAVIOUR, "true");
+                if (!scenarios.getText().isBlank()) {
+                    tools.put(BehaviourVerifier.SCENARIOS_OPTION, scenarios.getText().strip());
+                }
+                if (!repairBehaviour.isSelected()) {
+                    tools.put(Migrator.REPAIR_BEHAVIOUR, "false");
+                }
+            }
+            if (!settings.getText().isBlank()) {
+                tools.put("maven.settings", settings.getText().strip());
+            }
+            if (offline.isSelected()) {
+                tools.put("maven.offline", "true");
             }
             start(a, new MigrationOptions(Path.of(out.getText().strip()),
                     useAi.isSelected() ? chosenAi : AiSettings.NONE, useAi.isSelected() ? rounds.getValue() : 0, true, tools,
@@ -272,6 +346,181 @@ public final class ProjectView {
         boolean build = outcome.verification() == null || outcome.verification().success();
         BehaviourReport b = outcome.behaviour();
         return build && (b == null || b.status() == BehaviourReport.Status.SAME || b.status() == BehaviourReport.Status.SKIPPED);
+    }
+
+    private Node playbookChooser(Engine.Assessment a) {
+        ComboBox<String> choice = new ComboBox<>();
+        Map<String, String> labels = new LinkedHashMap<>();
+        for (Playbook p : engine.playbooks()) {
+            labels.put(p.id(), p.name());
+        }
+        if (!labels.containsKey(a.playbook().id())) {
+            labels.put(playbookRef == null ? a.playbook().id() : playbookRef, a.playbook().name() + " (file)");
+        }
+        String other = "\u0000other";
+        labels.put(other, "Other playbook file…");
+        choice.getItems().setAll(labels.keySet());
+        choice.setValue(labels.containsKey(a.playbook().id()) ? a.playbook().id() : playbookRef);
+        choice.setConverter(new javafx.util.StringConverter<>() {
+            @Override
+            public String toString(String id) {
+                return id == null ? "" : labels.getOrDefault(id, id);
+            }
+
+            @Override
+            public String fromString(String label) {
+                return label;
+            }
+        });
+        choice.setTooltip(new javafx.scene.control.Tooltip("The playbook: the rules, guards and migration notes used"));
+        choice.valueProperty().addListener((obs, old, now) -> {
+            if (now == null || now.equals(old)) {
+                return;
+            }
+            if (now.equals(other)) {
+                FileChooser chooser = new FileChooser();
+                chooser.setTitle("A Renova playbook (YAML)");
+                chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Playbooks", "*.yaml", "*.yml"));
+                File file = chooser.showOpenDialog(choice.getScene().getWindow());
+                if (file == null) {
+                    javafx.application.Platform.runLater(() -> choice.setValue(old));
+                    return;
+                }
+                playbookRef = file.getAbsolutePath();
+            } else {
+                playbookRef = now;
+            }
+            assess();
+        });
+        return choice;
+    }
+
+    private static Node playbookInfo(Playbook p) {
+        long guards = p.rules().stream().filter(io.renova.core.playbook.Rule::guard).count();
+        VBox box = new VBox(6, Ui.label(p.name() + "  ·  " + p.id() + " " + p.version(), Styles.TEXT_BOLD));
+        if (p.description() != null) {
+            box.getChildren().add(Ui.label(p.description().strip(), Styles.TEXT_MUTED));
+        }
+        box.getChildren().add(Ui.label((p.rules().size() - guards) + " rules · " + guards + " guards · "
+                + p.knowledge().size() + " migration notes" + (p.targets().isEmpty() ? "" : " · targets " + p.targets()), Styles.TEXT_SMALL));
+        return box;
+    }
+
+    /** Every finding, filtered by category, how it is resolved, and text in the rule, file or code. */
+    private Node findings(Engine.Assessment a) {
+        Map<String, String> strategyByRule = new java.util.HashMap<>();
+        a.plan().steps().forEach(s -> strategyByRule.put(s.rule().id(), s.strategy()));
+        List<Finding> all = a.analysis().findings();
+
+        ComboBox<String> category = new ComboBox<>();
+        category.getItems().add("All categories");
+        all.stream().map(f -> f.category().code() + " · " + f.category().description()).distinct().sorted().forEach(category.getItems()::add);
+        category.setValue("All categories");
+        ComboBox<String> resolver = new ComboBox<>();
+        resolver.getItems().add("Any resolver");
+        strategyByRule.values().stream().distinct().sorted().map(st -> STRATEGIES.getOrDefault(st, st)).forEach(resolver.getItems()::add);
+        resolver.setValue("Any resolver");
+        TextField text = new TextField();
+        text.setPromptText("Search rule, file or code");
+        HBox.setHgrow(text, Priority.ALWAYS);
+        Label count = Ui.label("", Styles.TEXT_MUTED);
+
+        TableView<Finding> table = new TableView<>();
+        table.getStyleClass().addAll(Styles.STRIPED, Styles.DENSE);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        TableColumn<Finding, String> cat = new TableColumn<>("Cat");
+        cat.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().category().code())));
+        cat.setMinWidth(56);
+        cat.setMaxWidth(70);
+        TableColumn<Finding, String> rule = new TableColumn<>("Rule");
+        rule.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().title()));
+        rule.setMinWidth(240);
+        TableColumn<Finding, String> by = new TableColumn<>("Resolved by");
+        by.setCellValueFactory(c -> new SimpleStringProperty(STRATEGIES.getOrDefault(strategyByRule.get(c.getValue().ruleId()),
+                String.valueOf(strategyByRule.get(c.getValue().ruleId())))));
+        by.setMinWidth(110);
+        TableColumn<Finding, String> where = new TableColumn<>("File");
+        where.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().file() + (c.getValue().line() > 0 ? ":" + c.getValue().line() : "")));
+        where.setMinWidth(300);
+        TableColumn<Finding, String> code = new TableColumn<>("Code");
+        code.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().evidence() == null ? "" : c.getValue().evidence().strip()));
+        where.getStyleClass().add("mono");
+        code.getStyleClass().add("mono");
+        table.getColumns().setAll(List.of(cat, rule, by, where, code));
+        table.setPrefHeight(520);
+        table.setRowFactory(t -> {
+            javafx.scene.control.TableRow<Finding> row = new javafx.scene.control.TableRow<>();
+            row.setOnMouseClicked(e -> {
+                if (!row.isEmpty() && e.getClickCount() == 2) {
+                    nav.openPath(path.resolve(row.getItem().file()));
+                }
+            });
+            return row;
+        });
+
+        Runnable filter = () -> {
+            String c = category.getValue();
+            String r = resolver.getValue();
+            String q = text.getText().strip().toLowerCase();
+            List<Finding> shown = all.stream()
+                    .filter(f -> c.startsWith("All") || c.startsWith(f.category().code() + " "))
+                    .filter(f -> r.startsWith("Any") || r.equals(STRATEGIES.getOrDefault(strategyByRule.get(f.ruleId()), strategyByRule.get(f.ruleId()))))
+                    .filter(f -> q.isEmpty() || (f.title() + " " + f.ruleId() + " " + f.file() + " " + f.evidence()).toLowerCase().contains(q))
+                    .toList();
+            table.getItems().setAll(shown);
+            count.setText(shown.size() == all.size() ? all.size() + " findings" : shown.size() + " of " + all.size() + " findings");
+        };
+        category.valueProperty().addListener((o, x, y) -> filter.run());
+        resolver.valueProperty().addListener((o, x, y) -> filter.run());
+        text.textProperty().addListener((o, x, y) -> filter.run());
+        filter.run();
+        HBox filters = new HBox(8, category, resolver, text, count);
+        filters.setAlignment(Pos.CENTER_LEFT);
+        return Ui.section("Findings", "Every place in the code a rule matched. Double-click to open the file.", new VBox(10, filters, table));
+    }
+
+    private void export(Engine.Assessment a, boolean json) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Export the assessment");
+        chooser.setInitialFileName(path.getFileName() + "-assessment" + (json ? ".json" : ".md"));
+        chooser.getExtensionFilters().add(json ? new FileChooser.ExtensionFilter("JSON", "*.json")
+                : new FileChooser.ExtensionFilter("Markdown", "*.md"));
+        File file = chooser.showSaveDialog(page.getScene().getWindow());
+        if (file == null) {
+            return;
+        }
+        try {
+            java.nio.file.Files.writeString(file.toPath(), engine.export(a, json));
+            Message done = new Message("Exported", file.toString());
+            done.getStyleClass().add(Styles.SUCCESS);
+            done.setOnClose(e -> page.getChildren().remove(done));
+            page.getChildren().add(1, done);
+        } catch (Exception e) {
+            page.getChildren().add(1, new Message("Could not export", String.valueOf(e.getMessage())));
+        }
+    }
+
+    private static TextField fileField(String value, String prompt) {
+        TextField field = new TextField(value);
+        field.setPromptText(prompt);
+        field.getStyleClass().add("mono");
+        HBox.setHgrow(field, Priority.ALWAYS);
+        return field;
+    }
+
+    private static Node browseRow(TextField field, String title, String... patterns) {
+        Button browse = new Button("Browse…");
+        browse.disableProperty().bind(field.disableProperty());
+        browse.setOnAction(e -> {
+            FileChooser chooser = new FileChooser();
+            chooser.setTitle(title);
+            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(title, patterns));
+            File file = chooser.showOpenDialog(browse.getScene().getWindow());
+            if (file != null) {
+                field.setText(file.getAbsolutePath());
+            }
+        });
+        return new HBox(8, field, browse);
     }
 
     private static ToggleSwitch toggle(boolean on) {

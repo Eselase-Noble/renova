@@ -4,6 +4,8 @@ import io.renova.core.ai.AiSettings;
 import io.renova.core.config.UserConfig;
 import io.renova.core.engine.PluginRegistry;
 import io.renova.core.config.AiPreferences;
+import io.renova.desktop.service.MigrationHistory;
+import io.renova.desktop.service.MigrationResult;
 import io.renova.desktop.service.RecentProjects;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -60,5 +62,66 @@ class DesktopServicesTest {
         assertThat(recent.list()).extracting(RecentProjects.Entry::name).containsExactly("a", "b");
         Files.delete(b);
         assertThat(recent.list()).extracting(RecentProjects.Entry::name).containsExactly("a");
+    }
+
+    @Test
+    void customEndpointsAreSavedValidatedAndCleared(@TempDir Path dir) throws Exception {
+        AiPreferences prefs = new AiPreferences(registry, new UserConfig(dir.resolve("config.properties")), Map.of());
+        prefs.setBaseUrl("openai", "https://gateway.example.com/v1");
+        assertThat(prefs.view().providers()).filteredOn(p -> p.name().equals("openai"))
+                .singleElement().satisfies(p -> assertThat(p.baseUrl()).isEqualTo("https://gateway.example.com/v1"));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> prefs.setBaseUrl("openai", "gateway.example.com"))
+                .isInstanceOf(IllegalArgumentException.class);
+        prefs.setBaseUrl("openai", "");
+        assertThat(prefs.view().providers()).filteredOn(p -> p.name().equals("openai"))
+                .singleElement().satisfies(p -> assertThat(p.baseUrl()).isNull());
+    }
+
+    @Test
+    void historyKeepsNewestFirstAndForgetsMissingCopies(@TempDir Path dir) throws Exception {
+        MigrationHistory history = new MigrationHistory(dir.resolve("history.json"));
+        Path one = Files.createDirectories(dir.resolve("one"));
+        Path two = Files.createDirectories(dir.resolve("two"));
+        history.add(entry(one, "PASSED"));
+        history.add(entry(two, "FAILED"));
+        history.add(entry(one, "FAILED"));
+        assertThat(history.list()).extracting(MigrationHistory.Entry::workspace).containsExactly(one.toString(), two.toString());
+        assertThat(history.list().getFirst().state()).isEqualTo("FAILED");
+
+        Files.delete(two);
+        assertThat(history.list()).hasSize(1);
+        history.remove(one.toString());
+        assertThat(history.list()).isEmpty();
+    }
+
+    @Test
+    void resultsAreReadFromTheMigratedCopy(@TempDir Path dir) throws Exception {
+        Path ws = dir.resolve("shop-migrated");
+        Path renova = Files.createDirectories(ws.resolve(".renova"));
+        Files.createDirectories(renova.resolve("ai"));
+        assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> MigrationResult.load(ws))).hasMessageContaining("not a finished migration");
+
+        Files.writeString(renova.resolve("report.json"), """
+                {"project": {"root": "/code/shop"}, "playbook": {"id": "java-8-to-21"},
+                 "migration": {"verification": {"success": true, "errors": []}, "aiUsage": {"requests": 2}}}
+                """);
+        Files.writeString(renova.resolve("report.md"), "# Report");
+        Files.writeString(renova.resolve("behaviour.json"), "{\"status\": \"DIFFERENT\", \"results\": []}");
+        Files.writeString(renova.resolve("ai/002.md"), "second");
+        Files.writeString(renova.resolve("ai/001.md"), "first");
+        MigrationResult.saveProgress(ws, java.util.List.of("Copying", "Done"));
+
+        MigrationResult r = MigrationResult.load(ws);
+        assertThat(r.projectName()).isEqualTo("shop");
+        assertThat(r.buildPasses()).isTrue();
+        assertThat(r.state()).isEqualTo("FAILED");
+        assertThat(r.markdown()).isEqualTo("# Report");
+        assertThat(r.aiExchanges()).extracting(MigrationResult.AiExchange::markdown).containsExactly("first", "second");
+        assertThat(r.progressLog()).containsExactly("Copying", "Done");
+    }
+
+    private static MigrationHistory.Entry entry(Path ws, String state) {
+        return new MigrationHistory.Entry("shop", "/code/shop", ws.toString(), state, "2026-10-06T10:00:00Z",
+                "2026-10-06T10:05:00Z", "Passes", "Not checked", 0, 0);
     }
 }

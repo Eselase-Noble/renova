@@ -89,7 +89,7 @@ public final class SettingsView {
                 Ui.header("Settings", "AI runs on your own provider account. Renova never supplies, pools or shares keys."),
                 messages,
                 Ui.section("AI provider", "Used for judgement calls, build repair and behaviour repair.", form),
-                Ui.section("API keys", "Saved in " + view.configFile() + ", readable only by you. "
+                Ui.section("API keys and endpoints", "Saved in " + view.configFile() + ", readable only by you. "
                         + "Environment variables such as ANTHROPIC_API_KEY take precedence.", keys));
     }
 
@@ -128,7 +128,18 @@ public final class SettingsView {
         Node status = p.keyConfigured()
                 ? new HBox(8, Ui.badge("Key set", Ui.Tone.GOOD), Ui.label(p.maskedKey() + " · from " + p.keySource(), Styles.TEXT_MUTED, "mono"))
                 : Ui.badge("No key", Ui.Tone.MUTED);
-        VBox row = new VBox(6, new HBox(8, Ui.label(p.displayName(), Styles.TEXT_BOLD), status), new HBox(8, key, save, remove));
+        TextField endpoint = new TextField(p.baseUrl() == null ? "" : p.baseUrl());
+        endpoint.setPromptText("Public endpoint (set one for a gateway, proxy or on-premises server)");
+        endpoint.getStyleClass().add("mono");
+        HBox.setHgrow(endpoint, Priority.ALWAYS);
+        Button saveEndpoint = new Button("Save endpoint");
+        saveEndpoint.setOnAction(e -> run(() -> {
+            ai.setBaseUrl(p.name(), endpoint.getText());
+            return endpoint.getText().isBlank() ? p.displayName() + " uses its public endpoint."
+                    : p.displayName() + " endpoint saved.";
+        }));
+        VBox row = new VBox(6, new HBox(8, Ui.label(p.displayName(), Styles.TEXT_BOLD), status), new HBox(8, key, save, remove),
+                new HBox(8, endpoint, saveEndpoint));
         row.setPadding(new Insets(0, 0, 4, 0));
         return row;
     }
