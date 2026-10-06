@@ -67,6 +67,8 @@ public final class ProjectView {
     private final VBox page;
     /** A bundled playbook id or a playbook file; null for the one that applies. */
     private String playbookRef;
+    /** Ids of the add-ons combined with the target. */
+    private final java.util.Set<String> addons = new java.util.LinkedHashSet<>();
 
     public ProjectView(Navigator nav, Engine engine, AiPreferences ai, Path path) {
         this.nav = nav;
@@ -91,7 +93,7 @@ public final class ProjectView {
         Task<Engine.Assessment> task = new Task<>() {
             @Override
             protected Engine.Assessment call() throws Exception {
-                return engine.assess(path, playbookRef);
+                return engine.assess(path, reference());
             }
         };
         task.setOnSucceeded(e -> show(task.getValue()));
@@ -177,7 +179,7 @@ public final class ProjectView {
                 .findFirst().ifPresent(t -> tabs.getSelectionModel().select(t));
 
         page.getChildren().setAll(
-                Ui.header(Icons.FOLDER, path.getFileName().toString(), path.toString(), playbookChooser(a), reassess, export, migrate),
+                Ui.header(Icons.FOLDER, path.getFileName().toString(), path.toString(), playbookChooser(a), addonsMenu(), reassess, export, migrate),
                 stats, tabs);
         if (!a.analysis().warnings().isEmpty()) {
             page.getChildren().add(new Message("Analysis warnings", String.join("\n", a.analysis().warnings())));
@@ -371,19 +373,50 @@ public final class ProjectView {
         return outcome.passed();
     }
 
+    /** The target with its add-ons, as the engine resolves it: target+addon+addon. Null for the suggested target alone. */
+    private String reference() {
+        if (addons.isEmpty()) {
+            return playbookRef;
+        }
+        String target = playbookRef == null ? engine.registry().defaultPlaybook(path).id() : playbookRef;
+        return target + "+" + String.join("+", addons);
+    }
+
+    /** Optional changes that go with any target: test frameworks, logging, common libraries. */
+    private Node addonsMenu() {
+        MenuButton menu = new MenuButton(addons.isEmpty() ? "Add-ons" : "Add-ons (" + addons.size() + ")", Icons.of(Icons.SPARK, 14));
+        menu.setTooltip(new javafx.scene.control.Tooltip("Optional upgrades to do in the same migration"));
+        for (Playbook addon : engine.addons()) {
+            javafx.scene.control.CheckMenuItem item = new javafx.scene.control.CheckMenuItem(addon.name());
+            item.setSelected(addons.contains(addon.id()));
+            item.setOnAction(e -> {
+                if (item.isSelected()) {
+                    addons.add(addon.id());
+                } else {
+                    addons.remove(addon.id());
+                }
+                assess();
+            });
+            menu.getItems().add(item);
+        }
+        return menu;
+    }
+
     private Node playbookChooser(Engine.Assessment a) {
         ComboBox<String> choice = new ComboBox<>();
         Map<String, String> labels = new LinkedHashMap<>();
         for (Playbook p : engine.playbooks()) {
             labels.put(p.id(), p.name());
         }
-        if (!labels.containsKey(a.playbook().id())) {
-            labels.put(playbookRef == null ? a.playbook().id() : playbookRef, a.playbook().name() + " (file)");
+        // The assessment's playbook is the target with its add-ons; the chooser shows the target.
+        String targetId = a.playbook().id().split("\\+")[0];
+        if (!labels.containsKey(targetId)) {
+            labels.put(playbookRef == null ? targetId : playbookRef, a.playbook().name().split(" \\+ ")[0] + " (file)");
         }
         String other = "\u0000other";
         labels.put(other, "Other playbook file…");
         choice.getItems().setAll(labels.keySet());
-        choice.setValue(labels.containsKey(a.playbook().id()) ? a.playbook().id() : playbookRef);
+        choice.setValue(labels.containsKey(targetId) ? targetId : playbookRef);
         choice.setConverter(new javafx.util.StringConverter<>() {
             @Override
             public String toString(String id) {

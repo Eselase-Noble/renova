@@ -22,7 +22,7 @@ public class CatalogueController {
     }
 
     public record PlaybookView(String id, String name, String ecosystem, String version, String description,
-                               Map<String, String> targets, long rules, long guards, int knowledgeCards) {
+                               Map<String, String> targets, long rules, long guards, int knowledgeCards, boolean addon) {
     }
 
     @GetMapping
@@ -33,6 +33,6 @@ public class CatalogueController {
     static PlaybookView view(Playbook p) {
         return new PlaybookView(p.id(), p.name(), p.ecosystem(), p.version(), p.description() == null ? null : p.description().strip(),
                 p.targets(), p.rules().stream().filter(r -> !r.guard()).count(), p.rules().stream().filter(Rule::guard).count(),
-                p.knowledge().size());
+                p.knowledge().size(), p.addon());
     }
 }

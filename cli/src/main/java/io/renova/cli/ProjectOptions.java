@@ -18,6 +18,10 @@ final class ProjectOptions {
             description = "Bundled playbook id or path to a playbook YAML. Default: the only bundled playbook that applies.")
     String playbook;
 
+    @Option(names = "--with", split = ",", paramLabel = "ADDON",
+            description = "Add-ons to combine with the target, for example junit5,log4j2 (see 'renova playbooks').")
+    java.util.List<String> addons;
+
     Path root() {
         Path root = project.toAbsolutePath().normalize();
         if (!Files.isDirectory(root)) {
@@ -27,6 +31,7 @@ final class ProjectOptions {
     }
 
     Playbook playbook(PluginRegistry registry) {
-        return playbook == null ? registry.defaultPlaybook(root()) : registry.playbook(playbook);
+        Playbook target = playbook == null ? registry.defaultPlaybook(root()) : registry.playbook(playbook);
+        return addons == null || addons.isEmpty() ? target : registry.playbook(target.id() + "+" + String.join("+", addons));
     }
 }

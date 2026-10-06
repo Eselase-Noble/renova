@@ -101,7 +101,13 @@ public class ProjectController {
     }
 
     /** The migration paths that can be applied to the project, and the one Renova suggests for it. */
-    public record Targets(String current, String recommended, List<CatalogueController.PlaybookView> playbooks) {
+    /**
+     * @param current   the project's target, with any add-ons joined by {@code +}
+     * @param playbooks the targets it can be migrated to
+     * @param addons    the optional add-ons that can be combined with a target
+     */
+    public record Targets(String current, String recommended, List<CatalogueController.PlaybookView> playbooks,
+                          List<CatalogueController.PlaybookView> addons) {
     }
 
     public record TargetChange(String playbook) {
@@ -112,7 +118,8 @@ public class ProjectController {
         Project project = project(id, access.caller(request));
         Path root = Path.of(project.path());
         return new Targets(project.playbook(), registry.defaultPlaybook(root).id(),
-                registry.playbooksFor(root).stream().map(CatalogueController::view).toList());
+                registry.playbooksFor(root).stream().map(CatalogueController::view).toList(),
+                registry.addonsFor(root).stream().map(CatalogueController::view).toList());
     }
 
     /** Chooses the migration path the project's assessment and migrations use from now on. */
@@ -120,9 +127,12 @@ public class ProjectController {
     public Project retarget(@PathVariable String id, @RequestBody TargetChange body, HttpServletRequest request) {
         Access.Caller caller = access.require(request, Role.ADMIN);
         Project project = project(id, caller);
-        Playbook playbook = registry.playbooksFor(Path.of(project.path())).stream()
-                .filter(p -> p.id().equals(body.playbook())).findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("No such migration path for this project: " + body.playbook()));
+        // A target, optionally with add-ons: target+addon+addon.
+        String target = body.playbook() == null ? "" : body.playbook().split("\\+")[0];
+        if (registry.playbooksFor(Path.of(project.path())).stream().noneMatch(p -> p.id().equals(target))) {
+            throw new IllegalArgumentException("No such migration path for this project: " + body.playbook());
+        }
+        Playbook playbook = registry.playbook(body.playbook());
         Project changed = project.withPlaybook(playbook.id());
         store.saveProject(changed);
         audit.record(caller, "project.retargeted", project.name(), "Now " + playbook.name());

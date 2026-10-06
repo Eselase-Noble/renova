@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpenCheck, CalendarDays, FolderGit2, MoreHorizontal, Play, Target, Trash2, Workflow } from "lucide-react";
+import { BookOpenCheck, CalendarDays, Check, FolderGit2, MoreHorizontal, Play, Target, Trash2, Workflow } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useState } from "react";
@@ -16,7 +16,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { active, api } from "@/lib/api";
+import { active, api, type ProjectTargets } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { dateTime } from "@/lib/format";
 
@@ -110,34 +111,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         }
       />
       {targets.data && targets.data.playbooks.length > 1 && (
-        <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border bg-card px-5 py-3 shadow-(--shadow-card)">
-          <Target className="size-4 shrink-0 text-brand" />
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium">Target</div>
-            <p className="text-[13px] text-muted-foreground">
-              What this project is migrated to. The assessment, the plan and new migrations follow it.
-              {targets.data.current !== targets.data.recommended && " Renova suggests another target for this project."}
-            </p>
-          </div>
-          <Select
-            value={targets.data.current}
-            onValueChange={(v) => v && v !== targets.data.current && retarget.mutate(v)}
-            items={Object.fromEntries(targets.data.playbooks.map((t) => [t.id, t.name]))}
-            disabled={!auth.can("ADMIN") || retarget.isPending}
-          >
-            <SelectTrigger className="w-full sm:w-96" aria-label="Target">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {targets.data.playbooks.map((t) => (
-                <SelectItem key={t.id} value={t.id}>
-                  {t.name}
-                  {t.id === targets.data.recommended && <span className="ml-2 text-xs text-muted-foreground">suggested</span>}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <TargetCard targets={targets.data} canEdit={auth.can("ADMIN")} busy={retarget.isPending} onChange={(playbook) => retarget.mutate(playbook)} />
       )}
       <Tabs defaultValue="assessment">
         <TabsList variant="line" className="w-full justify-start border-b">
@@ -205,6 +179,81 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/** The project's target and the optional add-ons that go with it. */
+function TargetCard({
+  targets,
+  canEdit,
+  busy,
+  onChange,
+}: {
+  targets: ProjectTargets;
+  canEdit: boolean;
+  busy: boolean;
+  onChange: (playbook: string) => void;
+}) {
+  // Stored as target+addon+addon.
+  const [target, ...chosen] = targets.current.split("+");
+  const compose = (base: string, addons: string[]) => [base, ...addons].join("+");
+  return (
+    <div className="mb-6 rounded-xl border bg-card shadow-(--shadow-card)">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
+        <Target className="size-4 shrink-0 text-brand" />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium">Target</div>
+          <p className="text-[13px] text-muted-foreground">
+            What this project is migrated to. The assessment, the plan and new migrations follow it.
+            {target !== targets.recommended && " Renova suggests another target for this project."}
+          </p>
+        </div>
+        <Select
+          value={target}
+          onValueChange={(v) => v && v !== target && onChange(compose(v, chosen))}
+          items={Object.fromEntries(targets.playbooks.map((t) => [t.id, t.name]))}
+          disabled={!canEdit || busy}
+        >
+          <SelectTrigger className="w-full sm:w-96" aria-label="Target">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {targets.playbooks.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.name}
+                {t.id === targets.recommended && <span className="ml-2 text-xs text-muted-foreground">suggested</span>}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {targets.addons.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t px-5 py-3">
+          <span className="text-[13px] text-muted-foreground">Add-ons, done in the same migration:</span>
+          {targets.addons.map((addon) => {
+            const on = chosen.includes(addon.id);
+            return (
+              <button
+                key={addon.id}
+                type="button"
+                role="switch"
+                aria-checked={on}
+                title={addon.description ?? undefined}
+                disabled={!canEdit || busy}
+                onClick={() => onChange(compose(target, on ? chosen.filter((id) => id !== addon.id) : [...chosen, addon.id]))}
+                className={cn(
+                  "inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50",
+                  on ? "border-brand/40 bg-brand/10 text-brand" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                {on && <Check className="size-3.5" />}
+                {addon.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

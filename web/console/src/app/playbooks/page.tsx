@@ -29,10 +29,27 @@ export default function PlaybooksPage() {
           Playbooks come with ecosystem plugins on the server&apos;s classpath.
         </Empty>
       ) : (
-        <div className="grid gap-5 xl:grid-cols-2">
-          {playbooks.data.map((p) => (
-            <PlaybookCard key={p.id} playbook={p} projects={(projects.data ?? []).filter((x) => x.playbook === p.id).length} />
-          ))}
+        <div className="space-y-8">
+          {[
+            { title: "Targets", text: "Where a project ends up. A migration has one.", items: playbooks.data.filter((p) => !p.addon) },
+            { title: "Add-ons", text: "Optional upgrades done in the same migration, with any target.", items: playbooks.data.filter((p) => p.addon) },
+          ]
+            .filter((group) => group.items.length > 0)
+            .map((group) => (
+              <section key={group.title}>
+                <h2 className="text-[15px] font-semibold tracking-tight">{group.title}</h2>
+                <p className="mb-3 text-[13px] text-muted-foreground">{group.text}</p>
+                <div className="grid gap-5 xl:grid-cols-2">
+                  {group.items.map((p) => (
+                    <PlaybookCard
+                      key={p.id}
+                      playbook={p}
+                      projects={(projects.data ?? []).filter((x) => x.playbook.split("+").includes(p.id)).length}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
         </div>
       )}
     </>
@@ -52,7 +69,7 @@ function PlaybookCard({ playbook: p, projects }: { playbook: Playbook; projects:
           <BookOpenCheck className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-[15px] leading-6 font-semibold tracking-tight">{p.name}</h2>
+          <h3 className="text-[15px] leading-6 font-semibold tracking-tight">{p.name}</h3>
           <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
             <span className="font-mono text-xs text-muted-foreground">{p.id}</span>
             <ToneBadge tone="muted">v{p.version}</ToneBadge>

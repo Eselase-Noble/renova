@@ -117,6 +117,16 @@ class WebApiTest {
         call(patch("/api/projects/" + projectId), owner, "{\"playbook\":\"java-to-25\"}").andExpect(jsonPath("$.playbook").value("java-to-25"));
         mvc.perform(get("/api/projects/" + projectId + "/assessment").session(owner))
                 .andExpect(jsonPath("$.playbook.id").value("java-to-25"));
+        // Add-ons go with a target; on their own they are not one.
+        mvc.perform(get("/api/projects/" + projectId + "/playbooks").session(owner))
+                .andExpect(jsonPath("$.addons[?(@.id == 'junit5')]").exists())
+                .andExpect(jsonPath("$.playbooks[?(@.id == 'junit5')]").doesNotExist());
+        call(patch("/api/projects/" + projectId), owner, "{\"playbook\":\"java-to-21+junit5+log4j2\"}")
+                .andExpect(jsonPath("$.playbook").value("java-to-21+junit5+log4j2"));
+        mvc.perform(get("/api/projects/" + projectId + "/assessment").session(owner))
+                .andExpect(jsonPath("$.playbook.id").value("java-to-21+junit5+log4j2"));
+        call(patch("/api/projects/" + projectId), owner, "{\"playbook\":\"junit5\"}").andExpect(status().isBadRequest());
+        call(patch("/api/projects/" + projectId), owner, "{\"playbook\":\"java-to-21+java-to-25\"}").andExpect(status().isBadRequest());
         call(patch("/api/projects/" + projectId), owner, "{\"playbook\":\"no-such-path\"}").andExpect(status().isBadRequest());
         call(patch("/api/projects/" + projectId), owner, "{\"playbook\":\"java8-to-21-jakarta-ee10\"}").andExpect(status().isOk());
     }

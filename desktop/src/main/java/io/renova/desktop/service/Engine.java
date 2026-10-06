@@ -40,9 +40,14 @@ public final class Engine {
         return new Assessment(root, playbook, analysis, new Planner().plan(analysis));
     }
 
-    /** Installed playbooks, for choosing one. */
+    /** The installed targets, for choosing one. */
     public java.util.List<Playbook> playbooks() {
-        return registry.playbooks();
+        return registry.playbooks().stream().filter(p -> !p.addon()).toList();
+    }
+
+    /** The optional add-ons that can be combined with a target. */
+    public java.util.List<Playbook> addons() {
+        return registry.addons();
     }
 
     /** The assessment as the CLI's Markdown or JSON report. */

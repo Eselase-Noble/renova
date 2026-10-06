@@ -158,6 +158,8 @@ export interface Playbook {
   rules: number;
   guards: number;
   knowledgeCards: number;
+  /** An optional set of changes combined with a target, not a target on its own. */
+  addon: boolean;
 }
 
 /** The migration paths a project can take, and the one Renova suggests for it. */
@@ -165,6 +167,8 @@ export interface ProjectTargets {
   current: string;
   recommended: string;
   playbooks: Playbook[];
+  /** Optional add-ons that can be combined with the target, as target+addon+addon. */
+  addons: Playbook[];
 }
 
 export interface ProviderSettings {
