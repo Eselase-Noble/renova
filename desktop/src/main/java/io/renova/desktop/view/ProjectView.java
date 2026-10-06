@@ -26,7 +26,6 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
-import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
@@ -87,7 +86,7 @@ public final class ProjectView {
         spinner.setMaxSize(40, 40);
         HBox loading = new HBox(12, spinner, Ui.label("Analysing " + path + "…", Styles.TEXT_MUTED));
         loading.setAlignment(Pos.CENTER_LEFT);
-        page.getChildren().setAll(Ui.header(path.getFileName().toString(), path.toString()), loading);
+        page.getChildren().setAll(Ui.header(Icons.FOLDER, path.getFileName().toString(), path.toString()), loading);
 
         Task<Engine.Assessment> task = new Task<>() {
             @Override
@@ -102,7 +101,7 @@ public final class ProjectView {
                 playbookRef = null;
                 assess();
             });
-            page.getChildren().setAll(Ui.header(path.getFileName().toString(), path.toString(), back),
+            page.getChildren().setAll(Ui.header(Icons.FOLDER, path.getFileName().toString(), path.toString(), back),
                     new Message("Renova cannot assess this folder", String.valueOf(task.getException().getMessage())));
         });
         Thread thread = new Thread(task, "renova-assess");
@@ -111,35 +110,49 @@ public final class ProjectView {
     }
 
     private void show(Engine.Assessment a) {
-        Button migrate = new Button("Migrate…");
+        Button migrate = new Button("Migrate…", Icons.of(Icons.PLAY, 14));
         migrate.getStyleClass().add(Styles.ACCENT);
         migrate.setOnAction(e -> migrateDialog(a));
 
         List<PlanStep> plan = a.plan().steps();
-        long manual = plan.stream().filter(s -> s.strategy().equals("manual")).count();
-        HBox stats = new HBox(12,
-                Ui.stat("Findings", String.valueOf(a.analysis().findings().size()), "places in the code"),
-                Ui.stat("Automation rate", Ui.percent(a.plan().automationRate()), "no human decision needed"),
-                Ui.stat("Plan steps", String.valueOf(plan.size()), a.playbook().id()),
-                Ui.stat("For a person", String.valueOf(manual), "steps with guidance"));
+        int findings = a.analysis().findings().size();
+        // Findings and steps by who resolves them: rules and recipes, AI checked by the build, or a person.
+        int[] byResolver = new int[3];
+        int[] stepsByResolver = new int[3];
+        for (PlanStep step : plan) {
+            int r = step.strategy().equals("ai") ? 1 : step.strategy().equals("manual") ? 2 : 0;
+            byResolver[r] += step.occurrences();
+            stepsByResolver[r]++;
+        }
+        long blockers = plan.stream().filter(s -> s.rule().severity().name().equals("BLOCKER")).count();
+        HBox stats = new HBox(14,
+                Ui.stat("Findings", String.valueOf(findings), "Places in the code a rule matched"),
+                Ui.stat("Plan steps", String.valueOf(plan.size()), stepsByResolver[0] + " automatic · " + stepsByResolver[1] + " AI · "
+                        + stepsByResolver[2] + " for a person"),
+                Ui.stat("Blockers", String.valueOf(blockers), "Steps the migration cannot succeed without"),
+                Ui.stat("For a person", String.valueOf(stepsByResolver[2]), "Decisions left to you, with guidance"));
+
+        Label lead = Ui.label((byResolver[0] + byResolver[1]) + " of " + findings + " findings are resolved by recipes, rules or AI and "
+                + "checked by the real build. " + (byResolver[2] == 0 ? "None are left to a person."
+                : byResolver[2] + (byResolver[2] == 1 ? " needs" : " need") + " a person, with guidance."), Styles.TEXT_MUTED);
+        VBox split = new VBox(14, lead, Ui.stackedBar(List.of(
+                new Ui.Segment(null, "Automatic", byResolver[0], 1),
+                new Ui.Segment(null, "AI, checked by the build", byResolver[1], 2),
+                new Ui.Segment(null, "A person", byResolver[2], 3))));
+        HBox.setHgrow(split, Priority.ALWAYS);
+        split.setMinWidth(0);
+        HBox automation = new HBox(28, Ui.gauge(a.plan().automationRate(), "automated"), split);
+        automation.setAlignment(Pos.CENTER_LEFT);
 
         Map<Category, Integer> byCategory = new java.util.TreeMap<>(java.util.Comparator.comparing(Category::code));
         a.analysis().findings().forEach(f -> byCategory.merge(f.category(), 1, Integer::sum));
-        int max = byCategory.values().stream().max(Integer::compare).orElse(1);
-        GridPane bars = new GridPane(12, 8);
-        int row = 0;
-        for (Map.Entry<Category, Integer> c : byCategory.entrySet()) {
-            ProgressBar bar = new ProgressBar((double) c.getValue() / max);
-            bar.setMaxWidth(Double.MAX_VALUE);
-            bar.getStyleClass().add("category-bar");
-            GridPane.setHgrow(bar, Priority.ALWAYS);
-            bars.addRow(row++, Ui.label(String.valueOf(c.getKey().code()), Styles.TEXT_BOLD, "mono"),
-                    Ui.label(c.getKey().description(), Styles.TEXT_MUTED), bar, Ui.label(String.valueOf(c.getValue())));
-        }
+        // A category keeps its colour whatever else is on screen: A is always the first series, B the second.
+        List<Ui.Segment> categories = byCategory.entrySet().stream().map(c -> new Ui.Segment(String.valueOf(c.getKey().code()),
+                c.getKey().description(), c.getValue(), Math.max(1, Math.min(5, c.getKey().code() - 'A' + 1)))).toList();
 
-        Button reassess = new Button("Re-assess");
+        Button reassess = new Button("Re-assess", Icons.of(Icons.REFRESH, 14));
         reassess.setOnAction(e -> assess());
-        MenuButton export = new MenuButton("Export");
+        MenuButton export = new MenuButton("Export", Icons.of(Icons.DOWNLOAD, 14));
         MenuItem markdown = new MenuItem("Assessment as Markdown…");
         markdown.setOnAction(e -> export(a, false));
         MenuItem json = new MenuItem("Assessment as JSON…");
@@ -147,20 +160,26 @@ public final class ProjectView {
         export.getItems().setAll(markdown, json);
 
         TabPane tabs = new TabPane(
-                new Tab("Overview", new VBox(16,
-                        Ui.section("Findings by category", "Plan steps run in the order A → E → B → C → D.", bars),
+                new Tab("Overview", new VBox(18,
+                        Ui.section("Automation", "How much of the migration needs no human decision.", automation),
+                        stats,
+                        Ui.section("Findings by category", "Plan steps run in the order A → E → B → C → D.", Ui.bars(categories)),
                         Ui.section("Playbook", null, playbookInfo(a.playbook())))),
                 new Tab("Plan (" + plan.size() + ")", Ui.section("Migration plan", "Select a step to see its guidance and files.", planTable(plan))),
                 new Tab("Findings (" + a.analysis().findings().size() + ")", findings(a)));
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        tabs.getStyleClass().add(Styles.TABS_FLOATING);
+        for (Tab t : tabs.getTabs()) {
+            VBox padded = new VBox(t.getContent());
+            padded.setPadding(new Insets(16, 0, 0, 0));
+            t.setContent(padded);
+        }
         String wanted = nav.startTab();
         tabs.getTabs().stream().filter(t -> wanted != null && t.getText().toLowerCase().startsWith(wanted.toLowerCase()))
                 .findFirst().ifPresent(t -> tabs.getSelectionModel().select(t));
 
         page.getChildren().setAll(
-                Ui.header(path.getFileName().toString(), path.toString(), playbookChooser(a), reassess, export, migrate),
-                stats, tabs);
+                Ui.header(Icons.FOLDER, path.getFileName().toString(), path.toString(), playbookChooser(a), reassess, export, migrate),
+                tabs);
         if (!a.analysis().warnings().isEmpty()) {
             page.getChildren().add(new Message("Analysis warnings", String.join("\n", a.analysis().warnings())));
         }
@@ -174,14 +193,13 @@ public final class ProjectView {
 
     private Node planTable(List<PlanStep> plan) {
         TableView<PlanStep> table = new TableView<>();
-        table.getStyleClass().addAll(Styles.STRIPED, Styles.DENSE);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         TableColumn<PlanStep, Number> order = new TableColumn<>("#");
         order.setCellValueFactory(c -> new SimpleObjectProperty<>(c.getValue().order()));
         order.setMaxWidth(50);
         TableColumn<PlanStep, String> title = new TableColumn<>("Step");
         title.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().rule().title()
-                + (c.getValue().rule().severity().name().equals("BLOCKER") ? "   (blocker)" : "")));
+                + (c.getValue().rule().severity().name().equals("BLOCKER") ? "   · blocker" : "")));
         title.setPrefWidth(520);
         TableColumn<PlanStep, String> category = new TableColumn<>("Category");
         category.setCellValueFactory(c -> new SimpleStringProperty(String.valueOf(c.getValue().rule().category().code())));
@@ -198,6 +216,10 @@ public final class ProjectView {
                             case "ai" -> Ui.Tone.INFO;
                             case "manual" -> Ui.Tone.WARN;
                             default -> Ui.Tone.GOOD;
+                        }, switch (strategy) {
+                            case "ai" -> Icons.SHIELD;
+                            case "manual" -> Icons.USER;
+                            default -> Icons.CHECK;
                         }));
             }
         });
@@ -206,8 +228,8 @@ public final class ProjectView {
         places.setMaxWidth(80);
         table.getColumns().setAll(List.of(order, title, category, by, places));
         table.getItems().setAll(plan);
-        table.setFixedCellSize(34);
-        table.setPrefHeight(Math.min(14, plan.size() + 1) * 34 + 8);
+        table.setFixedCellSize(38);
+        table.setPrefHeight(Math.min(14, plan.size() + 1) * 38 + 8);
 
         Label detail = Ui.label("", Styles.TEXT_MUTED);
         detail.setPadding(new Insets(8, 0, 0, 0));
@@ -397,12 +419,14 @@ public final class ProjectView {
 
     private static Node playbookInfo(Playbook p) {
         long guards = p.rules().stream().filter(io.renova.core.playbook.Rule::guard).count();
-        VBox box = new VBox(6, Ui.label(p.name() + "  ·  " + p.id() + " " + p.version(), Styles.TEXT_BOLD));
+        VBox box = new VBox(6, Ui.label(p.name(), Styles.TEXT_BOLD), Ui.label(p.id() + " · v" + p.version(), Styles.TEXT_MUTED, Styles.TEXT_SMALL, "mono"));
         if (p.description() != null) {
             box.getChildren().add(Ui.label(p.description().strip(), Styles.TEXT_MUTED));
         }
-        box.getChildren().add(Ui.label((p.rules().size() - guards) + " rules · " + guards + " guards · "
-                + p.knowledge().size() + " migration notes" + (p.targets().isEmpty() ? "" : " · targets " + p.targets()), Styles.TEXT_SMALL));
+        HBox counts = new HBox(8, Ui.badge((p.rules().size() - guards) + " rules", Ui.Tone.MUTED), Ui.badge(guards + " guards", Ui.Tone.MUTED),
+                Ui.badge(p.knowledge().size() + " migration notes", Ui.Tone.MUTED));
+        p.targets().forEach((name, value) -> counts.getChildren().add(Ui.badge(name + " → " + value, Ui.Tone.INFO)));
+        box.getChildren().add(new javafx.scene.layout.FlowPane(8, 8, counts.getChildren().toArray(Node[]::new)));
         return box;
     }
 

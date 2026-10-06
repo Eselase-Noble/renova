@@ -7,6 +7,7 @@ import io.renova.core.workspace.WorkspaceHistory;
 import io.renova.desktop.Navigator;
 import io.renova.desktop.service.MigrationResult;
 import io.renova.desktop.service.MigrationRun;
+import io.renova.desktop.service.Phases;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.concurrent.Task;
@@ -62,7 +63,6 @@ public final class MigrationView {
 
     public Node build() {
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        tabs.getStyleClass().add(Styles.TABS_FLOATING);
         render();
         if (run != null) {
             run.state().addListener((obs, old, now) -> render());
@@ -83,7 +83,7 @@ public final class MigrationView {
         try {
             result = MigrationResult.load(workspace);
         } catch (Exception e) {
-            page.getChildren().setAll(Ui.header("Migration", workspace.toString()),
+            page.getChildren().setAll(Ui.header(Icons.WORKFLOW, "Migration", workspace.toString()),
                     new Message("Cannot show this migration", e.getMessage()));
             return;
         }
@@ -91,44 +91,56 @@ public final class MigrationView {
     }
 
     private void renderRunning() {
-        ListView<String> log = new ListView<>(run.log());
-        log.getStyleClass().addAll("log", Styles.DENSE);
-        log.setPrefHeight(560);
-        run.log().addListener((ListChangeListener<String>) c -> log.scrollTo(run.log().size() - 1));
+        ListView<String> log = Ui.console(run.log());
+        log.setPrefHeight(480);
         ProgressIndicator spinner = new ProgressIndicator();
         spinner.setMaxSize(18, 18);
-        HBox status = new HBox(8, run.state().get() == MigrationRun.State.ERROR ? Ui.badge("Error", Ui.Tone.BAD)
-                : Ui.badge("Running", Ui.Tone.INFO));
+        boolean stopped = run.state().get() == MigrationRun.State.ERROR;
+        HBox status = new HBox(8, stopped ? Ui.badge("Error", Ui.Tone.BAD, Icons.ALERT) : Ui.badge("Running", Ui.Tone.INFO, Icons.REFRESH));
         if (running()) {
             status.getChildren().add(spinner);
         }
         status.setAlignment(Pos.CENTER_LEFT);
-        page.getChildren().setAll(Ui.header("Migration of " + run.projectName(), workspace + "  ·  " + elapsed()), status);
+        page.getChildren().setAll(Ui.header(Icons.WORKFLOW, "Migration of " + run.projectName(), workspace + "  ·  " + elapsed()), status);
         if (run.error() != null) {
             page.getChildren().add(new Message("The migration stopped", run.error()));
         }
-        tabs.getTabs().setAll(new Tab("Log", log));
+        // The pipeline follows the log: each new line may start the next phase.
+        VBox pipeline = new VBox();
+        Label step = Ui.label("", Styles.TEXT_MUTED, Styles.TEXT_SMALL);
+        Runnable follow = () -> {
+            List<Phases.Phase> phases = Phases.of(List.copyOf(run.log()), run.options().ai() != null && !run.options().ai().equals(io.renova.core.ai.AiSettings.NONE),
+                    !running(), stopped, null, null);
+            pipeline.getChildren().setAll(Ui.pipeline(phases));
+            step.setText(run.log().isEmpty() ? "Starting…" : run.log().getLast().replaceFirst(" to /.*$", ""));
+            log.scrollTo(Math.max(0, run.log().size() - 1));
+        };
+        follow.run();
+        run.log().addListener((ListChangeListener<String>) c -> follow.run());
+        page.getChildren().add(Ui.section("Pipeline", null, new VBox(14, pipeline, step)));
+        tabs.getTabs().setAll(tab("Log", log));
         page.getChildren().add(tabs);
     }
 
     private void renderFinished(MigrationResult r) {
-        Button folder = new Button("Open migrated folder");
+        Button folder = new Button("Open migrated folder", Icons.of(Icons.FOLDER_OPEN, 14));
         folder.setOnAction(e -> nav.openPath(workspace));
-        Button report = new Button("Open report");
+        Button report = new Button("Open report", Icons.of(Icons.FILE, 14));
         report.setOnAction(e -> nav.openPath(r.reportMarkdown()));
-        Button verify = new Button("Verify behaviour again");
+        Button verify = new Button("Verify behaviour again", Icons.of(Icons.SHIELD, 14));
         verify.setOnAction(e -> verifyAgain(r, verify));
         Button forget = new Button("Remove from history");
         forget.getStyleClass().add(Styles.FLAT);
         forget.setOnAction(e -> nav.forget(workspace));
 
         String state = r.state();
-        HBox status = new HBox(8, Ui.badge(state.equals("PASSED") ? "Passed" : "Failed",
-                state.equals("PASSED") ? Ui.Tone.GOOD : Ui.Tone.BAD));
+        HBox status = new HBox(8, state.equals("PASSED") ? Ui.badge("Passed", Ui.Tone.GOOD, Icons.CHECK)
+                : state.equals("FAILED") ? Ui.badge("Failed", Ui.Tone.BAD, Icons.CROSS) : Ui.badge("Error", Ui.Tone.BAD, Icons.ALERT));
         status.setAlignment(Pos.CENTER_LEFT);
-        page.getChildren().setAll(Ui.header("Migration of " + r.projectName(),
+        page.getChildren().setAll(Ui.header(Icons.WORKFLOW, "Migration of " + r.projectName(),
                         workspace + (run != null ? "  ·  " + elapsed() : ""), folder, report, verify, forget),
                 status);
+        page.getChildren().add(Ui.section("Pipeline", "Each stage is one commit in the migrated folder.", Ui.pipeline(phases(r))));
         if (note != null) {
             page.getChildren().add(new Message("Behaviour verified again", note));
         }
@@ -182,13 +194,59 @@ public final class MigrationView {
         };
         JsonNode ai = m.path("aiUsage");
         int requests = ai.path("requests").asInt();
-        return new HBox(12,
-                Ui.stat("Build and tests", build, buildHint),
-                Ui.stat("Behaviour", behaviour, b == null ? null : b.path("summary").asText()),
+        Node buildBadge = switch (build) {
+            case "Passes" -> Ui.badge("Build passes", Ui.Tone.GOOD, Icons.CHECK);
+            case "Fails" -> Ui.badge("Build fails", Ui.Tone.BAD, Icons.CROSS);
+            default -> Ui.badge("Not built", Ui.Tone.MUTED, Icons.MINUS);
+        };
+        Node behaviourBadge = switch (behaviour) {
+            case "Same" -> Ui.badge("Same behaviour", Ui.Tone.GOOD, Icons.CHECK);
+            case "Differs" -> Ui.badge("Behaviour differs", Ui.Tone.WARN, Icons.ALERT);
+            case "Comparison failed" -> Ui.badge("Comparison failed", Ui.Tone.BAD, Icons.CROSS);
+            default -> Ui.badge(behaviour, Ui.Tone.MUTED, Icons.MINUS);
+        };
+        return new HBox(14,
+                Ui.stat("Build and tests", stateRow(buildBadge), buildHint),
+                Ui.stat("Behaviour", stateRow(behaviourBadge), b == null ? "Behaviour verification was off" : b.path("summary").asText()),
                 Ui.stat("AI", requests > 0 ? requests + " requests" : "Not used", requests > 0
                         ? Ui.tokens(ai.path("inputTokens").asLong()) + " in · " + Ui.tokens(ai.path("outputTokens").asLong())
-                        + " out · " + m.path("repairRounds").asInt() + " repair round(s)" : null),
-                Ui.stat("For a person", String.valueOf(m.path("manualSteps").size()), "steps with guidance"));
+                        + " out · " + m.path("repairRounds").asInt() + " repair round(s)" : "AI steps are listed for a person"),
+                Ui.stat("For a person", String.valueOf(m.path("manualSteps").size()), "Steps with guidance"));
+    }
+
+    /** A badge at the height of a stat's figure, so cards with a state and cards with a number line up. */
+    private static Node stateRow(Node badge) {
+        HBox row = new HBox(badge);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setMinHeight(34);
+        return row;
+    }
+
+    /** The phases of a finished migration, from its saved log and results. */
+    private List<Phases.Phase> phases(MigrationResult r) {
+        List<String> lines;
+        try {
+            lines = run != null ? List.copyOf(run.log()) : r.progressLog();
+        } catch (Exception e) {
+            lines = List.of();
+        }
+        JsonNode m = r.migration();
+        if (lines.isEmpty()) {
+            // No log was kept: the stages in the report say how far it got.
+            List<String> fromStages = new java.util.ArrayList<>(List.of("Plan:"));
+            m.path("stages").forEach(s -> fromStages.add("Stage " + s.path("stage").asText() + ":"));
+            if (!m.path("verification").isMissingNode() && !m.path("verification").isNull()) {
+                fromStages.add("Verifying build");
+            }
+            if (r.behaviour() != null) {
+                fromStages.add("Verifying behaviour");
+            }
+            lines = fromStages;
+        }
+        JsonNode v = m.path("verification");
+        Boolean buildOk = v.isMissingNode() || v.isNull() ? null : v.path("success").asBoolean();
+        return Phases.of(lines, m.path("aiUsage").path("requests").asInt() > 0, true, r.state().equals("ERROR"), buildOk,
+                r.behaviour() == null ? null : r.behaviour().path("status").asText());
     }
 
     private Node overview(MigrationResult r) {
@@ -202,12 +260,22 @@ public final class MigrationView {
                 case "FAILED" -> Ui.Tone.BAD;
                 default -> Ui.Tone.MUTED;
             };
-            Label name = Ui.label(s.path("stage").asText(), Styles.TEXT_BOLD);
-            name.setMinWidth(230);
+            Label name = Ui.label(s.path("stage").asText(), Styles.TEXT_BOLD, "mono");
+            name.setMinWidth(210);
             Label summary = Ui.label(s.path("summary").asText(), Styles.TEXT_MUTED);
             summary.setPrefWidth(560);
             summary.setMinWidth(0);
-            HBox head = new HBox(12, Ui.badge(status.toLowerCase(), tone), name, summary);
+            HBox head = new HBox(12, Ui.badge(switch (status) {
+                case "APPLIED" -> "Applied";
+                case "PARTIAL" -> "Partly applied";
+                case "FAILED" -> "Failed";
+                default -> "Skipped";
+            }, tone, switch (status) {
+                case "APPLIED" -> Icons.CHECK;
+                case "PARTIAL" -> Icons.ALERT;
+                case "FAILED" -> Icons.CROSS;
+                default -> Icons.MINUS;
+            }), name, summary);
             head.setAlignment(Pos.CENTER_LEFT);
             if (s.path("details").isEmpty()) {
                 head.setPadding(new javafx.geometry.Insets(4, 0, 4, 26));
@@ -237,10 +305,13 @@ public final class MigrationView {
                 }
                 String file = e.path("file").isNull() ? "(build)" : e.path("file").asText();
                 int line = e.path("line").asInt();
-                list.getChildren().add(new VBox(2, Ui.label(file + (line > 0 ? ":" + line : ""), "mono", Styles.TEXT_SMALL),
-                        Ui.label(e.path("message").asText(), Styles.TEXT_MUTED)));
+                VBox text = new VBox(2, Ui.label(file + (line > 0 ? ":" + line : ""), "mono", Styles.TEXT_SMALL),
+                        Ui.label(e.path("message").asText(), Styles.TEXT_MUTED));
+                HBox.setHgrow(text, Priority.ALWAYS);
+                text.setMinWidth(0);
+                list.getChildren().add(new HBox(10, Icons.of(Icons.CROSS, 15, "bad"), text));
             }
-            body.getChildren().add(Ui.section("Build errors", null, list));
+            body.getChildren().add(Ui.section("Build errors", errors.size() + " from the compiler, the build file or the tests.", list));
         }
         if (m.path("manualSteps").size() > 0) {
             VBox manual = new VBox(12);
@@ -381,8 +452,7 @@ public final class MigrationView {
         } catch (Exception e) {
             lines = List.of();
         }
-        ListView<String> log = new ListView<>(FXCollections.observableArrayList(lines));
-        log.getStyleClass().addAll("log", Styles.DENSE);
+        ListView<String> log = Ui.console(FXCollections.observableArrayList(lines));
         log.setPrefHeight(560);
         log.setPlaceholder(new Label("No log was kept for this migration."));
         return log;

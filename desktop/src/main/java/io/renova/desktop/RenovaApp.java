@@ -2,7 +2,6 @@ package io.renova.desktop;
 
 import atlantafx.base.theme.PrimerDark;
 import atlantafx.base.theme.PrimerLight;
-import atlantafx.base.theme.Styles;
 import io.renova.core.config.AiPreferences;
 import io.renova.desktop.service.Engine;
 import io.renova.desktop.service.MigrationHistory;
@@ -10,6 +9,7 @@ import io.renova.desktop.service.MigrationResult;
 import io.renova.desktop.service.MigrationRun;
 import io.renova.desktop.service.RecentProjects;
 import io.renova.desktop.view.HomeView;
+import io.renova.desktop.view.Icons;
 import io.renova.desktop.view.MarkdownView;
 import io.renova.desktop.view.MigrationsView;
 import io.renova.desktop.view.MigrationView;
@@ -22,7 +22,9 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ListChangeListener;
 import javafx.collections.ObservableList;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
@@ -32,7 +34,9 @@ import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.SVGPath;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
@@ -67,6 +71,8 @@ public final class RenovaApp extends Application implements Navigator {
     private Button homeButton;
     private Button settingsButton;
     private Button migrationsButton;
+    private Button themeButton;
+    private Label runCaption;
     private Path snapshotDir;
     private Scene scene;
 
@@ -80,15 +86,14 @@ public final class RenovaApp extends Application implements Navigator {
         if (theme != null) {
             prefs.putBoolean("dark", theme.equalsIgnoreCase("dark"));
         }
-        applyTheme(prefs.getBoolean("dark", false));
-
         root = new BorderPane();
         root.setLeft(sidebar());
-        scene = new Scene(root, 1280, 820);
+        scene = new Scene(root, 1320, 860);
         scene.getStylesheets().add(RenovaApp.class.getResource("app.css").toExternalForm());
+        applyTheme(prefs.getBoolean("dark", false));
         stage.setTitle("Renova");
         stage.setScene(scene);
-        stage.setMinWidth(960);
+        stage.setMinWidth(1040);
         stage.setMinHeight(640);
         stage.show();
 
@@ -109,63 +114,95 @@ public final class RenovaApp extends Application implements Navigator {
     }
 
     private Node sidebar() {
-        Label mark = new Label("R");
+        // The mark: two chevrons rising out of a base line, as in the web console.
+        SVGPath upper = new SVGPath();
+        upper.setContent("M9 17.5 16 11l7 6.5");
+        upper.getStyleClass().add("chevron");
+        SVGPath lower = new SVGPath();
+        lower.setContent("M9 23.5 16 17l7 6.5");
+        lower.getStyleClass().addAll("chevron", "faint");
+        StackPane mark = new StackPane(new Group(upper, lower));
         mark.getStyleClass().add("brand-mark");
-        HBox brand = new HBox(8, mark, Ui.label("Renova", Styles.TITLE_4));
+        HBox brand = new HBox(10, mark, Ui.label("Renova", "brand-name"));
         brand.setAlignment(Pos.CENTER_LEFT);
+        brand.setPadding(new Insets(2, 6, 14, 6));
 
-        homeButton = navButton("Projects", e -> home());
-        migrationsButton = navButton("Migrations", e -> migrations());
-        settingsButton = navButton("Settings", e -> settings());
+        homeButton = navButton("Projects", Icons.FOLDER, e -> home());
+        migrationsButton = navButton("Migrations", Icons.WORKFLOW, e -> migrations());
+        settingsButton = navButton("Settings", Icons.SETTINGS, e -> settings());
         runList = new VBox(2);
+        runCaption = new Label("THIS SESSION");
+        runCaption.getStyleClass().add("nav-caption");
+        runCaption.setVisible(false);
+        runCaption.setManaged(false);
         runs.addListener((ListChangeListener<MigrationRun>) c -> refreshRuns());
 
-        Button theme = new Button("Light / dark");
-        theme.getStyleClass().addAll(Styles.FLAT, Styles.SMALL);
-        theme.setOnAction(e -> {
+        themeButton = navButton("", Icons.MOON, e -> {
             boolean dark = !prefs.getBoolean("dark", false);
             prefs.putBoolean("dark", dark);
             applyTheme(dark);
         });
+        Label note = new Label("Your code stays on this machine.");
+        note.getStyleClass().add("sidebar-note");
+        note.setWrapText(true);
+        VBox foot = new VBox(4, note, themeButton);
+        foot.getStyleClass().add("sidebar-foot");
 
-        Label caption = new Label("MIGRATIONS THIS SESSION");
+        Label caption = new Label("WORKSPACE");
         caption.getStyleClass().add("nav-caption");
-        javafx.scene.layout.Region gap = new javafx.scene.layout.Region();
-        gap.setMinHeight(16);
-        VBox sidebar = new VBox(brand, gap, homeButton, migrationsButton, settingsButton, caption, runList, Ui.grow(), theme);
+        caption.setPadding(new Insets(0, 10, 6, 10));
+        VBox sidebar = new VBox(brand, caption, homeButton, migrationsButton, settingsButton, runCaption, runList, Ui.grow(), foot);
         sidebar.getStyleClass().add("sidebar");
         return sidebar;
     }
 
-    private Button navButton(String text, javafx.event.EventHandler<javafx.event.ActionEvent> action) {
-        Button b = new Button(text);
+    private Button navButton(String text, String icon, javafx.event.EventHandler<javafx.event.ActionEvent> action) {
+        Button b = new Button(text, Icons.of(icon, 16));
         b.getStyleClass().add("nav-button");
-        b.setWrapText(true);
         b.setOnAction(action);
         return b;
     }
 
     private void refreshRuns() {
+        runCaption.setVisible(!runs.isEmpty());
+        runCaption.setManaged(!runs.isEmpty());
         runList.getChildren().clear();
         for (MigrationRun run : runs) {
-            Button b = navButton(run.projectName() + "\n" + stateText(run.state().get()), e -> showRun(run));
-            run.state().addListener((obs, old, now) -> b.setText(run.projectName() + "\n" + stateText(now)));
+            Button b = new Button();
+            b.getStyleClass().add("run-button");
+            b.setOnAction(e -> showRun(run));
+            Runnable update = () -> {
+                MigrationRun.State state = run.state().get();
+                b.setText(run.projectName() + "\n" + stateText(state));
+                b.setGraphic(Ui.dot(switch (state) {
+                    case RUNNING -> Ui.Tone.INFO;
+                    case PASSED -> Ui.Tone.GOOD;
+                    case FAILED, ERROR -> Ui.Tone.BAD;
+                }));
+            };
+            update.run();
+            run.state().addListener((obs, old, now) -> update.run());
             runList.getChildren().add(b);
         }
     }
 
     private static String stateText(MigrationRun.State state) {
         return switch (state) {
-            case RUNNING -> "running";
-            case PASSED -> "passed";
-            case FAILED -> "failed";
-            case ERROR -> "error";
+            case RUNNING -> "Running";
+            case PASSED -> "Passed";
+            case FAILED -> "Failed";
+            case ERROR -> "Stopped with an error";
         };
     }
 
     private void applyTheme(boolean dark) {
         MarkdownView.dark = dark;
         Application.setUserAgentStylesheet(dark ? new PrimerDark().getUserAgentStylesheet() : new PrimerLight().getUserAgentStylesheet());
+        // The class the stylesheet keys Renova's colours on.
+        root.getStyleClass().removeAll("renova-light", "renova-dark");
+        root.getStyleClass().add(dark ? "renova-dark" : "renova-light");
+        themeButton.setText(dark ? "Light theme" : "Dark theme");
+        themeButton.setGraphic(Icons.of(dark ? Icons.SUN : Icons.MOON, 16));
     }
 
     private void show(Node content, Button active, String snapshotName) {
@@ -177,14 +214,14 @@ public final class RenovaApp extends Application implements Navigator {
         }
         ScrollPane scroll = new ScrollPane(content);
         scroll.setFitToWidth(true);
-        scroll.getStyleClass().add(Styles.BG_DEFAULT);
+        scroll.getStyleClass().add("canvas");
         root.setCenter(scroll);
         snapshot(snapshotName, 1.5);
     }
 
     @Override
     public void home() {
-        show(new HomeView(this, recent, runs).build(), homeButton, "home");
+        show(new HomeView(this, recent, history, runs).build(), homeButton, "home");
     }
 
     @Override

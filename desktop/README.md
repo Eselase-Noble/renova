@@ -6,7 +6,7 @@ machine, on your own key.
 
 | Screen | |
 |---|---|
-| Projects | Open a project folder, or one opened before |
+| Projects | Open a project folder, or one opened before; the latest migrations, one click away |
 | Project | The assessment: findings by category, automation rate, the playbook, and the plan with each step's guidance and files. **Findings** lists every place a rule matched, filtered by category, resolver and text (double-click opens the file). Choose a bundled playbook or your own playbook file, **Re-assess**, **Export** the assessment as Markdown or JSON, **Migrate…** |
 | Migrate | AI and retrieval, running the project's tests, behaviour verification (Docker), repair rounds, and where the migrated copy goes. **Advanced:** scenario file, AI repair of behaviour differences on or off, Maven `settings.xml` and offline builds |
 | Migration | Live log while it runs. Then build and test result, behaviour, AI usage and steps for a person; **Overview** with each stage's details and the build errors; **Behaviour** with both answers to every request side by side, database changes and accepted changes, and **Verify behaviour again**; **Changes** (every stage's diff); the **Report** rendered; **AI exchanges** (every request to the provider: files offered and their roles, rules or errors, the answer and tokens); the **Log** |
@@ -16,7 +16,10 @@ machine, on your own key.
 A migration is shown from the files in its migrated copy (`.renova/report.json`, `behaviour.json`, `ai/`,
 `progress.log`), so a past migration looks the same as one that just finished.
 
-The look is AtlantaFX's Primer theme, light or dark.
+The controls are AtlantaFX's Primer theme, in Renova's own colours, light or dark: the same palette, status colours
+and chart colours as the web console (`src/main/resources/io/renova/desktop/app.css`). A project's assessment leads
+with the automation rate and who resolves the findings (rules, AI or a person); a migration is shown as a pipeline of
+phases that follows the log while it runs.
 
 ## Run
 

@@ -67,7 +67,7 @@ public final class SettingsView {
         form.add(rag, 1, 3);
         GridPane.setHgrow(provider, Priority.ALWAYS);
 
-        Button save = new Button("Save");
+        Button save = new Button("Save changes");
         save.getStyleClass().add(Styles.ACCENT);
         save.setOnAction(e -> run(() -> {
             ai.save(AiPreferences.PROVIDER, provider.getValue());
@@ -76,11 +76,11 @@ public final class SettingsView {
             ai.save(AiPreferences.RAG, String.valueOf(rag.isSelected()));
             return "Settings saved.";
         }));
-        Button check = new Button("Check key and model");
+        Button check = new Button("Check key and model", Icons.of(Icons.SHIELD, 14));
         check.setOnAction(e -> run(ai::check));
         form.add(new HBox(8, save, check), 1, 4);
 
-        VBox keys = new VBox(12);
+        VBox keys = new VBox(16);
         for (AiPreferences.Provider p : view.providers()) {
             keys.getChildren().add(keyRow(p));
         }
@@ -126,8 +126,8 @@ public final class SettingsView {
             return p.displayName() + " key removed.";
         }));
         Node status = p.keyConfigured()
-                ? new HBox(8, Ui.badge("Key set", Ui.Tone.GOOD), Ui.label(p.maskedKey() + " · from " + p.keySource(), Styles.TEXT_MUTED, "mono"))
-                : Ui.badge("No key", Ui.Tone.MUTED);
+                ? new HBox(8, Ui.badge("Key set", Ui.Tone.GOOD, Icons.CHECK), Ui.label(p.maskedKey() + " · from " + p.keySource(), Styles.TEXT_MUTED, Styles.TEXT_SMALL, "mono"))
+                : Ui.badge("No key", Ui.Tone.MUTED, Icons.MINUS);
         TextField endpoint = new TextField(p.baseUrl() == null ? "" : p.baseUrl());
         endpoint.setPromptText("Public endpoint (set one for a gateway, proxy or on-premises server)");
         endpoint.getStyleClass().add("mono");
@@ -138,9 +138,10 @@ public final class SettingsView {
             return endpoint.getText().isBlank() ? p.displayName() + " uses its public endpoint."
                     : p.displayName() + " endpoint saved.";
         }));
-        VBox row = new VBox(6, new HBox(8, Ui.label(p.displayName(), Styles.TEXT_BOLD), status), new HBox(8, key, save, remove),
-                new HBox(8, endpoint, saveEndpoint));
-        row.setPadding(new Insets(0, 0, 4, 0));
+        HBox title = new HBox(8, Icons.of(Icons.KEY, 15), Ui.label(p.displayName(), Styles.TEXT_BOLD), status);
+        title.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        VBox row = new VBox(8, title, new HBox(8, key, save, remove), new HBox(8, endpoint, saveEndpoint));
+        row.setPadding(new Insets(0, 0, 8, 0));
         return row;
     }
 
