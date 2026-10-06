@@ -33,7 +33,13 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
       </AuthCard>
     );
   }
-  if (!details.data) return <Skeleton className="h-64 w-full" />;
+  if (!details.data) {
+    return (
+      <AuthCard title="Checking your invitation">
+        <Skeleton className="h-40 w-full" />
+      </AuthCard>
+    );
+  }
   const d = details.data;
 
   return (
@@ -61,7 +67,7 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
             <AlertDescription>{accept.error.message}</AlertDescription>
           </Alert>
         )}
-        <Button type="submit" className="w-full" disabled={accept.isPending}>
+        <Button type="submit" size="lg" className="w-full" disabled={accept.isPending}>
           {accept.isPending ? "Joining…" : `Join ${d.organisation}`}
         </Button>
       </form>

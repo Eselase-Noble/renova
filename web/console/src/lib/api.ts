@@ -1,6 +1,6 @@
 // Types and calls for the Renova web API (web/api). All requests go through the /api rewrite.
 
-export type MigrationStatus = "QUEUED" | "RUNNING" | "PASSED" | "FAILED" | "ERROR";
+export type MigrationStatus = "QUEUED" | "RUNNING" | "PASSED" | "FAILED" | "ERROR" | "CANCELLED";
 export type BehaviourStatus = "SAME" | "DIFFERENT" | "SKIPPED" | "FAILED";
 
 export interface Project {
@@ -47,6 +47,8 @@ export interface Migration {
   workspace: string;
   summary: MigrationSummary | null;
   error: string | null;
+  /** Id of the member who started it. */
+  startedBy: string | null;
 }
 
 export interface MigrationDetail {
@@ -231,6 +233,43 @@ export interface InvitationDetails {
   expiresAt: string;
 }
 
+export interface AuditEvent {
+  id: string;
+  at: string;
+  actorId: string | null;
+  actorName: string;
+  /** area.verb, for example migration.started */
+  action: string;
+  target: string | null;
+  detail: string | null;
+}
+
+export interface SystemInfo {
+  version: string;
+  java: string;
+  ecosystems: { id: string; name: string }[];
+  aiProviders: string[];
+  playbooks: number;
+  parallelMigrations: number;
+  projectRoots: string[];
+}
+
+export interface DirectoryEntry {
+  name: string;
+  path: string;
+  /** Holds a build file an installed ecosystem recognises. */
+  project: boolean;
+}
+
+export interface DirectoryListing {
+  /** Null when listing the allowed roots. */
+  path: string | null;
+  parent: string | null;
+  project: boolean;
+  entries: DirectoryEntry[];
+  truncated: boolean;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -319,10 +358,16 @@ export const api = {
 
   migrations: () => request<Migration[]>("/migrations"),
   migration: (id: string) => request<MigrationDetail>(`/migrations/${id}`),
+  cancelMigration: (id: string) => request<Migration>(`/migrations/${id}/cancel`, { method: "POST" }),
   report: (id: string) => request<MigrationReport>(`/migrations/${id}/report`),
   behaviour: (id: string) => request<BehaviourReport>(`/migrations/${id}/behaviour`),
   commits: (id: string) => request<Commit[]>(`/migrations/${id}/commits`),
   diff: (id: string, hash: string) => request<string>(`/migrations/${id}/commits/${hash}/diff`, undefined, "text"),
+
+  audit: (area?: string) => request<AuditEvent[]>(`/org/audit?limit=500${area ? `&area=${encodeURIComponent(area)}` : ""}`),
+  system: () => request<SystemInfo>("/system"),
+  directories: (path?: string | null) =>
+    request<DirectoryListing>(`/system/directories${path ? `?path=${encodeURIComponent(path)}` : ""}`),
 
   playbooks: () => request<Playbook[]>("/playbooks"),
   settings: () => request<Settings>("/settings"),
@@ -334,4 +379,5 @@ export const api = {
   checkSettings: () => request<{ message: string }>("/settings/check", { method: "POST" }),
 };
 
-export const finished = (status: MigrationStatus) => status === "PASSED" || status === "FAILED" || status === "ERROR";
+export const finished = (status: MigrationStatus) => status !== "QUEUED" && status !== "RUNNING";
+export const active = (status: MigrationStatus) => !finished(status);

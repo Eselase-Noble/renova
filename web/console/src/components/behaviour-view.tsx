@@ -3,9 +3,8 @@
 import { ChevronRight } from "lucide-react";
 import { Fragment, useState } from "react";
 
-import { Stat } from "@/components/page";
+import { Panel, Stat } from "@/components/page";
 import { BehaviourBadge, ToneBadge } from "@/components/status";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { BehaviourReport, BehaviourResult } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -23,20 +22,15 @@ export function BehaviourView({ report }: { report: BehaviourReport }) {
         <span className="text-sm text-muted-foreground">{report.summary}</span>
       </div>
       {report.original && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Stat label="Original" value={<span className="text-base">{report.original}</span>} />
-          <Stat label="Migrated" value={<span className="text-base">{report.migrated}</span>} />
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+          <Stat label="Original" value={<span className="text-base">{report.original}</span>} hint="Built from the baseline commit" />
+          <Stat label="Migrated" value={<span className="text-base">{report.migrated}</span>} hint="Built from the migrated code" />
           <Stat label="Requests compared" value={report.results.length} />
           <Stat label="Answered differently" value={differing.length} />
         </div>
       )}
       {differing.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Differences</CardTitle>
-            <CardDescription>The migrated application answered these requests differently from the original.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Panel title="Differences" description="The migrated application answered these requests differently from the original." bodyClassName="p-5 space-y-4">
             {differing.map((r) => (
               <div key={`${r.scenario}:${r.step}`} className="space-y-2 rounded-lg border p-3">
                 <div className="font-mono text-sm font-medium">{label(r)}</div>
@@ -52,16 +46,10 @@ export function BehaviourView({ report }: { report: BehaviourReport }) {
                 <Answers result={r} />
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </Panel>
       )}
       {databases.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Database changes</CardTitle>
-            <CardDescription>Rows each version added and removed in its own database during the same scenario.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
+        <Panel title="Database changes" description="Rows each version added and removed in its own database during the same scenario." bodyClassName="p-5 space-y-2">
             {databases.map(([scenario, diffs]) => (
               <div key={scenario} className="flex flex-col gap-1 text-sm sm:flex-row sm:items-start sm:gap-3">
                 <span className="font-mono sm:w-64 sm:shrink-0">{scenario.replace(/^file\./, "")}</span>
@@ -70,29 +58,22 @@ export function BehaviourView({ report }: { report: BehaviourReport }) {
                 ) : (
                   <ul className="space-y-1">
                     {diffs.map((d) => (
-                      <li key={d} className="font-mono text-xs text-amber-700 dark:text-amber-400">{d}</li>
+                      <li key={d} className="font-mono text-xs text-warning">{d}</li>
                     ))}
                   </ul>
                 )}
               </div>
             ))}
-          </CardContent>
-        </Card>
+          </Panel>
       )}
       {report.accepted.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Accepted changes</CardTitle>
-            <CardDescription>Listed under accept: in the scenario file as intended.</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <Panel title="Accepted changes" description="Listed under accept: in the scenario file as intended.">
             <ul className="list-disc space-y-1 pl-5 text-sm">
               {report.accepted.map((a) => (
                 <li key={a}>{a}</li>
               ))}
             </ul>
-          </CardContent>
-        </Card>
+          </Panel>
       )}
       {report.results.length > 0 && <AllRequests results={report.results} />}
     </div>
@@ -102,11 +83,7 @@ export function BehaviourView({ report }: { report: BehaviourReport }) {
 function AllRequests({ results }: { results: BehaviourResult[] }) {
   const [open, setOpen] = useState<string | null>(null);
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>All requests</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <Panel title="All requests" bodyClassName="p-0">
         <Table>
           <TableHeader>
             <TableRow>
@@ -145,8 +122,7 @@ function AllRequests({ results }: { results: BehaviourResult[] }) {
             })}
           </TableBody>
         </Table>
-      </CardContent>
-    </Card>
+      </Panel>
   );
 }
 
@@ -156,13 +132,13 @@ function Answers({ result }: { result: BehaviourResult }) {
       {(["original", "migrated"] as const).map((side) => {
         const answer = result[side];
         return (
-          <div key={side} className="min-w-0 rounded-md bg-muted/50 p-2">
+          <div key={side} className="min-w-0 rounded-lg border bg-muted/40 p-3">
             <div className="mb-1 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
               <span className="font-medium capitalize text-foreground">{side}</span>
               <span>{answer.status < 0 ? answer.error : answer.status}</span>
               {answer.contentType && <span className="truncate">{answer.contentType}</span>}
             </div>
-            <pre className="max-h-48 overflow-auto font-mono text-xs whitespace-pre-wrap">{answer.body || "(empty)"}</pre>
+            <pre className="scroll-thin max-h-48 overflow-auto font-mono text-xs whitespace-pre-wrap">{answer.body || "(empty)"}</pre>
           </div>
         );
       })}

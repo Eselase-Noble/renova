@@ -1,11 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, ShieldCheck } from "lucide-react";
+import { KeyRound, Lock, Monitor, Moon, ShieldCheck, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { ErrorState, LoadingRows, PageHeader } from "@/components/page";
+import { ErrorState, Field, LoadingRows, PageHeader, Segmented } from "@/components/page";
 import { ToneBadge } from "@/components/status";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { api, type ProviderSettings, type Settings } from "@/lib/api";
+import { plural } from "@/lib/format";
 import { useAuth } from "@/lib/auth";
 
 const EFFORTS: Record<string, string> = { default: "Provider default", low: "Low", medium: "Medium", high: "High", xhigh: "Extra high", max: "Max" };
@@ -22,38 +24,117 @@ export default function SettingsPage() {
   const settings = useQuery({ queryKey: ["settings"], queryFn: api.settings });
   const auth = useAuth();
   const canEdit = auth.can("ADMIN");
+  const organisation = auth.data?.organisation?.name ?? "your organisation";
   return (
     <>
-      <PageHeader
-        title="Settings"
-        description={`AI for ${auth.data?.organisation?.name ?? "your organisation"} runs on its own provider account. Renova never supplies, pools or shares keys.`}
-      />
+      <PageHeader title="Settings" description={`How Renova works for ${organisation}.`} />
       {!canEdit && (
-        <p className="-mt-3 mb-4 text-sm text-muted-foreground">Only admins can change these settings.</p>
+        <div className="mb-6 flex items-center gap-2.5 rounded-lg border bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground">
+          <Lock className="size-4 shrink-0" /> Only admins can change these settings.
+        </div>
       )}
       {settings.error ? (
         <ErrorState error={settings.error} />
       ) : !settings.data ? (
         <LoadingRows rows={4} />
       ) : (
-        <div className="space-y-6">
-          <ProviderForm
-            key={JSON.stringify([settings.data.provider, settings.data.model, settings.data.effort, settings.data.rag])}
-            settings={settings.data}
-            canEdit={canEdit}
-            canCheck={auth.can("MEMBER")}
-          />
-          <div className="grid gap-4 md:grid-cols-2">
-            {settings.data.providers.map((p) => (
-              <KeyCard key={`${p.name}-${p.baseUrl}`} provider={p} canEdit={canEdit} />
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Keys are encrypted on the Renova server and only ever shown masked. Each organisation has its own.
-          </p>
+        <div className="divide-y [&>*]:py-8 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
+          <Section
+            title="AI provider"
+            description={`AI for ${organisation} runs on its own provider account. Renova never supplies, pools or shares keys. Without a provider, AI steps are listed for a person.`}
+          >
+            <ProviderForm
+              key={JSON.stringify([settings.data.provider, settings.data.model, settings.data.effort, settings.data.rag])}
+              settings={settings.data}
+              canEdit={canEdit}
+              canCheck={auth.can("MEMBER")}
+            />
+          </Section>
+          <Section
+            title="Provider keys"
+            description="Keys are encrypted on the Renova server and only ever shown masked. Each organisation has its own. An endpoint points a provider at a gateway or an on-premises server."
+          >
+            <div className="space-y-4">
+              {settings.data.providers.map((p) => (
+                <KeyCard key={`${p.name}-${p.baseUrl}`} provider={p} canEdit={canEdit} active={settings.data.provider === p.name} />
+              ))}
+            </div>
+          </Section>
+          <Section title="Appearance" description="The theme for this browser. It is not shared with the rest of the organisation.">
+            <Appearance />
+          </Section>
+          <Section title="Server" description="The Renova server this console talks to, and what is installed on it.">
+            <Server />
+          </Section>
         </div>
       )}
     </>
+  );
+}
+
+/** A settings row: what it is on the left, the controls on the right. */
+function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+  return (
+    <section className="grid gap-x-10 gap-y-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+      <div>
+        <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>
+        <p className="mt-1 text-[13px] text-muted-foreground">{description}</p>
+      </div>
+      <div className="min-w-0">{children}</div>
+    </section>
+  );
+}
+
+function Appearance() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <Card>
+      <CardContent className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="text-sm font-medium">Theme</div>
+          <p className="text-[13px] text-muted-foreground">System follows your device&apos;s light or dark setting.</p>
+        </div>
+        <Segmented
+          label="Theme"
+          value={theme ?? "system"}
+          onChange={setTheme}
+          options={[
+            { value: "light", label: <><Sun /> Light</> },
+            { value: "dark", label: <><Moon /> Dark</> },
+            { value: "system", label: <><Monitor /> System</> },
+          ]}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+function Server() {
+  const system = useQuery({ queryKey: ["system"], queryFn: api.system, staleTime: Infinity });
+  if (system.error) return <ErrorState error={system.error} />;
+  if (!system.data) return <LoadingRows rows={3} />;
+  const info = system.data;
+  return (
+    <Card>
+      <CardContent>
+        <dl className="divide-y [&>*:first-child]:pt-0 [&>*:last-child]:pb-0">
+          <Field label="Version"><span className="font-mono text-[13px]">{info.version}</span></Field>
+          <Field label="Java"><span className="font-mono text-[13px]">{info.java}</span></Field>
+          <Field label="Ecosystems">{info.ecosystems.map((e) => e.name).join(", ") || "None installed"}</Field>
+          <Field label="Playbooks">{plural(info.playbooks, "playbook")} installed</Field>
+          <Field label="AI providers"><span className="capitalize">{info.aiProviders.join(", ") || "None installed"}</span></Field>
+          <Field label="Concurrency">{plural(info.parallelMigrations, "migration")} at a time; others wait in the queue</Field>
+          <Field label="Project folders">
+            <ul className="space-y-0.5">
+              {info.projectRoots.map((root) => (
+                <li key={root} className="font-mono text-[13px] break-all">{root}</li>
+              ))}
+            </ul>
+            <p className="mt-1 text-xs text-muted-foreground">Projects can only be added from these folders (renova.project-roots on the server).</p>
+          </Field>
+        </dl>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -89,10 +170,6 @@ function ProviderForm({ settings, canEdit, canCheck }: { settings: Settings; can
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>AI provider</CardTitle>
-        <CardDescription>Used for judgement calls, build repair and behaviour repair.</CardDescription>
-      </CardHeader>
       <CardContent className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label>Provider</Label>
@@ -135,27 +212,27 @@ function ProviderForm({ settings, canEdit, canCheck }: { settings: Settings; can
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
-          <div>
+        <div className="flex items-start justify-between gap-4 rounded-lg border bg-muted/30 p-3">
+          <div className="space-y-0.5">
             <Label htmlFor="rag">Retrieve context (RAG)</Label>
             <p className="text-xs text-muted-foreground">Related code, tests and migration notes in each request. No extra key.</p>
           </div>
           <Switch id="rag" checked={rag} onCheckedChange={(c) => setRag(c)} disabled={!canEdit} />
         </div>
       </CardContent>
-      <CardFooter className="gap-2">
-        <Button onClick={() => save.mutate()} disabled={save.isPending || !canEdit}>
-          Save
-        </Button>
+      <CardFooter className="justify-between gap-2">
         <Button variant="outline" onClick={() => check.mutate()} disabled={check.isPending || settings.provider === "none" || !canCheck}>
           <ShieldCheck /> {check.isPending ? "Checking…" : "Check key and model"}
+        </Button>
+        <Button onClick={() => save.mutate()} disabled={save.isPending || !canEdit}>
+          {save.isPending ? "Saving…" : "Save changes"}
         </Button>
       </CardFooter>
     </Card>
   );
 }
 
-function KeyCard({ provider, canEdit }: { provider: ProviderSettings; canEdit: boolean }) {
+function KeyCard({ provider, canEdit, active }: { provider: ProviderSettings; canEdit: boolean; active: boolean }) {
   const [key, setKey] = useState("");
   const [baseUrl, setBaseUrl] = useState(provider.baseUrl ?? "");
   const queryClient = useQueryClient();
@@ -191,12 +268,13 @@ function KeyCard({ provider, canEdit }: { provider: ProviderSettings; canEdit: b
         <CardTitle className="flex items-center gap-2">
           <KeyRound className="size-4 text-muted-foreground" />
           {provider.displayName}
+          {active && <ToneBadge tone="brand">In use</ToneBadge>}
         </CardTitle>
         <CardDescription className="flex flex-wrap items-center gap-2">
           {provider.keyConfigured ? (
             <>
               <ToneBadge tone="good">Key set</ToneBadge>
-              <span className="font-mono">{provider.key}</span>
+              <span className="font-mono text-xs">{provider.key}</span>
             </>
           ) : (
             <ToneBadge tone="muted">No key</ToneBadge>

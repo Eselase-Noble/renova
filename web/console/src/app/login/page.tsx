@@ -51,7 +51,7 @@ function Login() {
             <AlertDescription>{login.error.message}</AlertDescription>
           </Alert>
         )}
-        <Button type="submit" className="w-full" disabled={login.isPending}>
+        <Button type="submit" size="lg" className="w-full" disabled={login.isPending}>
           {login.isPending ? "Signing in…" : "Sign in"}
         </Button>
         <p className="text-center text-xs text-muted-foreground">New here? Ask an admin of your organisation for an invitation.</p>
