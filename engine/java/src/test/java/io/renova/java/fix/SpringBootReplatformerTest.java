@@ -146,8 +146,39 @@ class SpringBootReplatformerTest {
                 + "    <version>1</version>\n    <packaging>war</packaging>\n</project>\n");
         file("src/main/java/com/acme/shop/Hello.java", "package com.acme.shop;\n\nimport jakarta.servlet.annotation.WebServlet;\n"
                 + "import jakarta.servlet.http.HttpServlet;\n\n@WebServlet(\"/hello\")\npublic class Hello extends HttpServlet {\n}\n");
+        file("src/main/java/com/acme/shop/Report.java", "package com.acme.shop;\n\nimport jakarta.servlet.http.HttpServlet;\n\n"
+                + "public class Report extends HttpServlet {\n}\n");
         file("src/main/webapp/index.jsp", "<html/>");
-        SpringBootReplatformer.convert(module, "3.5.7", new ArrayList<>());
+        file("src/main/webapp/WEB-INF/web.xml", """
+                <web-app xmlns="https://jakarta.ee/xml/ns/jakartaee" version="6.0">
+                  <context-param><param-name>region</param-name><param-value>gh</param-value></context-param>
+                  <filter><filter-name>audit</filter-name><filter-class>com.acme.shop.AuditFilter</filter-class></filter>
+                  <filter-mapping><filter-name>audit</filter-name><url-pattern>/*</url-pattern></filter-mapping>
+                  <servlet>
+                    <servlet-name>monthly-report</servlet-name>
+                    <servlet-class>com.acme.shop.Report</servlet-class>
+                    <init-param><param-name>format</param-name><param-value>pdf</param-value></init-param>
+                    <load-on-startup>1</load-on-startup>
+                  </servlet>
+                  <servlet-mapping><servlet-name>monthly-report</servlet-name><url-pattern>/report</url-pattern><url-pattern>/report/*</url-pattern></servlet-mapping>
+                  <listener><listener-class>com.acme.shop.Startup</listener-class></listener>
+                  <session-config><session-timeout>45</session-timeout></session-config>
+                  <error-page><error-code>404</error-code><location>/missing.jsp</location></error-page>
+                </web-app>
+                """);
+        List<String> notes = new ArrayList<>();
+        SpringBootReplatformer.convert(module, "3.5.7", notes);
+        assertThat(module.resolve("src/main/webapp/WEB-INF/web.xml")).doesNotExist();
+        assertThat(read("src/main/java/com/acme/shop/WebConfiguration.java")).contains("@Configuration",
+                "public ServletRegistrationBean<com.acme.shop.Report> monthlyReportServlet()",
+                "new ServletRegistrationBean<>(new com.acme.shop.Report(), \"/report\", \"/report/*\")", "bean.setName(\"monthly-report\");",
+                "bean.setLoadOnStartup(1);", "bean.addInitParameter(\"format\", \"pdf\");",
+                "public FilterRegistrationBean<com.acme.shop.AuditFilter> auditFilter()", "bean.addUrlPatterns(\"/*\");", "bean.setOrder(1);",
+                "new ServletListenerRegistrationBean<>(new com.acme.shop.Startup())");
+        assertThat(read("src/main/resources/application.properties")).contains("server.servlet.context-parameters.region=gh",
+                "server.servlet.session.timeout=45m");
+        assertThat(notes).anyMatch(n -> n.contains("<error-page>"));
+        assertThat(read("pom.xml")).contains("tomcat-embed-jasper");
         assertThat(read("src/main/java/com/acme/shop/Application.java")).contains("extends SpringBootServletInitializer",
                 "@ServletComponentScan");
         assertThat(read("pom.xml")).contains("<packaging>war</packaging>", "spring-boot-starter-web", "spring-boot-starter-tomcat",

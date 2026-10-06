@@ -166,6 +166,17 @@ public final class SpringBootReplatformer implements Fixer {
         if (contextRoot != null && !contextRoot.equals("/")) {
             properties.put("server.servlet.context-path", contextRoot, "The address the application server published it under.");
         }
+        // web.xml: an embedded server does not read it, so what it declares is declared in code.
+        Path webXml = module.resolve("src/main/webapp/WEB-INF/web.xml");
+        if (Files.isRegularFile(webXml)) {
+            String configuration = WebXml.configuration(Files.readString(webXml, StandardCharsets.UTF_8), base, properties, notes);
+            if (configuration != null) {
+                Files.writeString(baseDir.resolve("WebConfiguration.java"), configuration, StandardCharsets.UTF_8);
+            }
+            Files.delete(webXml);
+            notes.add("WEB-INF/web.xml → " + (configuration == null ? "" : sources.relativize(baseDir.resolve("WebConfiguration.java")) + " and ")
+                    + "application.properties: an embedded server does not read web.xml");
+        }
         boolean webContent = war && hasWebContent(module.resolve("src/main/webapp"));
         if (war && !webContent) {
             deleteEmpty(module.resolve("src/main/webapp"));
@@ -235,7 +246,13 @@ public final class SpringBootReplatformer implements Fixer {
         }
 
         // The build.
-        Files.writeString(module.resolve("pom.xml"), pom(pom, boot, uses, webContent, notes), StandardCharsets.UTF_8);
+        boolean jsp = false;
+        if (webContent) {
+            try (Stream<Path> walk = Files.walk(module.resolve("src/main/webapp"))) {
+                jsp = walk.anyMatch(p -> p.toString().endsWith(".jsp") || p.toString().endsWith(".jspx"));
+            }
+        }
+        Files.writeString(module.resolve("pom.xml"), pom(pom, boot, uses, webContent, jsp, notes), StandardCharsets.UTF_8);
         return true;
     }
 
@@ -547,7 +564,7 @@ public final class SpringBootReplatformer implements Fixer {
                 || artifactId.contains("_spec"));
     }
 
-    static String pom(String original, String boot, Uses uses, boolean webContent, List<String> notes) {
+    static String pom(String original, String boot, Uses uses, boolean webContent, boolean jsp, List<String> notes) {
         String pom = original;
         PomEditor.Result removed = PomEditor.removeDependencies(pom, SpringBootReplatformer::serverApi);
         pom = removed.content();
@@ -577,6 +594,10 @@ public final class SpringBootReplatformer implements Fixer {
         }
         if (webContent) {
             pom = PomEditor.addDependency(pom, "org.springframework.boot", "spring-boot-starter-tomcat", null, "provided").content();
+            if (jsp) {
+                // The embedded server compiles JSP pages only with its JSP engine present.
+                pom = PomEditor.addDependency(pom, "org.apache.tomcat.embed", "tomcat-embed-jasper", null, "provided").content();
+            }
         } else {
             pom = PomEditor.setPackaging(pom, "jar").content();
         }
