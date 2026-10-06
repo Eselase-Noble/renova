@@ -176,6 +176,14 @@ public final class MigrationView {
         if (note != null) {
             page.getChildren().add(new Message("Behaviour verified again", note));
         }
+        String skipped = skippedAi(r);
+        if (skipped != null) {
+            Button settings = new Button("Open settings", Icons.of(Icons.KEY, 14));
+            settings.setOnAction(e -> nav.settings());
+            Message why = new Message("The build fails because the AI steps were not done", skipped);
+            why.getStyleClass().add(Styles.WARNING);
+            page.getChildren().add(new VBox(8, why, settings));
+        }
         page.getChildren().add(summary(r));
 
         tabs.getTabs().setAll(tab("Overview", overview(r)));
@@ -258,6 +266,30 @@ public final class MigrationView {
                         ? Ui.tokens(ai.path("inputTokens").asLong()) + " in · " + Ui.tokens(ai.path("outputTokens").asLong())
                         + " out · " + m.path("repairRounds").asInt() + " repair round(s)" : "AI steps are listed for a person"),
                 Ui.stat("For a person", String.valueOf(m.path("manualSteps").size()), "Steps with guidance"));
+    }
+
+    /**
+     * Why a failing build is expected: the plan had steps for AI, and this migration ran without it. Null when
+     * that is not what happened.
+     */
+    private static String skippedAi(MigrationResult r) {
+        JsonNode m = r.migration();
+        if (r.buildPasses() || m.path("aiUsage").path("requests").asInt() > 0) {
+            return null;
+        }
+        List<String> steps = new java.util.ArrayList<>();
+        r.report().path("plan").forEach(step -> {
+            if (step.path("strategy").asText().equals("ai")) {
+                steps.add(step.path("title").asText());
+            }
+        });
+        if (steps.isEmpty()) {
+            return null;
+        }
+        return "This migration ran without AI, so " + steps.size() + (steps.size() == 1 ? " step of the plan was" : " steps of the plan were")
+                + " left undone and the code that depends on " + (steps.size() == 1 ? "it" : "them") + " does not build yet:\n• "
+                + String.join("\n• ", steps) + "\nAdd your own Anthropic or OpenAI key in Settings and migrate again: Renova then makes these "
+                + "changes and repairs the build errors that are left. Or make the changes by hand in the migrated folder.";
     }
 
     /** A badge at the height of a stat's figure, so cards with a state and cards with a number line up. */
