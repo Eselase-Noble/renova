@@ -1,0 +1,167 @@
+# Rule pack: Spring Framework 5 and earlier to 6: removed APIs and changed web defaults.
+# Included by the playbooks in the folder above; a pack holds only rules and knowledge cards.
+
+rules:
+
+  - id: spring-framework-6
+    title: Upgrade Spring Framework to 6.x
+    category: C
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates: ["org.springframework:spring-*"]
+      versionBelow: "6"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.framework.UpgradeSpringFramework_6_2]
+    rationale: Spring 5 and earlier only support javax; Jakarta EE 10 needs Spring 6.
+
+  - id: spring-assert-without-message
+    title: Add messages to Spring Assert calls (message-less overloads removed)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.java"]
+      pattern: "\\bAssert\\.(notNull|isNull|isTrue|hasText|hasLength|notEmpty|state|noNullElements|isInstanceOf)\\(\\s*[^,()]+(\\([^()]*\\))?\\s*\\)\\s*;"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.framework.MigrateSpringAssert]
+
+  - id: handler-interceptor-adapter
+    title: Replace HandlerInterceptorAdapter (removed in Spring 6)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [org.springframework.web.servlet.handler.HandlerInterceptorAdapter]
+    fix:
+      strategy: ai
+      hint: >
+        Change "extends HandlerInterceptorAdapter" to "implements AsyncHandlerInterceptor". The adapter
+        was an empty implementation of that interface, so behaviour is unchanged.
+
+  - id: commons-multipart-resolver
+    title: Replace CommonsMultipartResolver with StandardServletMultipartResolver
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.java", "**/*.xml"]
+      pattern: "CommonsMultipartResolver"
+    fix:
+      strategy: ai
+      hint: >
+        Keep the same bean id and aliases. Move maxUploadSize / maxInMemorySize to <multipart-config>
+        on the DispatcherServlet in web.xml (max-file-size, max-request-size, file-size-threshold)
+        with identical values, so upload limits do not change.
+
+  - id: spring-orm-ibatis
+    title: Replace Spring's iBATIS 2 support (removed in Spring 4)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [org.springframework.orm.ibatis]
+    fix:
+      strategy: manual
+      hint: >
+        Either vendor an Apache-2.0 bridge (e.g. mybatis-2-spring) under its original package so
+        callers do not change, or migrate the SQL maps to MyBatis 3 (much larger change).
+
+  - id: spring-mvc-url-matching
+    title: Preserve Spring MVC URL matching (suffix and mid-path ** patterns)
+    category: D
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates: ["org.springframework:spring-webmvc"]
+      versionBelow: "6"
+    fix:
+      strategy: manual
+      hint: >
+        Spring 6 removed suffix matching ("/foo" no longer answers "/foo.do") and its PathPatternParser
+        rejects "**" in the middle of a pattern, which stops startup. To keep the old behaviour,
+        register an AntPathMatcher and <mvc:path-matching suffix-pattern="true" trailing-slash="true"
+        path-matcher="pathMatcher"/>, then list ".do" forms explicitly where callers use them.
+
+  - id: guard-spring-assert-messages
+    phase: guard
+    title: Spring Assert calls left without a message (overloads removed in Spring 6)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.java"]
+      requires: 'org\.springframework\.util\.(Assert\b|\*)'
+      pattern: '\bAssert\.(notNull|isNull|isTrue|state|hasText|hasLength)\(\s*[^,()]+(\([^()]*\))?\s*\)\s*;'
+    fix:
+      strategy: replace
+      include: "**/*.java"
+      regex: true
+      params:
+        # The messages the removed overloads used, so exception messages do not change.
+        replacements:
+          - find: '\bAssert\.notNull\(\s*([^,()]+?(?:\([^()]*\))?)\s*\)(\s*;)'
+            replace: 'Assert.notNull($1, "[Assertion failed] - this argument is required; it must not be null")$2'
+          - find: '\bAssert\.isNull\(\s*([^,()]+?(?:\([^()]*\))?)\s*\)(\s*;)'
+            replace: 'Assert.isNull($1, "[Assertion failed] - the object argument must be null")$2'
+          - find: '\bAssert\.isTrue\(\s*([^,()]+?(?:\([^()]*\))?)\s*\)(\s*;)'
+            replace: 'Assert.isTrue($1, "[Assertion failed] - this expression must be true")$2'
+          - find: '\bAssert\.state\(\s*([^,()]+?(?:\([^()]*\))?)\s*\)(\s*;)'
+            replace: 'Assert.state($1, "[Assertion failed] - this state invariant must be true")$2'
+          - find: '\bAssert\.hasText\(\s*([^,()]+?(?:\([^()]*\))?)\s*\)(\s*;)'
+            replace: 'Assert.hasText($1, "[Assertion failed] - this String argument must have text; it must not be null, empty, or blank")$2'
+          - find: '\bAssert\.hasLength\(\s*([^,()]+?(?:\([^()]*\))?)\s*\)(\s*;)'
+            replace: 'Assert.hasLength($1, "[Assertion failed] - this String argument must have length; it must not be null or empty")$2'
+    rationale: >
+      OpenRewrite's MigrateSpringAssert only converts calls whose argument types it can resolve. An
+      argument whose type comes from a sibling module can leave a call unconverted, and Spring 6 no
+      longer compiles it. Calls whose argument contains a comma or nested calls are left to the build
+      and AI repair.
+
+knowledge:
+
+  - id: spring6-commons-multipart-removed
+    title: Spring 6 removed CommonsMultipartResolver
+    triggers: ["CommonsMultipartResolver", "commons-fileupload"]
+    body: |
+      Use org.springframework.web.multipart.support.StandardServletMultipartResolver, which relies on the
+      servlet container's multipart support. Spring looks the resolver up by the bean name
+      "multipartResolver"; keep that name. Limits move to the DispatcherServlet's <multipart-config> in
+      web.xml (or a MultipartConfigElement): Commons maxUploadSize limited the whole request, so map it to
+      max-request-size (and max-file-size, to keep per-file uploads at most as large); maxInMemorySize maps
+      to file-size-threshold. Without a <multipart-config> the container rejects multipart requests.
+
+  - id: spring6-handler-interceptor-adapter
+    title: Spring 6 removed HandlerInterceptorAdapter
+    triggers: ["HandlerInterceptorAdapter"]
+    body: |
+      HandlerInterceptorAdapter was an empty implementation of AsyncHandlerInterceptor. Replace
+      "extends HandlerInterceptorAdapter" with "implements AsyncHandlerInterceptor" (or HandlerInterceptor if
+      afterConcurrentHandlingStarted is not overridden). The interfaces have default methods, so only the
+      overridden methods are needed and behaviour does not change. Check superclasses too: a project base
+      class may extend the adapter.
+
+  - id: spring6-assert-messages
+    title: Spring 6 removed the message-less Assert overloads
+    triggers: ["org.springframework.util.Assert", "no suitable method found for notNull",
+               "no suitable method found for isTrue", "no suitable method found for state"]
+    body: |
+      Assert.notNull(Object), isNull, isTrue, state, hasText, hasLength, notEmpty and noNullElements without a
+      message were removed. Pass the message the removed overload used so exception text is unchanged, e.g.
+      notNull: "[Assertion failed] - this argument is required; it must not be null"; isTrue:
+      "[Assertion failed] - this expression must be true"; state: "[Assertion failed] - this state invariant
+      must be true"; hasText: "[Assertion failed] - this String argument must have text; it must not be
+      null, empty, or blank".
+
+  - id: spring6-url-matching
+    title: Spring 6 URL matching defaults changed
+    triggers: ["RequestMapping", "useSuffixPatternMatch", "suffix-pattern", "PathPatternParser", "AntPathMatcher",
+               "No more pattern data allowed after"]
+    body: |
+      Spring 6 matches URLs with PathPatternParser by default and dropped suffix pattern matching, so
+      "/orders" no longer answers "/orders.do", and trailing-slash matching is off ("/orders/" no longer
+      matches "/orders"). PathPatternParser also rejects "**" in the middle of a pattern, which stops startup
+      with "No more pattern data allowed after {*...} or ** pattern element". To keep old behaviour, configure
+      an AntPathMatcher with <mvc:path-matching path-matcher="..."/> and list ".do" forms explicitly.

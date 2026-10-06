@@ -1,0 +1,82 @@
+# Rule pack: JDK APIs removed or closed off since Java 8: what breaks when only the Java version is raised.
+# Included by the playbooks in the folder above; a pack holds only rules and knowledge cards.
+
+rules:
+
+  - id: sun-misc-base64
+    title: Replace sun.misc.BASE64Encoder/Decoder (removed in Java 9)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [sun.misc.BASE64Encoder, sun.misc.BASE64Decoder]
+    fix:
+      strategy: ai
+      hint: >
+        Use java.util.Base64. The sun decoder ignored line breaks and other non-alphabet characters;
+        use Base64.getMimeDecoder() where input may contain them, otherwise getDecoder() throws.
+        The sun encoder wrapped lines at 76 characters; use getMimeEncoder() only if callers rely on it.
+
+  - id: jdk-internal-apis
+    title: Remove other JDK-internal APIs (strongly encapsulated since Java 17)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: ["sun.", "com.sun.image.codec", "com.sun.org.apache"]
+      exclude: [sun.misc.BASE64Encoder, sun.misc.BASE64Decoder]
+    fix:
+      strategy: ai
+      hint: Replace with the supported public API; do not add --add-opens unless no replacement exists.
+
+  - id: nashorn-script-engine
+    title: Nashorn JavaScript engine (removed in Java 15)
+    category: D
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.java"]
+      pattern: 'getEngineByName\(\s*"(?i:nashorn|javascript|js|ecmascript)"\s*\)|import\s+jdk\.nashorn\.'
+    fix:
+      strategy: ai
+      hint: >
+        Java 15 removed Nashorn: ScriptEngineManager.getEngineByName returns null and the code fails at
+        runtime even though it compiles. Add the standalone engine org.openjdk.nashorn:nashorn-core:15.7
+        to this module's build file; it registers under the same engine names, so the Java code can stay
+        as it is. Imports of jdk.nashorn.api.* become org.openjdk.nashorn.api.*.
+
+  - id: security-manager
+    title: SecurityManager use (deprecated for removal, disabled by default since Java 18)
+    category: D
+    severity: WARNING
+    detect:
+      type: fileContains
+      include: ["**/*.java"]
+      pattern: "System\\.(get|set)SecurityManager|AccessController\\.doPrivileged"
+    fix:
+      strategy: manual
+      hint: Behaviour that relied on a SecurityManager must be enforced another way.
+
+  - id: cglib
+    title: Remove direct cglib dependency
+    category: C
+    severity: WARNING
+    detect: { type: dependency, coordinates: ["cglib:*"] }
+    fix:
+      strategy: manual
+      hint: >
+        cglib does not work on Java 17+ without --add-opens. Spring 6 repackages its own copy. If
+        iBATIS 2 is used, cglib is only needed for nested-select lazy loading; when no SQL map uses
+        it, removing cglib makes iBATIS fall back to reflection with identical results.
+
+knowledge:
+
+  - id: nashorn-removed
+    title: Nashorn was removed in Java 15
+    triggers: ["nashorn", "getEngineByName", "ScriptEngineManager", "jdk.nashorn"]
+    body: |
+      Java 15 removed the Nashorn JavaScript engine (JEP 372). ScriptEngineManager.getEngineByName("nashorn"
+      or "javascript") then returns null, so code compiles and fails at runtime with a NullPointerException.
+      Add org.openjdk.nashorn:nashorn-core:15.7 (it needs Java 11+) to the module that runs scripts; it
+      registers under the same engine names, so the Java code can stay unchanged. Direct imports of
+      jdk.nashorn.api.* become org.openjdk.nashorn.api.*.

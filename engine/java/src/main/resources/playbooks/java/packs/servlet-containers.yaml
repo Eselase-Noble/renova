@@ -1,0 +1,51 @@
+# Rule pack: What changes on the servlet container or application server itself: Tomcat 10.1/11, WildFly 27+, JBoss EAP 8.
+# Included by the playbooks in the folder above; a pack holds only rules and knowledge cards.
+
+rules:
+
+  - id: maven-variant-poms
+    title: Bring alternative build files (e.g. pom.jboss.xml) in line with the migrated pom.xml
+    category: A
+    severity: WARNING
+    detect: { type: fileExists, include: ["**/pom.*.xml"] }
+    fix:
+      strategy: ai
+      hint: >
+        Regenerate the variant from the migrated pom.xml and re-apply only its intended differences
+        (e.g. logging backend, container-specific resources). Compare the two files afterwards to
+        confirm no other differences exist.
+
+  - id: sitemesh2-tomcat10
+    title: SiteMesh 2 decorated pages render blank on Tomcat 10.1/11
+    category: D
+    severity: BLOCKER
+    detect: { type: dependency, coordinates: ["opensymphony:sitemesh"] }
+    fix:
+      strategy: manual
+      hint: >
+        Use the Jakarta build of SiteMesh 2 (opensymphony:sitemesh 2.6.0+). Tomcat 10.1/11 finishes the
+        response after a forward (suspendWrappedResponseAfterForward), discarding SiteMesh's buffered
+        output. Add <Context suspendWrappedResponseAfterForward="false" /> to
+        src/main/webapp/META-INF/context.xml.
+
+  - id: jboss-deployment-structure
+    title: Review JBoss module dependencies for EAP 8 / WildFly 27+
+    category: D
+    severity: WARNING
+    detect: { type: fileExists, include: ["**/jboss-deployment-structure.xml"] }
+    fix:
+      strategy: ai
+      hint: >
+        javax.* modules are renamed jakarta.* in EAP 8 / WildFly 27+. Update module names in
+        exclusions and dependencies, and re-check every excluded subsystem still exists.
+
+knowledge:
+
+  - id: tomcat10-sitemesh2-forward
+    title: SiteMesh 2 pages render blank on Tomcat 10.1/11
+    triggers: ["sitemesh", "suspendWrappedResponseAfterForward"]
+    body: |
+      Tomcat 10.1+ finishes the response after a RequestDispatcher forward (suspendWrappedResponseAfterForward
+      defaults to true), discarding output SiteMesh 2 buffered. Use the Jakarta build of SiteMesh 2
+      (opensymphony:sitemesh 2.6.0+) and add <Context suspendWrappedResponseAfterForward="false" /> to
+      src/main/webapp/META-INF/context.xml.

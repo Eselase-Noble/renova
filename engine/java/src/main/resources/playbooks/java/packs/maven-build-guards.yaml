@@ -1,0 +1,68 @@
+# Rule pack: Guards on the build files, checked on the migrated code whatever the migration path.
+# Included by the playbooks in the folder above; a pack holds only rules and knowledge cards.
+
+rules:
+
+  - id: guard-war-plugin-java17
+    phase: guard
+    title: maven-war-plugin must be 3.3.2 or newer to run on Java 17+
+    category: A
+    severity: BLOCKER
+    detect:
+      type: mavenPluginBelow
+      plugin: maven-war-plugin
+      version: "3.3.2"
+      packaging: war
+      whenUndeclared: true
+    fix:
+      strategy: maven
+      params: { action: setPluginVersion, plugin: maven-war-plugin, version: "3.4.0" }
+    rationale: >
+      Older versions, including the default Maven 3 picks when none is declared, fail on Java 17+
+      because they reflect into JDK internals. Declaring the version also makes builds reproducible.
+
+  - id: guard-compiler-target
+    phase: guard
+    title: Compiler target level must match the source level
+    category: A
+    severity: BLOCKER
+    detect:
+      type: pomProperty
+      missing: maven.compiler.target
+      requires: maven.compiler.source
+      unless: [maven.compiler.release]
+    fix:
+      strategy: maven
+      params: { action: setProperty, name: maven.compiler.target, value: "${maven.compiler.source}" }
+    rationale: >
+      With only the source level raised, older compiler plugins keep a lower default target and the
+      build fails ("source release 21 requires target release 21").
+
+  - id: guard-dependency-version
+    phase: guard
+    title: Dependencies without a version need one when nothing manages them
+    category: E
+    severity: BLOCKER
+    detect: { type: dependencyWithoutVersion }
+    fix:
+      strategy: maven
+      params: { action: setVersion }
+    rationale: >
+      A recipe can rename an artifact in a module but rename the parent's managed entry differently (for
+      example commons-fileupload2-jakarta-servlet5 in the module, -servlet6 in the parent), leaving the
+      module's dependency without a version and the build broken. The version is taken from the managed
+      artifact of the same family. Review whether the module should use the managed artifact instead.
+
+  - id: guard-duplicate-dependencies
+    phase: guard
+    title: A dependency must be declared only once in a build file
+    category: E
+    severity: WARNING
+    detect: { type: duplicateDependency }
+    fix:
+      strategy: maven
+      params: { action: removeDuplicates }
+    rationale: >
+      Recipes that add a dependency can miss an existing declaration they renamed, leaving two copies that
+      disagree on version or scope. Maven only warns. The first declaration, normally the project's own,
+      is kept and later copies are removed.
