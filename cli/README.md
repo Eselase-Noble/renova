@@ -14,6 +14,7 @@ mvn package                            # produces target/renova.jar
 ```sh
 cli/bin/renova playbooks                                  # installed ecosystems and playbooks
 cli/bin/renova analyze <project> [-f md|json] [-o FILE]   # read-only assessment and plan
+cli/bin/renova portfolio <folder> [-f md|json|csv] [-o FILE] [--depth N]   # every project under a folder, ranked easiest first
 cli/bin/renova migrate <project> --out <dir>              # migrate a copy; each stage is a git commit
           [--playbook ID|FILE] [--maven-settings FILE] [--offline]
           [--ai PROVIDER] [--ai-model MODEL] [--ai-effort LEVEL] [--env-file FILE]

@@ -32,36 +32,19 @@ public final class MavenVerifier implements Verifier {
     public static final String SKIP_TESTS_GOALS = "clean package -DskipTests";
     private static final Duration TIMEOUT = Duration.ofMinutes(60);
 
-    /** The build runs on the JDK in JAVA_HOME, or the one running Renova: it must be at least the target's. */
+    /** The build needs an installed JDK that can compile for the target; Renova finds it (see {@link Jdks}). */
     @Override
     public void preflight(MigrationContext context) {
-        String target = context.playbook().targets().get("java");
-        if (target == null || !target.matches("\\d+")) {
+        int target = MavenSupport.targetJava(context);
+        if (target == 0 || MavenSupport.buildJdk(context).isPresent()) {
             return;
         }
-        int installed = installedJava(System.getenv("JAVA_HOME"));
-        if (installed < Integer.parseInt(target)) {
-            throw new IllegalStateException("This migration targets Java " + target + ", but the build would run on Java " + installed
-                    + ". Install JDK " + target + " and point JAVA_HOME at it, or choose a target this machine can build "
-                    + "(for example with --playbook java-to-" + installed + "). Use --no-verify to migrate without building.");
-        }
-    }
-
-    /** The feature version of the JDK in {@code javaHome} (from its release file), or of the running one. */
-    static int installedJava(String javaHome) {
-        if (javaHome != null && !javaHome.isBlank()) {
-            try {
-                for (String line : java.nio.file.Files.readAllLines(Path.of(javaHome, "release"))) {
-                    Matcher m = java.util.regex.Pattern.compile("^JAVA_VERSION=\"(?:1\\.)?(\\d+)").matcher(line);
-                    if (m.find()) {
-                        return Integer.parseInt(m.group(1));
-                    }
-                }
-            } catch (java.io.IOException | RuntimeException e) {
-                // No release file: fall back to the JDK Renova itself runs on.
-            }
-        }
-        return Runtime.version().feature();
+        java.util.List<Jdks.Jdk> jdks = Jdks.installed();
+        int newest = jdks.stream().mapToInt(Jdks.Jdk::feature).max().orElse(Runtime.version().feature());
+        throw new IllegalStateException("This migration targets Java " + target + ", and no JDK " + target + " or newer is installed "
+                + "(found: " + Jdks.describe(jdks) + "). Install JDK " + target + " (Renova looks in JAVA_HOME, ~/.jdks, "
+                + "~/.sdkman, /usr/lib/jvm and the folders in RENOVA_JDKS), or choose a target this machine can build "
+                + "(for example with --playbook java-to-" + newest + "). Use --no-verify to migrate without building.");
     }
 
     @Override
@@ -83,7 +66,7 @@ public final class MavenVerifier implements Verifier {
         for (Path root : MavenSupport.buildRoots(context)) {
             List<String> cmd = MavenSupport.baseCommand(context, root);
             cmd.addAll(Arrays.asList(goals.split("\\s+")));
-            Proc.Result result = Proc.run(cmd, root, TIMEOUT, MavenSupport.environment());
+            Proc.Result result = Proc.run(cmd, root, TIMEOUT, MavenSupport.environment(context));
             log.append("== ").append(workspace.relativize(root)).append(": exit ").append(result.exitCode()).append('\n');
             if (!result.ok()) {
                 success = false;

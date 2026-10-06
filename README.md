@@ -113,6 +113,10 @@ cli/bin/renova playbooks
 cli/bin/renova analyze /path/to/project
 cli/bin/renova analyze /path/to/project -f json -o assessment.json
 
+# Assess every project under a folder and rank them, easiest to migrate first (Markdown, JSON or CSV)
+cli/bin/renova portfolio /path/to/all-projects
+cli/bin/renova portfolio /path/to/all-projects -f csv -o portfolio.csv
+
 # Migrate a copy of the project into an empty directory
 cli/bin/renova migrate /path/to/project --out /path/to/migrated \
     [--playbook ID|FILE] [--maven-settings settings.xml] [--offline] [--skip ai] [--skip-tests]
@@ -295,8 +299,11 @@ Maven and Gradle builds are both supported: recipes run through the project's ow
 when it has one, and Gradle builds are changed without adding anything to their build files. The build-file
 guards (`maven` fixes) apply to Maven builds only.
 
-The build is verified on the JDK in `JAVA_HOME`, so a target needs that JDK installed (Java 25 for `java-to-25`);
-Renova says so before it changes anything.
+**JDKs.** Renova finds the JDKs installed on the machine (`JAVA_HOME`, `~/.jdks`, `~/.sdkman`, `/usr/lib/jvm`,
+the usual folders on macOS and Windows, and any folder listed in `RENOVA_JDKS`) and uses the right one for each
+step: the target's JDK to build the result, and, for a Gradle project whose wrapper is too old to start on it,
+an older one to run the recipes. Such a wrapper is then moved to a Gradle that runs on the target (8.14, or 9.1
+for Java 25). A target for which no JDK is installed is reported before anything is changed.
 
 Playbooks are made of **rule packs** (`include:`), so each concern is written once: the JDK's removed APIs,
 Jakarta EE 10, Spring Framework 6, what Spring Boot 3 changed, servlet containers, and guards on the build

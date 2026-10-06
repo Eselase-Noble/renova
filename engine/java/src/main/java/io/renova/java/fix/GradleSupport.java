@@ -35,6 +35,39 @@ final class GradleSupport {
         return cmd;
     }
 
+    private static final java.util.regex.Pattern DISTRIBUTION = java.util.regex.Pattern.compile(
+            "(distributionUrl=.*?gradle-)(\\d+(?:\\.\\d+)*)(-(?:bin|all)\\.zip)");
+
+    /** The Gradle version the project's wrapper runs, or null when it has no wrapper. */
+    static String wrapperVersion(Path buildRoot) {
+        Path properties = buildRoot.resolve("gradle/wrapper/gradle-wrapper.properties");
+        try {
+            java.util.regex.Matcher m = DISTRIBUTION.matcher(Files.readString(properties));
+            return m.find() ? m.group(2) : null;
+        } catch (java.io.IOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Moves the wrapper to a Gradle that runs on Java {@code target}, when the one it names does not. Returns
+     * what changed, for the report, or null when nothing had to. The checksum of the old distribution is
+     * dropped with it; the wrapper jar itself works with any distribution.
+     */
+    static String upgradeWrapper(Path buildRoot, int target) throws java.io.IOException {
+        String current = wrapperVersion(buildRoot);
+        if (current == null || target == 0 || Jdks.newestJavaFor(current) >= target) {
+            return null;
+        }
+        Path properties = buildRoot.resolve("gradle/wrapper/gradle-wrapper.properties");
+        String wanted = Jdks.gradleFor(target);
+        String text = DISTRIBUTION.matcher(Files.readString(properties)).replaceFirst("$1" + wanted + "$3")
+                .replaceAll("(?m)^distributionSha256Sum=.*\\R?", "");
+        Files.writeString(properties, text);
+        return "Gradle wrapper moved from " + current + " to " + wanted + ": Gradle " + current + " runs on Java "
+                + Jdks.newestJavaFor(current) + " at most, and the target is Java " + target;
+    }
+
     /**
      * Directories to run Gradle in: Gradle modules not nested in another Gradle module (a root build covers its
      * subprojects), leaving out directories that also have a pom.xml, which are built with Maven.

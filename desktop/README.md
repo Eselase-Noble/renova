@@ -8,6 +8,7 @@ machine, on your own key.
 |---|---|
 | Overview | The start screen: migrations passed, average automation rate, AI tokens used, activity over the last 14 days, what is running now, and the latest migrations and projects. A fresh install gets a short checklist: connect an AI provider, open a project, run a migration |
 | Projects | Open a project folder, or one opened before; the latest migrations, one click away |
+| Portfolio | Choose a folder holding many projects: each is assessed against the target that fits it, and they are ranked easiest first (fully automatic, needs AI, needs a person) with findings, automation rate and blockers. Double-click opens a project; **Export** as CSV or Markdown |
 | Project | The assessment: findings by category, automation rate, the playbook, and the plan with each step's guidance and files. **Findings** lists every place a rule matched, filtered by category, resolver and text (double-click opens the file). Choose a bundled playbook or your own playbook file, **Re-assess**, **Export** the assessment as Markdown or JSON, **Migrate…** |
 | Migrate | AI and retrieval, running the project's tests, behaviour verification (Docker), repair rounds, and where the migrated copy goes. **Advanced:** scenario file, AI repair of behaviour differences on or off, Maven `settings.xml` and offline builds |
 | Migration | A pipeline of phases and the live log while it runs, with **Cancel migration** (the build is stopped; stages already committed stay in the migrated folder). Then build and test result, behaviour, AI usage and steps for a person; **Overview** with each stage's details and the build errors; **Behaviour** with both answers to every request side by side, database changes and accepted changes, and **Verify behaviour again**; **Changes** (every stage's diff, with line numbers before and after); the **Report** rendered; **AI exchanges** (every request to the provider: files offered and their roles, rules or errors, the answer and tokens); the **Log** |
@@ -30,7 +31,7 @@ java -jar desktop/target/renova-desktop-0.1.0-SNAPSHOT.jar            # or: mvn 
 java -jar desktop/target/renova-desktop-0.1.0-SNAPSHOT.jar --open=/path/to/project
 ```
 
-Options: `--open=DIR` opens a project, `--show=projects|settings|migrations` opens that screen,
+Options: `--open=DIR` opens a project, `--show=projects|portfolio|settings|migrations` opens that screen, `--portfolio=DIR` assesses a folder of projects,
 `--workspace=DIR` shows a migrated copy, `--theme=light|dark` picks the theme (and
 remembers it). Development aids for checking screens: `--snapshot-dir=DIR` saves a PNG of each screen shortly after it
 appears (at least `--snapshot-delay=SECONDS` after), `--migrate` (with `--open`) starts a migration with the default options and no AI, `--cancel-after=SECONDS` cancels it that long after it starts, and `--tab=NAME` opens that
