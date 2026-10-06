@@ -34,8 +34,16 @@ public final class Proc {
                 .start();
         process.getOutputStream().close();
         CompletableFuture<String> output = CompletableFuture.supplyAsync(() -> readAll(process.getInputStream()));
-        if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
-            process.destroyForcibly();
+        boolean exited;
+        try {
+            exited = process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            // The caller was cancelled: a build left running would keep working in a workspace nobody waits for.
+            kill(process);
+            throw e;
+        }
+        if (!exited) {
+            kill(process);
             return new Result(-1, output.getNow("") + "\n[timed out after " + timeout + ": " + String.join(" ", command) + "]");
         }
         return new Result(process.exitValue(), output.join());
@@ -50,6 +58,12 @@ public final class Proc {
             Thread.currentThread().interrupt();
             return false;
         }
+    }
+
+    /** Stops the tool and whatever it started (a Maven wrapper's JVM, forked test JVMs). */
+    private static void kill(Process process) {
+        process.descendants().forEach(ProcessHandle::destroyForcibly);
+        process.destroyForcibly();
     }
 
     private static String readAll(InputStream in) {
