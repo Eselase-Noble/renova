@@ -32,10 +32,15 @@ public class SystemController {
     private final List<Path> roots;
     private final int parallel;
     private final String version;
+    private final String dataDir;
+    private final boolean localMode;
 
     public SystemController(PluginRegistry registry, Access access, ObjectProvider<BuildProperties> build,
                             @Value("${renova.project-roots:${user.home}}") String roots,
-                            @Value("${renova.parallel-migrations:1}") int parallel) {
+                            @Value("${renova.parallel-migrations:1}") int parallel,
+                            @Value("${renova.data-dir}") Path dataDir, @Value("${renova.mode:server}") String mode) {
+        this.dataDir = dataDir.toAbsolutePath().normalize().toString();
+        this.localMode = "local".equalsIgnoreCase(mode);
         this.registry = registry;
         this.access = access;
         this.roots = Arrays.stream(roots.split(",")).map(String::strip).filter(r -> !r.isEmpty())
@@ -49,8 +54,9 @@ public class SystemController {
     public record Ecosystem(String id, String name) {
     }
 
+    /** @param dataDir where projects are registered and migrated copies are kept, on this server */
     public record Info(String version, String java, List<Ecosystem> ecosystems, List<String> aiProviders, int playbooks,
-                       int parallelMigrations, List<String> projectRoots) {
+                       int parallelMigrations, List<String> projectRoots, String dataDir, boolean localMode) {
     }
 
     /** @param project whether the folder holds a build file an installed ecosystem recognises */
@@ -67,7 +73,7 @@ public class SystemController {
         return new Info(version, Runtime.version().toString(),
                 registry.plugins().stream().map(p -> new Ecosystem(p.id(), p.displayName())).toList(),
                 registry.aiProviders().stream().map(p -> p.name()).toList(), registry.playbooks().size(), parallel,
-                roots.stream().map(Path::toString).toList());
+                roots.stream().map(Path::toString).toList(), dataDir, localMode);
     }
 
     /**

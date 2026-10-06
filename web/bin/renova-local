@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Renova's web console for one person on this machine: no accounts, nothing listening beyond 127.0.0.1, and
+# every project and migrated copy kept on this machine (data in ~/.renova/local).
+#
+#   web/bin/renova-local [--port 3000] [--api-port 8787] [--build] [--no-browser]
+#
+# The first run builds the API and the console; --build rebuilds them after an update.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+port=3000
+api_port=8787
+build=false
+browser=true
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --port) port="$2"; shift 2 ;;
+    --api-port) api_port="$2"; shift 2 ;;
+    --build) build=true; shift ;;
+    --no-browser) browser=false; shift ;;
+    -h|--help) sed -n '2,7p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "Unknown option: $1 (try --help)" >&2; exit 2 ;;
+  esac
+done
+
+jar="$(ls "$root"/web/api/target/renova-web-api-*.jar 2>/dev/null | grep -v original | head -1 || true)"
+if $build || [ -z "$jar" ]; then
+  echo "Building the Renova API…"
+  (cd "$root" && mvn -q -pl web/api -am install -DskipTests)
+  jar="$(ls "$root"/web/api/target/renova-web-api-*.jar | grep -v original | head -1)"
+fi
+if $build || [ ! -f "$root/web/console/.next/BUILD_ID" ]; then
+  echo "Building the console…"
+  (cd "$root/web/console" && { [ -d node_modules ] || npm ci; } && npm run build >/dev/null)
+fi
+
+api_pid=""
+console_pid=""
+stop() {
+  trap - EXIT INT TERM
+  [ -n "$console_pid" ] && kill "$console_pid" 2>/dev/null || true
+  [ -n "$api_pid" ] && kill "$api_pid" 2>/dev/null || true
+  wait 2>/dev/null || true
+}
+trap stop EXIT INT TERM
+
+log="${TMPDIR:-/tmp}/renova-local-$USER"
+mkdir -p "$log"
+java -jar "$jar" --spring.profiles.active=local --server.port="$api_port" > "$log/api.log" 2>&1 &
+api_pid=$!
+for _ in $(seq 1 120); do
+  curl -fs -o /dev/null "http://127.0.0.1:$api_port/api/auth/state" && break
+  kill -0 "$api_pid" 2>/dev/null || { echo "The API did not start; see $log/api.log" >&2; exit 1; }
+  sleep 0.5
+done
+
+# The console also listens only on this machine.
+(cd "$root/web/console" && RENOVA_API_URL="http://127.0.0.1:$api_port" exec npx next start -H 127.0.0.1 -p "$port") > "$log/console.log" 2>&1 &
+console_pid=$!
+for _ in $(seq 1 60); do
+  curl -fs -o /dev/null "http://127.0.0.1:$port/" && break
+  kill -0 "$console_pid" 2>/dev/null || { echo "The console did not start; see $log/console.log" >&2; exit 1; }
+  sleep 0.5
+done
+
+url="http://localhost:$port"
+echo "Renova is running in local mode at $url"
+echo "  Projects and migrated copies stay on this machine: ~/.renova/local"
+echo "  Logs: $log   ·   Ctrl C to stop"
+if $browser; then
+  (xdg-open "$url" || open "$url") >/dev/null 2>&1 || true
+fi
+wait "$api_pid"

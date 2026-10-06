@@ -7,7 +7,38 @@ The web console and REST API for the [Renova engine](../engine), for a team's ow
 | REST API | [`api`](api) | Spring Boot 4, embedding the engine |
 | Console | [`console`](console) | Next.js 16 (App Router, TypeScript), Tailwind CSS, shadcn/ui, TanStack Query |
 
-## Run it
+## Two ways to run it
+
+| | Local mode | Server mode |
+|---|---|---|
+| For | One person, on their own machine | A team, on a server inside their network |
+| Sign-in | None | Accounts, organisations and roles |
+| Listens on | `127.0.0.1` only | `127.0.0.1` by default; put it behind HTTPS to serve a team |
+| Projects and migrated copies | On that machine (`~/.renova/local`) | On that server (`~/.renova/server`) |
+
+Either way, Renova is never a hosted service: project code and every migrated copy stay on a machine you run.
+Only AI requests leave it, to the provider and on the key you set.
+
+### Local mode
+
+```sh
+web/bin/renova-local            # builds on first use, starts the API and the console, opens http://localhost:3000
+web/bin/renova-local --build    # rebuild after an update;  --port, --api-port, --no-browser
+```
+
+There are no accounts: whoever uses the machine is the owner of the one organisation, "This computer", and the
+console hides everything about members, invitations and the audit log. Because there is no sign-in, local mode:
+
+- refuses to start unless the API listens on a loopback address (the console is started on `127.0.0.1` too);
+- answers only requests addressed to this machine (`localhost`, `127.0.0.1`, `[::1]`), so a web page elsewhere
+  cannot reach it by pointing its own host name at `127.0.0.1` (DNS rebinding);
+- still requires the CSRF token on every change, so no other site can make the browser act on it.
+
+By hand: `java -jar web/api/target/renova-web-api-0.1.0-SNAPSHOT.jar --spring.profiles.active=local`, then the
+console as below with `npx next start -H 127.0.0.1`. The [desktop app](../desktop) does the same job in one window
+with no ports at all, and is the simplest way to keep everything on one machine.
+
+## Run it (server mode)
 
 ```sh
 # API on http://127.0.0.1:8787 (data in ~/.renova/server)
@@ -73,7 +104,7 @@ All endpoints except `/api/auth/*` need a signed-in session; requests that chang
 
 | Method | Path | |
 |---|---|---|
-| GET | `/api/auth/state` | Setup needed?, the user, their organisations and current role |
+| GET | `/api/auth/state` | Setup needed?, the user, their organisations and current role; `localMode` |
 | POST | `/api/auth/setup`, `/api/auth/login`, `/api/auth/logout` | First account; sign in; sign out |
 | POST | `/api/auth/organisation`, `/api/auth/password` | Switch organisation; change password |
 | GET, POST | `/api/auth/invitations/{token}`, `…/accept` | Invitation details; join `{name?, password}` |
@@ -91,7 +122,7 @@ All endpoints except `/api/auth/*` need a signed-in session; requests that chang
 | GET | `/api/migrations/{id}/commits`, `/commits/{hash}/diff` | Stages as commits, and their diffs |
 | GET | `/api/playbooks` | Installed playbooks |
 | GET | `/api/org/audit?area=&limit=` | Audit log, newest first (admin); `area`: auth, project, migration, settings, member, invitation |
-| GET | `/api/system` | Version, ecosystems, AI providers, concurrency, project roots |
+| GET | `/api/system` | Version, mode, data folder, ecosystems, AI providers, concurrency, project roots |
 | GET | `/api/system/directories?path=` | Folders under the project roots, for the folder browser (admin) |
 | GET, PUT | `/api/settings` | AI settings (keys masked) |
 | PUT, DELETE | `/api/settings/keys/{provider}` | Set or remove a key |

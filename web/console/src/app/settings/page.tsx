@@ -27,7 +27,7 @@ export default function SettingsPage() {
   const organisation = auth.data?.organisation?.name ?? "your organisation";
   return (
     <>
-      <PageHeader title="Settings" description={`How Renova works for ${organisation}.`} />
+      <PageHeader title="Settings" description={auth.local ? "How Renova works on this machine." : `How Renova works for ${organisation}.`} />
       {!canEdit && (
         <div className="mb-6 flex items-center gap-2.5 rounded-lg border bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground">
           <Lock className="size-4 shrink-0" /> Only admins can change these settings.
@@ -124,6 +124,13 @@ function Server() {
           <Field label="Playbooks">{plural(info.playbooks, "playbook")} installed</Field>
           <Field label="AI providers"><span className="capitalize">{info.aiProviders.join(", ") || "None installed"}</span></Field>
           <Field label="Concurrency">{plural(info.parallelMigrations, "migration")} at a time; others wait in the queue</Field>
+          <Field label="Mode">
+            {info.localMode ? "Local: one person on this machine, no sign-in, answers only this machine" : "Server: accounts and organisations"}
+          </Field>
+          <Field label="Data folder">
+            <span className="font-mono text-[13px] break-all">{info.dataDir}</span>
+            <p className="mt-1 text-xs text-muted-foreground">Project records, settings and every migrated copy are kept here, on this {info.localMode ? "machine" : "server"}.</p>
+          </Field>
           <Field label="Project folders">
             <ul className="space-y-0.5">
               {info.projectRoots.map((root) => (

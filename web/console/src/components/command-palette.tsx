@@ -48,7 +48,7 @@ function Palette({ close }: { close: () => void }) {
     const all: Entry[] = [];
     for (const group of NAV) {
       for (const item of group.items) {
-        if (!item.role || auth.can(item.role)) all.push({ group: "Go to", label: item.label, icon: item.icon, href: item.href });
+        if ((!item.role || auth.can(item.role)) && !(item.team && auth.local)) all.push({ group: "Go to", label: item.label, icon: item.icon, href: item.href });
       }
     }
     if (auth.can("ADMIN")) {

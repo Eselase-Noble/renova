@@ -198,6 +198,8 @@ export interface AuthState {
   user: UserView | null;
   organisation: Membership | null;
   organisations: Membership[];
+  /** One person on their own machine: no sign-in and no members. */
+  localMode?: boolean;
 }
 
 export interface Member {
@@ -252,6 +254,9 @@ export interface SystemInfo {
   playbooks: number;
   parallelMigrations: number;
   projectRoots: string[];
+  /** Where the server keeps its records and the migrated copies. */
+  dataDir: string;
+  localMode: boolean;
 }
 
 export interface DirectoryEntry {

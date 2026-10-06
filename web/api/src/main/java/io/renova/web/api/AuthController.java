@@ -4,6 +4,7 @@ import io.renova.web.account.Access;
 import io.renova.web.account.AccountService;
 import io.renova.web.account.AccountStore;
 import io.renova.web.account.Invitation;
+import io.renova.web.account.LocalMode;
 import io.renova.web.account.Organisation;
 import io.renova.web.account.Role;
 import io.renova.web.account.User;
@@ -38,10 +39,12 @@ public class AuthController {
     private final DataStore data;
     private final SecurityContextRepository contexts;
     private final AuditLog audit;
+    private final LocalMode local;
 
     public AuthController(AccountService accounts, AccountStore store, Access access, DataStore data,
-                          SecurityContextRepository contexts, AuditLog audit) {
+                          SecurityContextRepository contexts, AuditLog audit, LocalMode local) {
         this.audit = audit;
+        this.local = local;
         this.accounts = accounts;
         this.store = store;
         this.access = access;
@@ -52,8 +55,13 @@ public class AuthController {
     public record Membership(String id, String name, Role role) {
     }
 
-    /** What the console needs to decide which page to show. */
-    public record State(boolean setupRequired, User.View user, Membership organisation, List<Membership> organisations) {
+    /**
+     * What the console needs to decide which page to show.
+     *
+     * @param localMode one person on their own machine: no sign-in, no members
+     */
+    public record State(boolean setupRequired, User.View user, Membership organisation, List<Membership> organisations,
+                        boolean localMode) {
     }
 
     public record Setup(String organisation, String name, String email, String password) {
@@ -77,17 +85,18 @@ public class AuthController {
     @GetMapping("/state")
     public State state(HttpServletRequest request) {
         if (access.user().isEmpty()) {
-            return new State(accounts.setupRequired(), null, null, List.of());
+            return new State(accounts.setupRequired(), null, null, List.of(), false);
         }
         Access.Caller caller = access.caller(request);
         List<Membership> mine = store.organisationsOf(caller.user().id()).stream()
                 .map(o -> new Membership(o.id(), o.name(), o.roleOf(caller.user().id()).orElseThrow())).toList();
         return new State(false, caller.user().view(),
-                new Membership(caller.organisationId(), caller.organisation().name(), caller.role()), mine);
+                new Membership(caller.organisationId(), caller.organisation().name(), caller.role()), mine, local.enabled());
     }
 
     @PostMapping("/setup")
     public State setup(@RequestBody Setup body, HttpServletRequest request, HttpServletResponse response) {
+        noAccountsInLocalMode();
         Organisation organisation = accounts.setup(body.organisation(), body.name(), body.email(), body.password());
         // Projects and migrations from before accounts existed belong to the first organisation.
         data.adoptUnowned(organisation.id());
@@ -99,6 +108,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public State login(@RequestBody Login body, HttpServletRequest request, HttpServletResponse response) {
+        noAccountsInLocalMode();
         User user = accounts.authenticate(body.email(), body.password())
                 .orElseThrow(() -> new IllegalArgumentException("Wrong email or password"));
         signIn(user, request, response);
@@ -149,6 +159,12 @@ public class AuthController {
         Access.Caller caller = access.caller(request);
         accounts.changePassword(caller.user().id(), body.current(), body.replacement());
         audit.record(caller, "auth.password_changed", caller.user().email(), null);
+    }
+
+    private void noAccountsInLocalMode() {
+        if (local.enabled()) {
+            throw new IllegalStateException("Renova runs in local mode on this machine: there are no accounts to sign in to");
+        }
     }
 
     /** A new session (against session fixation) holding the signed-in user. */
