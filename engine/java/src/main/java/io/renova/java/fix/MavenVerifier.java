@@ -83,7 +83,7 @@ public final class MavenVerifier implements Verifier {
         for (Path root : MavenSupport.buildRoots(context)) {
             List<String> cmd = MavenSupport.baseCommand(context, root);
             cmd.addAll(Arrays.asList(goals.split("\\s+")));
-            Proc.Result result = Proc.run(cmd, root, TIMEOUT);
+            Proc.Result result = Proc.run(cmd, root, TIMEOUT, MavenSupport.environment());
             log.append("== ").append(workspace.relativize(root)).append(": exit ").append(result.exitCode()).append('\n');
             if (!result.ok()) {
                 success = false;

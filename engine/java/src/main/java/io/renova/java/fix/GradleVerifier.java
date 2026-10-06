@@ -53,7 +53,7 @@ final class GradleVerifier {
                 cmd.add("-x");
                 cmd.add("test");
             }
-            Proc.Result result = Proc.run(cmd, root, TIMEOUT);
+            Proc.Result result = Proc.run(cmd, root, TIMEOUT, MavenSupport.environment());
             log.append("== ").append(workspace.relativize(root)).append(" (gradle): exit ").append(result.exitCode()).append('\n');
             if (!result.ok()) {
                 success = false;

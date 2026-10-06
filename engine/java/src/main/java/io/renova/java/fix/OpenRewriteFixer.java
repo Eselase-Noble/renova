@@ -48,7 +48,7 @@ public final class OpenRewriteFixer implements Fixer {
         List<String> details = new ArrayList<>();
         int succeeded = 0;
         for (Path root : gradleRoots) {
-            Proc.Result result = runGradle(context, root, recipes, artifacts);
+            Proc.Result result = retryingOnNetworkErrors(() -> runGradle(context, root, recipes, artifacts), details);
             String name = context.workspace().root().relativize(root).toString();
             details.add("== " + (name.isEmpty() ? "." : name) + " (gradle): exit " + result.exitCode());
             details.add(result.tail(result.ok() ? 8 : 40));
@@ -72,7 +72,7 @@ public final class OpenRewriteFixer implements Fixer {
                 cmd.add("compile");
             }
             cmd.add(plugin + ":" + goal);
-            Proc.Result result = Proc.run(cmd, root, TIMEOUT);
+            Proc.Result result = retryingOnNetworkErrors(() -> Proc.run(cmd, root, TIMEOUT, MavenSupport.environment()), details);
             String name = context.workspace().root().relativize(root).toString();
             details.add("== " + (name.isEmpty() ? "." : name) + ": exit " + result.exitCode());
             details.add(result.tail(result.ok() ? 8 : 40));
@@ -121,10 +121,33 @@ public final class OpenRewriteFixer implements Fixer {
             cmd.add(init.toString());
             cmd.add("rewriteRun");
             cmd.add("-Drewrite.activeRecipe=" + String.join(",", recipes));
-            return Proc.run(cmd, root, TIMEOUT);
+            return Proc.run(cmd, root, TIMEOUT, MavenSupport.environment());
         } finally {
             java.nio.file.Files.deleteIfExists(init);
         }
+    }
+
+    private interface Run {
+        Proc.Result call() throws Exception;
+    }
+
+    private static final java.util.regex.Pattern NETWORK_ERROR = java.util.regex.Pattern.compile(
+            "Unknown host|UnknownHostException|timed out|Timeout|Connection reset|Connection refused|Could not transfer artifact"
+                    + "|Temporary failure in name resolution|SocketException|Could not GET|Read timed out");
+    private static final int ATTEMPTS = 3;
+
+    /**
+     * Recipes look things up as they run (artifacts, release lists, wrapper checksums), and one slow answer
+     * fails the whole run. A failure that names the network is tried again; any other failure is not.
+     */
+    private static Proc.Result retryingOnNetworkErrors(Run run, List<String> details) throws Exception {
+        Proc.Result result = run.call();
+        for (int attempt = 2; attempt <= ATTEMPTS && !result.ok() && NETWORK_ERROR.matcher(result.output()).find(); attempt++) {
+            details.add("The network failed during the run; attempt " + attempt + " of " + ATTEMPTS);
+            Thread.sleep(5_000L * attempt);
+            result = run.call();
+        }
+        return result;
     }
 
     private static boolean isReactor(MigrationContext context, Path buildRoot) {
