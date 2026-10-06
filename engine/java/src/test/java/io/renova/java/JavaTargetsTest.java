@@ -48,7 +48,8 @@ class JavaTargetsTest {
         assertThat(REGISTRY.defaultPlaybook(boot3).id()).isEqualTo("spring-boot-4");
         // Every Java path stays available for whoever wants a different target.
         assertThat(REGISTRY.playbooksFor(plain)).extracting(Playbook::id)
-                .contains("java-to-17", "java-to-21", "java-to-25", "spring-boot-3", "spring-boot-4", "java8-to-21-jakarta-ee10");
+                .contains("java-to-17", "java-to-21", "java-to-25", "spring-boot-3", "spring-boot-4", "java8-to-21-jakarta-ee10",
+                        "java-to-21-jakarta-ee11-spring7");
     }
 
     @Test

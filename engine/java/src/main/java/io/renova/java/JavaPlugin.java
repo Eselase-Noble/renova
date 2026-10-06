@@ -209,7 +209,8 @@ public final class JavaPlugin implements EcosystemPlugin {
 
     @Override
     public List<String> bundledPlaybooks() {
-        return List.of("playbooks/java/java8-to-21-jakarta-ee10.yaml", "playbooks/java/spring-boot-3.yaml", "playbooks/java/spring-boot-4.yaml",
+        return List.of("playbooks/java/java8-to-21-jakarta-ee10.yaml", "playbooks/java/java-to-21-jakarta-ee11-spring7.yaml",
+                "playbooks/java/spring-boot-3.yaml", "playbooks/java/spring-boot-4.yaml",
                 "playbooks/java/java-to-17.yaml", "playbooks/java/java-to-21.yaml", "playbooks/java/java-to-25.yaml");
     }
 
