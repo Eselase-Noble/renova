@@ -40,8 +40,9 @@ public final class AiPreferences {
         this.environment = environment;
     }
 
+    /** @param baseUrl a custom endpoint (for example an on-premises OpenAI-compatible server), or null */
     public record Provider(String name, String displayName, String defaultModel, boolean keyConfigured, String maskedKey,
-                           String keySource) {
+                           String keySource, String baseUrl) {
     }
 
     public record View(String provider, String model, String effort, boolean rag, List<Provider> providers, String configFile) {
@@ -53,7 +54,8 @@ public final class AiPreferences {
         for (AiProviderFactory f : registry.aiProviders()) {
             Optional<Settings.Value> key = s.find(f.name() + ".apiKey");
             providers.add(new Provider(f.name(), f.displayName(), f.defaultModel(), key.isPresent(),
-                    key.map(k -> Secret.of(k.value()).masked()).orElse(null), key.map(Settings.Value::source).orElse(null)));
+                    key.map(k -> Secret.of(k.value()).masked()).orElse(null), key.map(Settings.Value::source).orElse(null),
+                    s.get(f.name() + ".baseUrl").orElse(null)));
         }
         return new View(s.get(PROVIDER).orElse(NoAiProvider.NAME), s.get(MODEL).orElse(null), s.get(EFFORT).orElse(null),
                 s.get(RAG).map(Boolean::parseBoolean).orElse(true), providers, config.file().toString());
@@ -66,6 +68,17 @@ public final class AiPreferences {
         } else {
             config.set(key, value.strip());
         }
+    }
+
+    /** A custom endpoint for the provider; blank removes it. */
+    public void setBaseUrl(String provider, String url) throws IOException {
+        if (registry.aiProvider(provider).isEmpty()) {
+            throw new IllegalArgumentException("Unknown AI provider: " + provider);
+        }
+        if (url != null && !url.isBlank() && !url.strip().matches("https?://\\S+")) {
+            throw new IllegalArgumentException("An endpoint must start with http:// or https://");
+        }
+        save(provider + ".baseUrl", url);
     }
 
     public void setKey(String provider, String key) throws IOException {

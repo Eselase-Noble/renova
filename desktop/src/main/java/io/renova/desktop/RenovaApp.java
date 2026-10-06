@@ -5,9 +5,13 @@ import atlantafx.base.theme.PrimerLight;
 import atlantafx.base.theme.Styles;
 import io.renova.core.config.AiPreferences;
 import io.renova.desktop.service.Engine;
+import io.renova.desktop.service.MigrationHistory;
+import io.renova.desktop.service.MigrationResult;
 import io.renova.desktop.service.MigrationRun;
 import io.renova.desktop.service.RecentProjects;
 import io.renova.desktop.view.HomeView;
+import io.renova.desktop.view.MarkdownView;
+import io.renova.desktop.view.MigrationsView;
 import io.renova.desktop.view.MigrationView;
 import io.renova.desktop.view.ProjectView;
 import io.renova.desktop.view.SettingsView;
@@ -36,6 +40,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.prefs.Preferences;
 
 /**
@@ -43,8 +48,10 @@ import java.util.prefs.Preferences;
  * only AI requests leave the machine, on the user's own key.
  *
  * <p>Options: {@code --open=DIR} opens a project at start; {@code --show=settings} opens Settings;
+ * {@code --show=migrations} opens the migration history; {@code --workspace=DIR} shows a migrated copy;
  * {@code --theme=light|dark} chooses the theme (and remembers it). Development aids: {@code --snapshot-dir=DIR} saves
- * a PNG of each screen shortly after it is shown; {@code --migrate} (with {@code --open}) starts a migration with the
+ * a PNG of each screen shortly after it is shown
+ * (at least {@code --snapshot-delay=SECONDS} after); {@code --migrate} (with {@code --open}) starts a migration with the
  * default options and no AI once the project is assessed; {@code --tab=NAME} opens that tab of a finished migration.
  */
 public final class RenovaApp extends Application implements Navigator {
@@ -54,10 +61,12 @@ public final class RenovaApp extends Application implements Navigator {
     private Engine engine;
     private AiPreferences ai;
     private RecentProjects recent;
+    private MigrationHistory history;
     private BorderPane root;
     private VBox runList;
     private Button homeButton;
     private Button settingsButton;
+    private Button migrationsButton;
     private Path snapshotDir;
     private Scene scene;
 
@@ -66,6 +75,7 @@ public final class RenovaApp extends Application implements Navigator {
         engine = new Engine();
         ai = new AiPreferences(engine.registry());
         recent = new RecentProjects();
+        history = new MigrationHistory();
         String theme = getParameters().getNamed().get("theme");
         if (theme != null) {
             prefs.putBoolean("dark", theme.equalsIgnoreCase("dark"));
@@ -87,8 +97,12 @@ public final class RenovaApp extends Application implements Navigator {
         String open = getParameters().getNamed().get("open");
         if (open != null) {
             openProject(Path.of(open));
+        } else if (getParameters().getNamed().get("workspace") != null) {
+            showWorkspace(Path.of(getParameters().getNamed().get("workspace")));
         } else if ("settings".equals(getParameters().getNamed().get("show"))) {
             settings();
+        } else if ("migrations".equals(getParameters().getNamed().get("show"))) {
+            migrations();
         } else {
             home();
         }
@@ -101,6 +115,7 @@ public final class RenovaApp extends Application implements Navigator {
         brand.setAlignment(Pos.CENTER_LEFT);
 
         homeButton = navButton("Projects", e -> home());
+        migrationsButton = navButton("Migrations", e -> migrations());
         settingsButton = navButton("Settings", e -> settings());
         runList = new VBox(2);
         runs.addListener((ListChangeListener<MigrationRun>) c -> refreshRuns());
@@ -117,7 +132,7 @@ public final class RenovaApp extends Application implements Navigator {
         caption.getStyleClass().add("nav-caption");
         javafx.scene.layout.Region gap = new javafx.scene.layout.Region();
         gap.setMinHeight(16);
-        VBox sidebar = new VBox(brand, gap, homeButton, settingsButton, caption, runList, Ui.grow(), theme);
+        VBox sidebar = new VBox(brand, gap, homeButton, migrationsButton, settingsButton, caption, runList, Ui.grow(), theme);
         sidebar.getStyleClass().add("sidebar");
         return sidebar;
     }
@@ -149,11 +164,12 @@ public final class RenovaApp extends Application implements Navigator {
     }
 
     private void applyTheme(boolean dark) {
+        MarkdownView.dark = dark;
         Application.setUserAgentStylesheet(dark ? new PrimerDark().getUserAgentStylesheet() : new PrimerLight().getUserAgentStylesheet());
     }
 
     private void show(Node content, Button active, String snapshotName) {
-        for (Button b : new Button[] {homeButton, settingsButton}) {
+        for (Button b : new Button[] {homeButton, migrationsButton, settingsButton}) {
             b.getStyleClass().remove("active");
         }
         if (active != null) {
@@ -185,6 +201,11 @@ public final class RenovaApp extends Application implements Navigator {
     @Override
     public void startRun(MigrationRun run, Runnable work) {
         runs.addFirst(run);
+        run.state().addListener((obs, old, now) -> {
+            if (now != MigrationRun.State.RUNNING) {
+                record(run);
+            }
+        });
         Thread thread = new Thread(work, "renova-migration");
         thread.setDaemon(true);
         thread.start();
@@ -195,6 +216,59 @@ public final class RenovaApp extends Application implements Navigator {
     public void showRun(MigrationRun run) {
         show(new MigrationView(this, run).build(), null, "migration");
         run.state().addListener((obs, old, now) -> snapshot("migration-finished", 2.5));
+    }
+
+    /** Keeps the run's log with its reports and adds it to the history. */
+    private void record(MigrationRun run) {
+        Path ws = run.workspace();
+        MigrationResult.saveProgress(ws, List.copyOf(run.log()));
+        String started = run.started().toString();
+        String finished = run.finished() == null ? null : run.finished().toString();
+        try {
+            MigrationResult r = MigrationResult.load(ws);
+            var m = r.migration();
+            var v = m.path("verification");
+            String build = v.isMissingNode() || v.isNull() ? "Not built" : v.path("success").asBoolean() ? "Passes" : "Fails";
+            String behaviour = r.behaviour() == null ? "Not checked" : switch (r.behaviour().path("status").asText()) {
+                case "SAME" -> "Same";
+                case "DIFFERENT" -> "Differs";
+                case "SKIPPED" -> "Not compared";
+                default -> "Comparison failed";
+            };
+            var ai = m.path("aiUsage");
+            history.add(new MigrationHistory.Entry(run.projectName(), r.report().path("project").path("root").asText(null), ws.toString(),
+                    r.state(), started, finished, build, behaviour, ai.path("requests").asInt(),
+                    ai.path("inputTokens").asLong() + ai.path("outputTokens").asLong()));
+        } catch (Exception e) {
+            if (java.nio.file.Files.isDirectory(ws)) {
+                history.add(new MigrationHistory.Entry(run.projectName(), null, ws.toString(), "ERROR", started, finished,
+                        "Not built", "Not checked", 0, 0));
+            }
+        }
+    }
+
+    @Override
+    public void migrations() {
+        show(new MigrationsView(this, history).build(), migrationsButton, "migrations");
+    }
+
+    @Override
+    public void showWorkspace(Path workspace) {
+        Path ws = workspace.toAbsolutePath().normalize();
+        runs.stream().filter(r -> r.workspace().toAbsolutePath().normalize().equals(ws)).findFirst()
+                .ifPresentOrElse(this::showRun, () -> show(new MigrationView(this, ws).build(), migrationsButton, "migration"));
+    }
+
+    @Override
+    public void forget(Path workspace) {
+        history.remove(workspace.toString());
+        runs.removeIf(r -> r.workspace().equals(workspace) && r.state().get() != MigrationRun.State.RUNNING);
+        migrations();
+    }
+
+    @Override
+    public Engine engine() {
+        return engine;
     }
 
     @Override
@@ -208,7 +282,9 @@ public final class RenovaApp extends Application implements Navigator {
         if (snapshotDir == null) {
             return;
         }
-        PauseTransition wait = new PauseTransition(Duration.seconds(delaySeconds));
+        String minimum = getParameters().getNamed().get("snapshot-delay");
+        double delay = minimum == null ? delaySeconds : Math.max(delaySeconds, Double.parseDouble(minimum));
+        PauseTransition wait = new PauseTransition(Duration.seconds(delay));
         wait.setOnFinished(e -> {
             try {
                 WritableImage image = scene.snapshot(null);

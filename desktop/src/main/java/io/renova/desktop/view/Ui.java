@@ -39,8 +39,15 @@ public final class Ui {
             text.getChildren().add(label(subtitle, Styles.TEXT_MUTED));
         }
         HBox.setHgrow(text, Priority.ALWAYS);
+        text.setMinWidth(0);
         HBox row = new HBox(8, text);
-        row.getChildren().addAll(actions);
+        for (Node action : actions) {
+            if (action instanceof Region r) {
+                // Buttons keep their full labels; a long subtitle wraps instead.
+                r.setMinWidth(Region.USE_PREF_SIZE);
+            }
+            row.getChildren().add(action);
+        }
         row.setAlignment(Pos.BOTTOM_LEFT);
         return row;
     }

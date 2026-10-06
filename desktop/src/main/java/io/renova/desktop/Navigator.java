@@ -18,6 +18,17 @@ public interface Navigator {
 
     void showRun(MigrationRun run);
 
+    /** Past migrations from this app. */
+    void migrations();
+
+    /** A finished migration, from its migrated copy. */
+    void showWorkspace(Path workspace);
+
+    /** Removes a migration from the history (the migrated copy stays) and shows the list. */
+    void forget(Path workspace);
+
+    io.renova.desktop.service.Engine engine();
+
     /** Opens a file or folder with the system's default application. */
     void openPath(Path path);
 
