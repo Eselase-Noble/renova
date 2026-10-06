@@ -10,6 +10,9 @@ public interface Navigator {
     /** The start screen: what has been migrated and what is running. */
     void overview();
 
+    /** Every project under a folder, assessed and ranked. */
+    void portfolio();
+
     /** Projects opened before, and opening another. */
     void home();
 

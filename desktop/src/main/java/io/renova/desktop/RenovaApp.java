@@ -14,6 +14,7 @@ import io.renova.desktop.view.MarkdownView;
 import io.renova.desktop.view.MigrationsView;
 import io.renova.desktop.view.MigrationView;
 import io.renova.desktop.view.OverviewView;
+import io.renova.desktop.view.PortfolioView;
 import io.renova.desktop.view.ProjectView;
 import io.renova.desktop.view.SettingsView;
 import io.renova.desktop.view.Ui;
@@ -53,7 +54,7 @@ import java.util.prefs.Preferences;
  * only AI requests leave the machine, on the user's own key.
  *
  * <p>Options: {@code --open=DIR} opens a project at start; {@code --show=settings} opens Settings;
- * {@code --show=migrations} opens the migration history; {@code --workspace=DIR} shows a migrated copy;
+ * {@code --show=migrations} opens the migration history; {@code --portfolio=DIR} assesses every project under a folder; {@code --workspace=DIR} shows a migrated copy;
  * {@code --theme=light|dark} chooses the theme (and remembers it). Development aids: {@code --snapshot-dir=DIR} saves
  * a PNG of each screen shortly after it is shown
  * (at least {@code --snapshot-delay=SECONDS} after); {@code --migrate} (with {@code --open}) starts a migration with the
@@ -72,6 +73,9 @@ public final class RenovaApp extends Application implements Navigator {
     private VBox runList;
     private Button overviewButton;
     private Button homeButton;
+    private Button portfolioButton;
+    /** The portfolio assessed in this session, so coming back to the screen does not assess it again. */
+    private io.renova.core.engine.Portfolio.Result portfolio;
     private Button settingsButton;
     private Button migrationsButton;
     private Button themeButton;
@@ -111,6 +115,11 @@ public final class RenovaApp extends Application implements Navigator {
             settings();
         } else if ("migrations".equals(getParameters().getNamed().get("show"))) {
             migrations();
+        } else if (getParameters().getNamed().get("portfolio") != null) {
+            show(new PortfolioView(this, null, result -> portfolio = result).build(Path.of(getParameters().getNamed().get("portfolio"))),
+                    portfolioButton, "portfolio-assessing");
+        } else if ("portfolio".equals(getParameters().getNamed().get("show"))) {
+            portfolio();
         } else if ("projects".equals(getParameters().getNamed().get("show"))) {
             home();
         } else {
@@ -134,6 +143,7 @@ public final class RenovaApp extends Application implements Navigator {
 
         overviewButton = navButton("Overview", Icons.DASHBOARD, e -> overview());
         homeButton = navButton("Projects", Icons.FOLDER, e -> home());
+        portfolioButton = navButton("Portfolio", Icons.CHART, e -> portfolio());
         migrationsButton = navButton("Migrations", Icons.WORKFLOW, e -> migrations());
         settingsButton = navButton("Settings", Icons.SETTINGS, e -> settings());
         runList = new VBox(2);
@@ -157,7 +167,7 @@ public final class RenovaApp extends Application implements Navigator {
         Label caption = new Label("WORKSPACE");
         caption.getStyleClass().add("nav-caption");
         caption.setPadding(new Insets(0, 10, 6, 10));
-        VBox sidebar = new VBox(brand, caption, overviewButton, homeButton, migrationsButton, settingsButton, runCaption, runList, Ui.grow(), foot);
+        VBox sidebar = new VBox(brand, caption, overviewButton, homeButton, portfolioButton, migrationsButton, settingsButton, runCaption, runList, Ui.grow(), foot);
         sidebar.getStyleClass().add("sidebar");
         return sidebar;
     }
@@ -214,7 +224,7 @@ public final class RenovaApp extends Application implements Navigator {
     }
 
     private void show(Node content, Button active, String snapshotName) {
-        for (Button b : new Button[] {overviewButton, homeButton, migrationsButton, settingsButton}) {
+        for (Button b : new Button[] {overviewButton, homeButton, portfolioButton, migrationsButton, settingsButton}) {
             b.getStyleClass().remove("active");
         }
         if (active != null) {
@@ -230,6 +240,11 @@ public final class RenovaApp extends Application implements Navigator {
     @Override
     public void overview() {
         show(new OverviewView(this, ai, recent, history, runs).build(), overviewButton, "overview");
+    }
+
+    @Override
+    public void portfolio() {
+        show(new PortfolioView(this, portfolio, result -> portfolio = result).build(), portfolioButton, "portfolio");
     }
 
     @Override

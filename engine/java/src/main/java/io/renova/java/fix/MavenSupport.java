@@ -15,18 +15,24 @@ final class MavenSupport {
     }
 
     /**
-     * The environment build tools run in: JAVA_HOME as it is set, or else the JDK running Renova. Without it,
-     * a wrapper script picks a JDK by its own rules (the javac on the PATH, which may be another version than
-     * java), and the build is verified on a JDK nobody chose.
+     * The environment build tools run in: JAVA_HOME pointing at a JDK that can build the migration's target.
+     * JAVA_HOME as it is set wins when it is new enough; otherwise the installed JDK that fits best. Without
+     * this, a wrapper script picks a JDK by its own rules (the javac on the PATH, which may be another version
+     * than java), and the build is verified on a JDK nobody chose.
      */
-    static java.util.Map<String, String> environment() {
-        String set = System.getenv("JAVA_HOME");
-        if (set != null && !set.isBlank()) {
-            return java.util.Map.of();
-        }
-        Path running = Path.of(System.getProperty("java.home"));
-        return Files.isExecutable(running.resolve("bin/javac")) || Files.isExecutable(running.resolve("bin/javac.exe"))
-                ? java.util.Map.of("JAVA_HOME", running.toString()) : java.util.Map.of();
+    static java.util.Map<String, String> environment(MigrationContext context) {
+        return buildJdk(context).map(jdk -> java.util.Map.of("JAVA_HOME", jdk.home().toString())).orElse(java.util.Map.of());
+    }
+
+    /** The JDK the migrated project is built with; empty when none that is installed can build the target. */
+    static java.util.Optional<Jdks.Jdk> buildJdk(MigrationContext context) {
+        return Jdks.forTarget(Jdks.installed(), targetJava(context));
+    }
+
+    /** The Java version the playbook migrates to; 0 when it does not name one. */
+    static int targetJava(MigrationContext context) {
+        String target = context.playbook().targets().get("java");
+        return target != null && target.matches("\\d+") ? Integer.parseInt(target) : 0;
     }
 
     static List<String> baseCommand(MigrationContext context, Path buildRoot) {

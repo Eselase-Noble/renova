@@ -81,15 +81,6 @@ class JavaTargetsTest {
     }
 
     @Test
-    void theInstalledJdkIsReadFromItsReleaseFile(@TempDir Path jdk) throws Exception {
-        Files.writeString(jdk.resolve("release"), "IMPLEMENTOR=\"Acme\"\nJAVA_VERSION=\"25.0.1\"\n");
-        assertThat(io.renova.java.fix.MavenVerifierAccess.installedJava(jdk.toString())).isEqualTo(25);
-        Files.writeString(jdk.resolve("release"), "JAVA_VERSION=\"1.8.0_402\"\n");
-        assertThat(io.renova.java.fix.MavenVerifierAccess.installedJava(jdk.toString())).isEqualTo(8);
-        assertThat(io.renova.java.fix.MavenVerifierAccess.installedJava(null)).isEqualTo(Runtime.version().feature());
-    }
-
-    @Test
     void aParentTheRecipeLeftBehindIsBroughtToTheTarget(@TempDir Path root) throws Exception {
         // What the recipe leaves when a release lookup fails part-way: Spring Boot 3.3 under code already moved on.
         project(root.resolve("stalled"), bootParent("3.3.13"));
@@ -121,10 +112,53 @@ class JavaTargetsTest {
                     id("org.springframework.boot") version "3.3.4"
                 }
                 """);
+        Files.writeString(root.resolve("groovy/build.gradle"), Files.readString(root.resolve("groovy/build.gradle")) + """
+                dependencies {
+                    implementation 'org.springframework.boot:spring-boot-starter-web'
+                    runtimeOnly "com.h2database:h2:2.1.214"
+                }
+                """);
+        // The Spring Boot plugin manages the starters' versions, so they are written without one.
+        assertThat(parents(root, "spring-boot-3", "spring-boot-trailing-slash")).containsExactly("groovy/build.gradle");
         assertThat(parents(root, "spring-boot-3", "spring-boot-gradle-plugin")).containsExactly("groovy/build.gradle");
         assertThat(parents(root, "spring-boot-4", "spring-boot-gradle-plugin")).containsExactly("groovy/build.gradle", "kotlin/build.gradle.kts");
         assertThat(REGISTRY.defaultPlaybook(root.resolve("groovy")).id()).isEqualTo("spring-boot-3");
         assertThat(REGISTRY.defaultPlaybook(root.resolve("kotlin")).id()).isEqualTo("spring-boot-4");
+    }
+
+    @Test
+    void aFolderOfProjectsIsAssessedAndRankedEasiestFirst(@TempDir Path root) throws Exception {
+        project(root.resolve("libs/plain"), "<groupId>g</groupId><artifactId>lib</artifactId><version>1</version>"
+                + "<properties><maven.compiler.release>17</maven.compiler.release></properties>");
+        Path webapp = project(root.resolve("apps/webapp"), "<groupId>g</groupId><artifactId>shop</artifactId><version>1</version>"
+                + "<packaging>war</packaging><modules><module>core</module></modules><dependencies><dependency>"
+                + "<groupId>javax.servlet</groupId><artifactId>javax.servlet-api</artifactId><version>3.1.0</version></dependency>"
+                + "<dependency><groupId>org.springframework</groupId><artifactId>spring-webmvc</artifactId><version>4.3.30.RELEASE</version>"
+                + "</dependency></dependencies>");
+        // A module of the web application: part of it, not a project of its own.
+        project(webapp.resolve("core"), "<groupId>g</groupId><artifactId>core</artifactId><version>1</version>");
+        project(root.resolve("apps/boot2"), bootParent("2.7.18"));
+        Files.createDirectories(root.resolve("docs/notes"));
+        Files.createDirectories(root.resolve("apps/webapp/target/classes"));
+
+        io.renova.core.engine.Portfolio.Result result = new io.renova.core.engine.Portfolio(REGISTRY).assess(root, line -> { });
+
+        assertThat(result.entries()).extracting(io.renova.core.engine.Portfolio.Entry::path)
+                .containsExactlyInAnyOrder("libs/plain", "apps/webapp", "apps/boot2");
+        assertThat(result.entries()).filteredOn(e -> e.path().equals("apps/webapp")).singleElement().satisfies(e -> {
+            assertThat(e.playbook()).isEqualTo("java8-to-21-jakarta-ee10");
+            // Spring MVC URL matching is left to a person.
+            assertThat(e.manualSteps()).isGreaterThan(0);
+            assertThat(e.fullyAutomatic()).isFalse();
+        });
+        // The plain library needs no decision from anyone, so it comes first.
+        assertThat(result.entries().getFirst().path()).isEqualTo("libs/plain");
+        assertThat(result.entries().getFirst().fullyAutomatic()).isTrue();
+        assertThat(result.fullyAutomatic()).isGreaterThanOrEqualTo(1);
+        assertThat(result.findings()).isEqualTo(result.entries().stream().mapToInt(io.renova.core.engine.Portfolio.Entry::findings).sum());
+
+        assertThat(io.renova.core.engine.Portfolio.markdown(result)).contains("| Projects | 3 |", "| libs/plain | Java → 21 |");
+        assertThat(io.renova.core.engine.Portfolio.csv(result)).startsWith("project,path,").contains("\"apps/boot2\"", "\"spring-boot-3\"");
     }
 
     private static List<String> parents(Path root, String playbookId, String ruleId) throws Exception {

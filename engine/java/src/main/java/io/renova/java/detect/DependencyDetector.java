@@ -30,7 +30,8 @@ import java.util.regex.Pattern;
  */
 public final class DependencyDetector implements DetectorFactory {
 
-    private static final Pattern GRADLE_DEP = Pattern.compile("(['\"])([\\w.\\-]+):([\\w.\\-]+):([^'\":@]+)[^'\"]*\\1");
+    /** A dependency notation in a Gradle build file; the version is absent when a platform or plugin manages it. */
+    private static final Pattern GRADLE_DEP = Pattern.compile("(['\"])([\\w.\\-]+):([\\w.\\-]+)(?::([^'\":@]+))?[^'\"]*\\1");
 
     @Override
     public String type() {
@@ -81,7 +82,8 @@ public final class DependencyDetector implements DetectorFactory {
                     Matcher m = GRADLE_DEP.matcher(lines.get(i));
                     while (m.find()) {
                         if (matches(coordinates, versionBelow, m.group(2), m.group(3), m.group(4))) {
-                            findings.add(ctx.finding(rule, gradle, i + 1, m.group(2) + ":" + m.group(3) + ":" + m.group(4)));
+                            findings.add(ctx.finding(rule, gradle, i + 1, m.group(2) + ":" + m.group(3)
+                                    + (m.group(4) == null ? "" : ":" + m.group(4))));
                         }
                     }
                 }

@@ -14,12 +14,14 @@ import io.renova.java.detect.DependencyDetector;
 import io.renova.java.detect.DuplicateDependencyDetector;
 import io.renova.java.detect.ImportDependencyDetector;
 import io.renova.java.detect.ImportDetector;
+import io.renova.java.detect.GradleImportDependencyDetector;
 import io.renova.java.detect.GradlePluginDetector;
 import io.renova.java.detect.JavaVersionDetector;
 import io.renova.java.detect.MavenParentDetector;
 import io.renova.java.detect.MavenPluginDetector;
 import io.renova.java.detect.PomPropertyDetector;
 import io.renova.java.detect.UnversionedDependencyDetector;
+import io.renova.java.fix.GradleBuildFixer;
 import io.renova.java.fix.MavenPomFixer;
 import io.renova.java.fix.MavenVerifier;
 import io.renova.java.fix.OpenRewriteFixer;
@@ -129,12 +131,12 @@ public final class JavaPlugin implements EcosystemPlugin {
     public List<DetectorFactory> detectors() {
         return List.of(new ImportDetector(), new DependencyDetector(), new JavaVersionDetector(),
                 new MavenPluginDetector(), new PomPropertyDetector(), new ImportDependencyDetector(),
-                new UnversionedDependencyDetector(), new DuplicateDependencyDetector(), new MavenParentDetector(), new GradlePluginDetector());
+                new UnversionedDependencyDetector(), new DuplicateDependencyDetector(), new MavenParentDetector(), new GradlePluginDetector(), new GradleImportDependencyDetector());
     }
 
     @Override
     public List<Fixer> fixers() {
-        return List.of(new OpenRewriteFixer(), new MavenPomFixer());
+        return List.of(new OpenRewriteFixer(), new MavenPomFixer(), new GradleBuildFixer());
     }
 
     @Override

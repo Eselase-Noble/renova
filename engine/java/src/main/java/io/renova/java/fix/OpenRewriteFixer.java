@@ -54,6 +54,11 @@ public final class OpenRewriteFixer implements Fixer {
             details.add(result.tail(result.ok() ? 8 : 40));
             if (result.ok()) {
                 succeeded++;
+                // The recipes ran on the project's own Gradle; the migrated code must now build on the target JDK.
+                String upgraded = GradleSupport.upgradeWrapper(root, MavenSupport.targetJava(context));
+                if (upgraded != null) {
+                    details.add(upgraded);
+                }
             }
         }
         for (Path root : roots) {
@@ -72,7 +77,7 @@ public final class OpenRewriteFixer implements Fixer {
                 cmd.add("compile");
             }
             cmd.add(plugin + ":" + goal);
-            Proc.Result result = retryingOnNetworkErrors(() -> Proc.run(cmd, root, TIMEOUT, MavenSupport.environment()), details);
+            Proc.Result result = retryingOnNetworkErrors(() -> Proc.run(cmd, root, TIMEOUT, MavenSupport.environment(context)), details);
             String name = context.workspace().root().relativize(root).toString();
             details.add("== " + (name.isEmpty() ? "." : name) + ": exit " + result.exitCode());
             details.add(result.tail(result.ok() ? 8 : 40));
@@ -121,7 +126,21 @@ public final class OpenRewriteFixer implements Fixer {
             cmd.add(init.toString());
             cmd.add("rewriteRun");
             cmd.add("-Drewrite.activeRecipe=" + String.join(",", recipes));
-            return Proc.run(cmd, root, TIMEOUT, MavenSupport.environment());
+            // The project as it is runs on the Gradle its wrapper names, which may be too old for the target JDK.
+            java.util.Map<String, String> environment = MavenSupport.environment(context);
+            String gradle = GradleSupport.wrapperVersion(root);
+            if (gradle != null) {
+                List<Jdks.Jdk> jdks = Jdks.installed();
+                java.util.Optional<Jdks.Jdk> jdk = Jdks.forGradle(jdks, gradle);
+                if (jdk.isEmpty()) {
+                    return new Proc.Result(1, "The project's Gradle wrapper is " + gradle + ", which runs on Java "
+                            + Jdks.newestJavaFor(gradle) + " at most, and no such JDK is installed (found: " + Jdks.describe(jdks)
+                            + "). Install one (Renova looks in JAVA_HOME, ~/.jdks, ~/.sdkman, /usr/lib/jvm and the folders in "
+                            + "RENOVA_JDKS); it is only needed to run the recipes, the result is built on the target JDK.");
+                }
+                environment = java.util.Map.of("JAVA_HOME", jdk.get().home().toString());
+            }
+            return Proc.run(cmd, root, TIMEOUT, environment);
         } finally {
             java.nio.file.Files.deleteIfExists(init);
         }

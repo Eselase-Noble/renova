@@ -96,6 +96,24 @@ rules:
         mapped, and callers get 404. Either add the trailing-slash forms explicitly where clients use them, or
         redirect them in one place with a filter. Check links, API clients and monitoring probes.
 
+  - id: guard-gradle-jaxb-api
+    phase: guard
+    title: A Gradle build must declare the Jakarta XML Binding API the code imports
+    category: E
+    severity: BLOCKER
+    detect:
+      type: gradleImportWithoutDependency
+      imports: [jakarta.xml.bind]
+      dependency: "jakarta.xml.bind:jakarta.xml.bind-api"
+      configuration: implementation
+    fix:
+      strategy: gradle
+      # The recipe adds the old javax artifact at runtime only, which the renamed imports do not compile against.
+      params: { action: addDependency, remove: ["javax.xml.bind:jaxb-api"] }
+    rationale: >
+      Spring Boot 2 brought javax.xml.bind in with its starters; Spring Boot 3 does not bring jakarta.xml.bind.
+      Code that uses JAXB annotations needs the API declared. Spring Boot manages its version.
+
 knowledge:
 
   - id: spring-boot-3-baseline
