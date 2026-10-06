@@ -1,0 +1,88 @@
+# Spring Boot 2 applications → Spring Boot 3.5, which brings Java 17 or later, Jakarta EE 10 and Spring 6 with it.
+#
+# For the latest major version, use spring-boot-4.
+
+id: spring-boot-3
+name: "Spring Boot 2 → 3.5 (Java 21, Jakarta EE 10)"
+ecosystem: java
+version: 0.1.0
+description: >
+  Moves a Spring Boot 2 application to Spring Boot 3.5 on Java 21: the Boot parent and starters, javax to
+  jakarta packages, Spring Security 6 configuration, renamed configuration properties, and the JDK APIs
+  removed on the way.
+targets:
+  java: "21"
+  springBoot: "3.5"
+  spring: "6.2"
+  jakartaEE: "10"
+
+settings:
+  openrewrite:
+    plugin: org.openrewrite.maven:rewrite-maven-plugin:6.46.1
+    artifacts:
+      - org.openrewrite.recipe:rewrite-migrate-java:3.42.1
+      - org.openrewrite.recipe:rewrite-spring:6.37.1
+
+include:
+  - packs/spring-boot-3-changes.yaml
+  - packs/spring-framework-6.yaml
+  - packs/jdk-removed-apis.yaml
+  - packs/maven-build-guards.yaml
+
+rules:
+
+  - id: java-level
+    title: Raise the Java language level to 21
+    category: A
+    severity: BLOCKER
+    detect: { type: javaVersionBelow, version: 21 }
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.migrate.UpgradeToJava21]
+    rationale: Spring Boot 3 needs Java 17 or later; 21 is the long-term-support release it is most used with.
+
+  - id: spring-boot-3
+    title: Upgrade Spring Boot to 3.5
+    category: A
+    severity: BLOCKER
+    detect:
+      type: mavenParent
+      coordinates: ["org.springframework.boot:spring-boot-starter-parent"]
+      versionBelow: "3"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_5]
+    rationale: >
+      The recipe steps through every Spring Boot release from 2.x to 3.5: the parent and plugin versions,
+      starters that were renamed or removed, and the framework upgrades each release brings.
+
+  - id: spring-boot-bom-3
+    title: Upgrade the Spring Boot dependency management (BOM) to 3.5
+    category: A
+    severity: BLOCKER
+    detect:
+      # For builds that import the BOM instead of inheriting from the Spring Boot parent.
+      type: dependency
+      coordinates: ["org.springframework.boot:spring-boot-dependencies"]
+      versionBelow: "3"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_5]
+
+  - id: guard-spring-boot-parent
+    phase: guard
+    title: The Spring Boot parent must be on 3.5
+    category: A
+    severity: BLOCKER
+    detect:
+      type: mavenParent
+      coordinates: ["org.springframework.boot:spring-boot-starter-parent"]
+      versionBelow: "3.5"
+    fix:
+      strategy: maven
+      params: { action: setParentVersion, version: "3.5.7" }
+    rationale: >
+      The upgrade recipe moves the parent one release at a time and looks each release up as it goes. When a
+      lookup fails (a slow or restricted network, a repository mirror that lags), it stops part-way and leaves
+      the parent on an earlier release than the starters and the code it has already moved, which do not work
+      together. Setting the parent finishes the step the recipe could not.

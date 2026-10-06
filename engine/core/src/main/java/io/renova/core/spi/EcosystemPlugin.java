@@ -31,6 +31,15 @@ public interface EcosystemPlugin {
         return List.of();
     }
 
+    /**
+     * Which of this ecosystem's playbooks to use for the project when the user has not chosen one.
+     *
+     * @param candidates ids of the installed playbooks of this ecosystem, never empty
+     */
+    default String recommendedPlaybook(Path root, List<String> candidates) {
+        return candidates.getFirst();
+    }
+
     default List<DetectorFactory> detectors() {
         return List.of();
     }

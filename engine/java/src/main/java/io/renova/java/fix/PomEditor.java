@@ -285,6 +285,21 @@ final class PomEditor {
                 + indent + "</dependency>\n";
     }
 
+    /** Sets the version of the declared parent; a pom without a parent, or already on that version, is left alone. */
+    static Result setParentVersion(String pom, String version) {
+        Matcher parent = Pattern.compile("(?s)<parent>.*?</parent>").matcher(pom);
+        if (!parent.find()) {
+            return new Result(pom, 0);
+        }
+        Matcher declared = Pattern.compile("<version>([^<]*)</version>").matcher(parent.group());
+        if (!declared.find() || declared.group(1).strip().equals(version)) {
+            return new Result(pom, 0);
+        }
+        int start = parent.start() + declared.start(1);
+        int end = parent.start() + declared.end(1);
+        return new Result(pom.substring(0, start) + version + pom.substring(end), 1);
+    }
+
     /** Adds a project-level property unless it already exists. */
     static Result setProperty(String pom, String name, String value) {
         List<Span> profiles = spans(pom, "profiles");

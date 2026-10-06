@@ -14,4 +14,12 @@ public final class MavenVerifierAccess {
     public static List<BuildError> parse(String output, Path workspace, Path buildRoot) {
         return MavenVerifier.parse(output, workspace, buildRoot);
     }
+
+    public static int installedJava(String javaHome) {
+        return MavenVerifier.installedJava(javaHome);
+    }
+
+    public static String setParentVersion(String pom, String version) {
+        return PomEditor.setParentVersion(pom, version).content();
+    }
 }

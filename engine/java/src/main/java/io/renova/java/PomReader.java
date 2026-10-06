@@ -46,10 +46,13 @@ public final class PomReader {
     public record Plugin(String groupId, String artifactId, String version, boolean managed) {
     }
 
-    /** @param parent groupId:artifactId of the declared parent, or null when there is none */
+    /**
+     * @param parent        groupId:artifactId of the declared parent, or null when there is none
+     * @param parentVersion the declared parent's version, or null
+     */
     public record Pom(String groupId, String artifactId, String version, String packaging, String javaVersion,
                       List<String> modules, List<Dependency> dependencies, List<Plugin> plugins,
-                      Map<String, String> properties, String parent) {
+                      Map<String, String> properties, String parent, String parentVersion) {
     }
 
     private PomReader() {
@@ -97,7 +100,8 @@ public final class PomReader {
 
         return new Pom(interpolate(groupId, props), artifactId, interpolate(version, props),
                 firstNonNull(text(project, "packaging"), "jar"), javaVersion(project, props),
-                modules, deps, plugins, props, parent == null ? null : text(parent, "groupId") + ":" + text(parent, "artifactId"));
+                modules, deps, plugins, props, parent == null ? null : text(parent, "groupId") + ":" + text(parent, "artifactId"),
+                parent == null ? null : interpolate(text(parent, "version"), props));
     }
 
     /** "1.8" → "8"; checks the usual properties, then the compiler plugin configuration. */
