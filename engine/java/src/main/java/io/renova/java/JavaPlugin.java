@@ -237,7 +237,7 @@ public final class JavaPlugin implements EcosystemPlugin {
                 // Add-ons: optional, combined with a target (java-to-21+junit5).
                 "playbooks/java/addons/junit5.yaml", "playbooks/java/addons/mockito5.yaml", "playbooks/java/addons/log4j2.yaml",
                 "playbooks/java/addons/commons-lang3.yaml", "playbooks/java/addons/commons-collections4.yaml",
-                "playbooks/java/addons/httpclient5.yaml");
+                "playbooks/java/addons/httpclient5.yaml", "playbooks/java/addons/struts7.yaml");
     }
 
     /**
@@ -252,6 +252,7 @@ public final class JavaPlugin implements EcosystemPlugin {
         boolean boot = false;
         boolean boot3 = false;
         boolean javaEe = false;
+        boolean struts = false;
         try {
             for (Path buildFile : buildFiles(root)) {
                 if (!buildFile.getFileName().toString().startsWith("pom")) {
@@ -273,6 +274,7 @@ public final class JavaPlugin implements EcosystemPlugin {
                 }
                 for (PomReader.Dependency d : pom.dependencies()) {
                     boot |= d.groupId().equals("org.springframework.boot");
+                    struts |= d.groupId().equals("org.apache.struts");
                     javaEe |= d.groupId().startsWith("javax") || d.groupId().equals("jstl")
                             || (d.groupId().equals("org.springframework") && d.version() != null && !d.version().contains("${")
                             && io.renova.core.util.Versions.isBelow(d.version(), "6"));
@@ -285,7 +287,11 @@ public final class JavaPlugin implements EcosystemPlugin {
             // An unreadable build file: fall through to the plain Java path, which the analysis will report on.
         }
         String wanted = boot3 ? "spring-boot-4" : boot ? "spring-boot-3" : javaEe ? "java8-to-21-jakarta-ee10" : "java-to-21";
-        return candidates.contains(wanted) ? wanted : candidates.getFirst();
+        if (!candidates.contains(wanted)) {
+            return candidates.getFirst();
+        }
+        // A framework that must move with the target comes along as its add-on.
+        return struts && wanted.contains("jakarta") ? wanted + "+struts7" : wanted;
     }
 
     private static final java.util.regex.Pattern JAVA_EE_IMPORT = java.util.regex.Pattern.compile(

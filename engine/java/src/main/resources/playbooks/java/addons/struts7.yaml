@@ -1,0 +1,51 @@
+# Add-on: Struts 2 → 7, combined with a Jakarta target as in java8-to-21-jakarta-ee10+struts7. Renova adds it
+# by itself when it suggests a target for a project that uses Struts.
+
+id: struts7
+name: "Struts 2 → 7"
+ecosystem: java
+version: 0.1.0
+description: >
+  Moves a Struts 2 application to Struts 7, the first Struts line on Jakarta EE: renamed packages, the Aware
+  interfaces, struts.xml. For use with a Jakarta target; Struts 7 does not run on javax.servlet.
+
+settings:
+  kind: addon
+  openrewrite:
+    artifacts:
+      - org.openrewrite.recipe:rewrite-struts:0.27.0
+
+rules:
+
+  - id: struts-7
+    title: Upgrade Struts 2 to Struts 7 (the Jakarta EE line)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates: ["org.apache.struts:struts2-*"]
+      versionBelow: "7"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.struts.migrate6.MigrateStruts6, org.openrewrite.java.struts.migrate7.MigrateStruts7]
+    rationale: >
+      Struts 2.x and 6.x run on javax.servlet only; Struts 7 is the first line on Jakarta EE. The recipes rename
+      the com.opensymphony.xwork2 classes to org.apache.struts2, replace the removed Aware interfaces
+      (SessionAware, ServletRequestAware) and update struts.xml constants and DTDs. Plugins without a Struts 7
+      release, and OGNL expressions that relied on relaxed security defaults, need a person.
+
+  - id: struts-aware-callers
+    title: Update code that calls the Aware setters Struts 7 renamed
+    category: C
+    severity: WARNING
+    detect:
+      type: fileContains
+      include: ["**/*.java"]
+      pattern: "\\.set(Session|ServletRequest|ServletResponse|Application|Parameters|Principal)\\(\\s*\\w"
+    fix:
+      strategy: manual
+      hint: >
+        Struts 7 replaced SessionAware.setSession, ServletRequestAware.setServletRequest and the other Aware
+        setters with withSession, withServletRequest and so on. The recipe renames the methods in the actions;
+        code that calls them on an action, most often unit tests that set an action up by hand, must call the
+        new names. Calls with the same names on other objects (a mock request's setSession) are not affected.

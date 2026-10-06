@@ -177,6 +177,10 @@ public final class PluginRegistry {
                     + candidates.stream().map(Playbook::id).toList());
         }
         String id = plugins.get(ecosystems.getFirst()).recommendedPlaybook(root, candidates.stream().map(Playbook::id).toList());
+        if (id.contains("+")) {
+            // A target with the add-ons the project needs with it.
+            return playbook(id);
+        }
         return candidates.stream().filter(p -> p.id().equals(id)).findFirst().orElse(candidates.getFirst());
     }
 }
