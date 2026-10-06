@@ -67,6 +67,11 @@ public final class Migrator {
         MigrationOptions options = context.options();
         Workspace workspace = context.workspace();
 
+        // A migration that can only end in "cannot build here" should say so before doing an hour of work.
+        if (options.verify()) {
+            registry.plugin(ecosystem).verifier().ifPresent(v -> v.preflight(context));
+        }
+
         List<StageResult> stages = new ArrayList<>();
         applyPlan(context, plan, "", stages);
         List<PlanStep> manual = new ArrayList<>(plan.steps(FixSpec.MANUAL));

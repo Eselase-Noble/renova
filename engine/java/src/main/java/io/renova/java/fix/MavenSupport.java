@@ -31,6 +31,14 @@ final class MavenSupport {
         }
         if ("true".equals(context.options().toolOption("maven.offline"))) {
             cmd.add("-o");
+        } else {
+            // A download that stalls would otherwise hold the migration for ever: give up on a silent connection
+            // after two minutes and let Maven try again. (Maven 3 reads the first set, Maven 4 and 3.9 the second.)
+            cmd.add("-Dmaven.wagon.http.connectionTimeout=30000");
+            cmd.add("-Dmaven.wagon.rto=120000");
+            cmd.add("-Dmaven.wagon.http.retryHandler.count=3");
+            cmd.add("-Daether.connector.connectTimeout=30000");
+            cmd.add("-Daether.connector.requestTimeout=120000");
         }
         return cmd;
     }
