@@ -1,0 +1,113 @@
+# Java EE (javax) or Jakarta EE 10 web applications → Java 21, Jakarta EE 11, Spring Framework 7: the latest of
+# each, for applications that do not use Spring Boot (for those, use spring-boot-4).
+#
+# Everything java8-to-21-jakarta-ee10 does, then one release further: Servlet 6.1 and Spring Framework 7,
+# which run on Tomcat 11 and WildFly 37+.
+
+id: java-to-21-jakarta-ee11-spring7
+name: "Java → 21 + Jakarta EE 11 + Spring 7"
+ecosystem: java
+version: 0.1.0
+description: >
+  Moves a Java EE (javax) or Jakarta EE 10 web application to Java 21, Jakarta EE 11 and Spring Framework 7,
+  ready for Tomcat 11 and WildFly 37+. Covers everything the Jakarta EE 10 and Spring 6 path does, then the
+  Servlet 6.1 APIs and what Spring Framework 7 removed.
+targets:
+  java: "21"
+  jakartaEE: "11 (Servlet 6.1)"
+  spring: "7.0"
+  containers: "Tomcat 11, WildFly 37+"
+
+settings:
+  openrewrite:
+    plugin: org.openrewrite.maven:rewrite-maven-plugin:6.46.1
+    artifacts:
+      - org.openrewrite.recipe:rewrite-migrate-java:3.42.1
+      - org.openrewrite.recipe:rewrite-spring:6.37.1
+  behaviour:
+    baseline: { build: "maven:3.9-eclipse-temurin-8", server: "tomcat:9.0-jdk8", platform: "Java 8, Tomcat 9" }
+    candidate: { server: "tomcat:11.0-jdk21", platform: "Java 21, Tomcat 11" }
+
+include:
+  - packs/jakarta-ee10.yaml
+  - packs/spring-framework-6.yaml
+  - packs/jdk-removed-apis.yaml
+  - packs/servlet-containers.yaml
+  - packs/maven-build-guards.yaml
+
+rules:
+
+  - id: java-level
+    title: Raise the Java language level to 21
+    category: A
+    severity: BLOCKER
+    detect: { type: javaVersionBelow, version: 21 }
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.migrate.UpgradeToJava21]
+    rationale: Spring Framework 7 needs Java 17 or later; 21 is the long-term-support release it is most used with.
+
+  - id: jakarta-ee-11
+    title: Move the Jakarta EE APIs to Jakarta EE 11
+    category: A
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates:
+        - "javax.servlet:*"
+        - "javax:javaee-api"
+        - "javax:javaee-web-api"
+        - "jakarta.servlet:jakarta.servlet-api"
+        - "jakarta.platform:*"
+      versionBelow: "6.1"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.migrate.jakarta.JakartaEE11]
+    rationale: >
+      Spring Framework 7 is built on Jakarta EE 11 (Servlet 6.1, Persistence 3.2, Validation 3.1). The recipe
+      includes the javax to jakarta rename of Jakarta EE 10 and then the changes of 11.
+
+  - id: spring-framework-7
+    title: Upgrade Spring Framework to 7.0
+    category: C
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates: ["org.springframework:spring-*"]
+      versionBelow: "7"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.framework.UpgradeSpringFramework_7_0]
+    rationale: >
+      The recipe steps through Spring Framework 6 on the way, so an application on Spring 4 or 5 gets the same
+      changes as the Spring 6 path before the ones Spring 7 makes.
+
+  - id: guard-servlet-api-6-1
+    phase: guard
+    title: The Servlet API must be 6.1 for Spring Framework 7
+    category: E
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates: ["jakarta.servlet:jakarta.servlet-api"]
+      versionBelow: "6.1"
+    fix:
+      strategy: maven
+      params: { action: setVersion, version: "6.1.0" }
+    rationale: >
+      Spring Framework 7 calls Servlet 6.1 methods. The Jakarta EE 10 step of the recipe leaves the API on 6.0,
+      which compiles but fails at runtime on those calls.
+
+knowledge:
+
+  - id: spring-framework-7-baseline
+    title: What Spring Framework 7 requires and removed
+    triggers: ["org.springframework", "spring-webmvc", "jakarta.servlet-api", "AntPathMatcher", "javax.annotation", "jakarta.inject"]
+    body: |
+      Spring Framework 7 requires Java 17 or later and Jakarta EE 11: Servlet 6.1 (Tomcat 11, Jetty 12.1),
+      Persistence 3.2 (Hibernate 7), Validation 3.1. Removed: support for javax.annotation and javax.inject
+      annotations (use jakarta.annotation and jakarta.inject), the spring-jcl module (Apache Commons Logging
+      is used directly), AntPathMatcher for web request mapping together with suffix pattern matching and
+      trailing-slash matching (PathPatternParser only), ListenableFuture (use CompletableFuture), and Undertow
+      support. Null-safety annotations moved to JSpecify (org.jspecify.annotations). XML configuration of
+      Spring MVC (<mvc:annotation-driven>) is deprecated but still works.

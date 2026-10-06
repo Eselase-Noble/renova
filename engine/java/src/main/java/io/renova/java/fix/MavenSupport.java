@@ -14,6 +14,21 @@ final class MavenSupport {
     private MavenSupport() {
     }
 
+    /**
+     * The environment build tools run in: JAVA_HOME as it is set, or else the JDK running Renova. Without it,
+     * a wrapper script picks a JDK by its own rules (the javac on the PATH, which may be another version than
+     * java), and the build is verified on a JDK nobody chose.
+     */
+    static java.util.Map<String, String> environment() {
+        String set = System.getenv("JAVA_HOME");
+        if (set != null && !set.isBlank()) {
+            return java.util.Map.of();
+        }
+        Path running = Path.of(System.getProperty("java.home"));
+        return Files.isExecutable(running.resolve("bin/javac")) || Files.isExecutable(running.resolve("bin/javac.exe"))
+                ? java.util.Map.of("JAVA_HOME", running.toString()) : java.util.Map.of();
+    }
+
     static List<String> baseCommand(MigrationContext context, Path buildRoot) {
         List<String> cmd = new ArrayList<>();
         String executable = context.options().toolOption("maven.executable");

@@ -209,9 +209,7 @@ public final class RenovaProjectService {
     }
 
     static boolean passed(MigrationOutcome outcome) {
-        boolean build = outcome.verification() == null || outcome.verification().success();
-        BehaviourReport b = outcome.behaviour();
-        return build && (b == null || b.status() == BehaviourReport.Status.SAME || b.status() == BehaviourReport.Status.SKIPPED);
+        return outcome.passed();
     }
 
     private void announce(Run run) {

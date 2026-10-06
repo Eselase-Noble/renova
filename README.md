@@ -276,6 +276,9 @@ rules:
 
 ### Targets
 
+Every target below has been run end to end without AI, with a passing build and tests, on at least one
+project, including the public Spring PetClinic sample: see [docs/verified-migrations.md](docs/verified-migrations.md).
+
 A playbook is a target: where the project should end up. Renova suggests the one that fits the project, and
 any other can be chosen (`--playbook ID`, the **Target** selector on a project in the console, or the playbook
 list in the desktop app):
@@ -284,8 +287,13 @@ list in the desktop app):
 |---|---|---|---|
 | `java-to-17`, `java-to-21`, `java-to-25` | Any Java project | That Java version, and nothing else: frameworks and javax or jakarta APIs stay | Projects without Java EE or Spring Boot (`java-to-21`) |
 | `java8-to-21-jakarta-ee10` | Java EE (javax) web applications, Spring 5 or earlier | Java 21, Jakarta EE 10, Spring 6, for Tomcat 10.1/11 and WildFly 27+ / JBoss EAP 8 | WAR projects and projects using javax APIs |
+| `java-to-21-jakarta-ee11-spring7` | The same applications, or ones already on Jakarta EE 10 | Java 21, Jakarta EE 11 (Servlet 6.1), Spring Framework 7, for Tomcat 11 and WildFly 37+ | Chosen by hand: the latest of each |
 | `spring-boot-3` | Spring Boot 2 applications | Spring Boot 3.5, Java 21, Jakarta EE 10 | Spring Boot 2 applications |
-| `spring-boot-4` | Spring Boot 2 or 3 applications | Spring Boot 4.0, Java 21, Spring Framework 7 | Spring Boot 3 applications |
+| `spring-boot-4` | Spring Boot 2, 3 or 4.0 applications | Spring Boot 4.1, Java 21, Spring Framework 7 | Spring Boot 3 applications |
+
+Maven and Gradle builds are both supported: recipes run through the project's own wrapper (`mvnw`, `gradlew`)
+when it has one, and Gradle builds are changed without adding anything to their build files. The build-file
+guards (`maven` fixes) apply to Maven builds only.
 
 The build is verified on the JDK in `JAVA_HOME`, so a target needs that JDK installed (Java 25 for `java-to-25`);
 Renova says so before it changes anything.
@@ -341,8 +349,8 @@ Linux, Windows and macOS, the web bundle, the CLI and both IDE plugins. See [doc
 3. **Benchmark harness:** `renova benchmark` scores migrations of synthetic legacy apps (see
    [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.
 4. **Web console:** single sign-on and licensing (the audit log and local mode are in). **Desktop:** signed installers.
-5. **More targets and ecosystems:** Java 17/21/25 and Spring Boot 3 and 4 are in. Next: Spring Framework 7
-   with Jakarta EE 11 for applications without Spring Boot, Gradle builds, Java EE → Quarkus, then .NET and Python.
+5. **More targets and ecosystems:** Java 17/21/25, Spring Boot 3 and 4.1, Spring Framework 7 with Jakarta EE 11,
+   and Gradle builds are in. Next: build-file guards for Gradle, Java EE → Quarkus, then .NET and Python.
 
 ## Contributing
 

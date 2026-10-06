@@ -175,8 +175,9 @@ public class MigrationService {
                     b == null ? null : b.status().name(), b == null ? null : b.summary(), outcome.repairRounds(),
                     outcome.aiUsage().requests(), outcome.aiUsage().inputTokens(), outcome.aiUsage().outputTokens(),
                     outcome.manualSteps().size(), plan.automationRate(), analysis.findings().size());
-            boolean passed = !build.equals("FAILS") && (b == null || b.status() == BehaviourReport.Status.SAME
-                    || b.status() == BehaviourReport.Status.SKIPPED);
+            boolean passed = outcome.passed();
+            outcome.failedStages().forEach(stage -> store.appendProgress(id, "The " + stage.stage() + " stage could not run, so its "
+                    + "changes were not made"));
             store.appendProgress(id, "Finished: build " + build + (b == null ? "" : ", behaviour " + b.status()));
             store.saveMigration(running.with(passed ? MigrationRecord.Status.PASSED : MigrationRecord.Status.FAILED, null, now(),
                     summary, null));

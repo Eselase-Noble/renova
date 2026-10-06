@@ -56,6 +56,28 @@ rules:
       The recipe steps through every Spring Boot release from 2.x to 3.5: the parent and plugin versions,
       starters that were renamed or removed, and the framework upgrades each release brings.
 
+  - id: spring-boot-gradle-plugin
+    title: Upgrade the Spring Boot Gradle plugin to 3.5
+    category: A
+    severity: BLOCKER
+    detect: { type: gradlePlugin, id: org.springframework.boot, versionBelow: "3" }
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_5]
+    rationale: In a Gradle build the plugin's version is the Spring Boot version; the recipe also updates the Gradle wrapper when the new release needs a newer Gradle.
+
+  - id: spring-boot-gradle-classpath
+    title: Upgrade the Spring Boot Gradle plugin declared on the buildscript classpath
+    category: A
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates: ["org.springframework.boot:spring-boot-gradle-plugin"]
+      versionBelow: "3"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.spring.boot3.UpgradeSpringBoot_3_5]
+
   - id: spring-boot-bom-3
     title: Upgrade the Spring Boot dependency management (BOM) to 3.5
     category: A

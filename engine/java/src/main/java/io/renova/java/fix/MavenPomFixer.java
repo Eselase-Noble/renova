@@ -23,6 +23,8 @@ import java.util.regex.Pattern;
  *   <li>{@code action: setPluginVersion, plugin: maven-war-plugin, version: "3.4.0", groupId?}</li>
  *   <li>{@code action: setProperty, name: maven.compiler.target, value: "${maven.compiler.source}"}</li>
  *   <li>{@code action: setParentVersion, version: "3.5.7"}: the version of the pom's declared parent</li>
+ *   <li>{@code action: setVersion, version: "6.1.0"}: that version for each dependency the rule's {@code dependency}
+ *       detector reported; without {@code version}, the one each finding carries</li>
  *   <li>{@code action: addDependency}: adds the dependency each finding describes in its data
  *       (groupId, artifactId, version, scope), or the fixed {@code dependency: "g:a:v"} (and
  *       {@code scope}) given in the params</li>
@@ -101,7 +103,19 @@ public final class MavenPomFixer implements Fixer {
                     case "setVersion" -> {
                         String content = before;
                         int changes = 0;
+                        Optional<String> fixedVersion = params.optString("version");
                         for (Finding f : step.findings()) {
+                            if (f.file().equals(file) && fixedVersion.isPresent() && f.evidence() != null) {
+                                // A version the playbook names, for the dependencies its dependency detector reported
+                                // (their evidence is groupId:artifactId:version).
+                                String[] gav = f.evidence().split("[: ]");
+                                if (gav.length >= 2) {
+                                    PomEditor.Result set = PomEditor.changeDependencyVersion(content, gav[0], gav[1], fixedVersion.get());
+                                    content = set.content();
+                                    changes += set.changes();
+                                }
+                                continue;
+                            }
                             if (!f.file().equals(file) || !f.data().containsKey("version")) {
                                 continue;
                             }

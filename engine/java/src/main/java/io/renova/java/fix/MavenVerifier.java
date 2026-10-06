@@ -15,6 +15,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
+ * Builds and tests every build root of a Java project: Maven here, Gradle through {@link GradleVerifier}.
  * Builds and tests every Maven build root ({@code clean verify} by default) and turns compiler,
  * project-model and test failures into structured errors for the AI repair loop.
  */
@@ -71,10 +72,18 @@ public final class MavenVerifier implements Verifier {
         List<BuildError> errors = new ArrayList<>();
         StringBuilder log = new StringBuilder();
         boolean success = true;
+        // Gradle builds in the same project are verified the same way, with their own tool.
+        List<Path> gradleRoots = GradleSupport.buildRoots(context);
+        if (!gradleRoots.isEmpty()) {
+            VerifyResult gradle = GradleVerifier.verify(context, gradleRoots);
+            success = gradle.success();
+            errors.addAll(gradle.errors());
+            log.append(gradle.log());
+        }
         for (Path root : MavenSupport.buildRoots(context)) {
             List<String> cmd = MavenSupport.baseCommand(context, root);
             cmd.addAll(Arrays.asList(goals.split("\\s+")));
-            Proc.Result result = Proc.run(cmd, root, TIMEOUT);
+            Proc.Result result = Proc.run(cmd, root, TIMEOUT, MavenSupport.environment());
             log.append("== ").append(workspace.relativize(root)).append(": exit ").append(result.exitCode()).append('\n');
             if (!result.ok()) {
                 success = false;

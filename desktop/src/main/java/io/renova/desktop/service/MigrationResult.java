@@ -76,7 +76,12 @@ public final class MigrationResult {
     public String state() {
         String b = behaviour == null ? null : behaviour.path("status").asText();
         boolean behaviourOk = b == null || b.equals("SAME") || b.equals("SKIPPED");
-        return buildPasses() && behaviourOk ? "PASSED" : "FAILED";
+        // A stage that could not run made none of its changes: a passing build then proves nothing.
+        boolean stagesRan = true;
+        for (JsonNode stage : migration().path("stages")) {
+            stagesRan &= !stage.path("status").asText().equals("FAILED");
+        }
+        return buildPasses() && behaviourOk && stagesRan ? "PASSED" : "FAILED";
     }
 
     public Path reportMarkdown() {

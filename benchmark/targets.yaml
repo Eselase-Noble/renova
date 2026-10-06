@@ -1,0 +1,64 @@
+# Renova targets suite: one app per migration path, each expected to pass with recipes, text rules and guards
+# alone. It answers "does every target Renova offers work end to end?", without an AI key.
+#
+# Run: benchmark/fetch-public.sh                       (once: fetches the public project below)
+#      cli/bin/renova benchmark --suite benchmark/targets.yaml --out <empty dir> --configs deterministic
+#
+# java-to-25 needs JDK 25 in JAVA_HOME and is left out; run it on its own with --playbook java-to-25.
+
+id: java-targets
+appsDir: ../../renova-test-apps
+
+configurations:
+  - id: deterministic           # recipes, text rules and guards only; free
+    behaviour: false
+
+apps:
+  - id: java17-to-21
+    path: billing-java17
+    playbook: java-to-21
+    checks:
+      - { file: pom.xml, contains: "<maven.compiler.source>21</maven.compiler.source>", why: "the build compiles for the target" }
+      - { file: src/main/java/com/acme/billing/Invoice.java, contains: "getFirst()", why: "code uses what the new Java level offers" }
+
+  - id: java17-to-21-gradle
+    path: billing-gradle17
+    playbook: java-to-21
+    checks:
+      - { file: build.gradle, contains: "JavaVersion.VERSION_21", why: "the Gradle build compiles for the target" }
+      - { file: build.gradle, absent: "openrewrite", why: "the build files are not given a migration plugin" }
+
+  - id: spring-boot-2-to-3
+    path: orders-boot2
+    playbook: spring-boot-3
+    checks:
+      - { file: pom.xml, matches: '<artifactId>spring-boot-starter-parent</artifactId>\s*<version>3\.5\.', why: "on the target release, not part-way" }
+      - { file: "**/*.java", absent: "import javax.persistence", why: "Spring Boot 3 is built on Jakarta EE" }
+      - { file: src/main/java/com/acme/orders/SecurityConfig.java, contains: "SecurityFilterChain", why: "WebSecurityConfigurerAdapter was removed" }
+      - { file: src/main/java/com/acme/orders/SecurityConfig.java, contains: "permitAll", why: "the access rules are kept" }
+
+  - id: spring-boot-2-to-4
+    path: orders-boot2
+    playbook: spring-boot-4
+    checks:
+      - { file: pom.xml, matches: '<artifactId>spring-boot-starter-parent</artifactId>\s*<version>4\.1\.', why: "on the latest release" }
+      - { file: pom.xml, contains: "spring-boot-starter-webmvc", why: "the web starter was renamed in Spring Boot 4" }
+      - { file: "**/*.java", absent: "import javax.persistence", why: "Jakarta EE" }
+
+  - id: spring5-to-7
+    path: notes-spring5
+    playbook: java-to-21-jakarta-ee11-spring7
+    checks:
+      - { file: pom.xml, matches: '<spring.version>7\.', why: "Spring Framework 7" }
+      - { file: pom.xml, matches: '(?s)<artifactId>jakarta.servlet-api</artifactId>\s*<version>6\.1', why: "Spring 7 needs Servlet 6.1" }
+      - { file: pom.xml, matches: '(?s)<artifactId>jakarta.servlet-api</artifactId>.*?<scope>provided</scope>', why: "the container supplies the Servlet API" }
+      - { file: "**/*.java", absent: "import javax.servlet", why: "Jakarta EE" }
+
+  # A real project nobody wrote for Renova: the Spring PetClinic sample at its last Spring Boot 2.7 commit.
+  - id: petclinic-boot-2-to-3
+    path: public/petclinic-boot27
+    playbook: spring-boot-3
+    checks:
+      - { file: pom.xml, matches: '<artifactId>spring-boot-starter-parent</artifactId>\s*<version>3\.5\.', why: "on the target release" }
+      - { file: "**/*.java", absent: "import javax.persistence", why: "Jakarta EE" }
+      - { file: "**/*.java", absent: "import javax.validation", why: "Jakarta EE" }

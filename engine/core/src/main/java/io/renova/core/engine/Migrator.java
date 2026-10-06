@@ -75,6 +75,13 @@ public final class Migrator {
         List<StageResult> stages = new ArrayList<>();
         applyPlan(context, plan, "", stages);
         List<PlanStep> manual = new ArrayList<>(plan.steps(FixSpec.MANUAL));
+        Optional<StageResult> failed = stages.stream().filter(s -> s.status() == StageResult.Status.FAILED).findFirst();
+        if (failed.isPresent()) {
+            // The stage's tool could not run (often a dependency that could not be downloaded), so the code is
+            // not migrated. Guards and the build would only judge, and patch, the unchanged project.
+            progress.accept("Stopped: the " + failed.get().stage() + " stage could not run, so nothing after it was attempted");
+            return new MigrationOutcome(workspace.root(), stages, null, manual);
+        }
         manual.addAll(runGuards(context, stages, "guard", true));
 
         VerifyResult verification = null;
@@ -194,6 +201,10 @@ public final class Migrator {
             result = new StageResult(stage, result.status(), result.summary(), result.details());
             context.workspace().commitAll("renova: " + stage + " stage: " + result.summary());
             stages.add(result);
+            if (result.status() == StageResult.Status.FAILED) {
+                // Later stages build on this one's changes.
+                break;
+            }
         }
     }
 

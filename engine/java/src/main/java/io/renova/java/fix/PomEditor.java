@@ -97,6 +97,52 @@ final class PomEditor {
     }
 
     /**
+     * Sets the version of every dependency with this groupId and artifactId, real or managed: a version written
+     * in place is replaced, one given by a property changes that property, and a dependency without a version
+     * (managed elsewhere) is left alone.
+     */
+    static Result changeDependencyVersion(String pom, String groupId, String artifactId, String version) {
+        String content = pom;
+        int changes = 0;
+        Matcher block = Pattern.compile("(?s)<dependency>.*?</dependency>").matcher(pom);
+        List<String> properties = new ArrayList<>();
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        while (block.find()) {
+            String text = block.group();
+            String own = text.replaceAll("(?s)<exclusions>.*?</exclusions>", "");
+            String declared = tag(own, "version");
+            if (!groupId.equals(tag(own, "groupId")) || !artifactId.equals(tag(own, "artifactId")) || declared == null
+                    || declared.equals(version)) {
+                continue;
+            }
+            Matcher property = Pattern.compile("^\\$\\{([^}]+)}$").matcher(declared);
+            if (property.find()) {
+                properties.add(property.group(1));
+                continue;
+            }
+            Matcher at = Pattern.compile("<version>\\s*" + Pattern.quote(declared) + "\\s*</version>").matcher(text);
+            if (at.find()) {
+                out.append(pom, last, block.start()).append(text, 0, at.start()).append("<version>").append(version)
+                        .append("</version>").append(text.substring(at.end()));
+                last = block.end();
+                changes++;
+            }
+        }
+        if (changes > 0) {
+            content = out.append(pom.substring(last)).toString();
+        }
+        for (String name : properties) {
+            Matcher value = Pattern.compile("(<" + Pattern.quote(name) + ">)[^<]*(</" + Pattern.quote(name) + ">)").matcher(content);
+            if (value.find() && !value.group().contains(">" + version + "<")) {
+                content = content.substring(0, value.start()) + value.group(1) + version + value.group(2) + content.substring(value.end());
+                changes++;
+            }
+        }
+        return new Result(content, changes);
+    }
+
+    /**
      * Replaces every dependency whose groupId and artifactId match (real or managed, outside plugins)
      * with new coordinates. A declared version becomes {@code version}; a real dependency without one
      * gets it, because nothing manages the new artifact yet. Scope, exclusions and the rest are kept.

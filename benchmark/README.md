@@ -29,6 +29,20 @@ For every app and configuration:
 A run *passes* when the build passes and every check holds. Results go to `results.md` (scoreboard) and
 `results.json`, next to one migrated workspace per run, each with its report and AI audit log.
 
+## Two suites
+
+| Suite | Question it answers | AI |
+|---|---|---|
+| [`suite.yaml`](suite.yaml) (default) | How well does Renova do on applications whose last changes need judgement? | With and without |
+| [`targets.yaml`](targets.yaml) | Does every target Renova offers work end to end? One app per path, including the public Spring PetClinic sample | Without |
+
+```sh
+benchmark/fetch-public.sh       # once: fetches PetClinic at its last Spring Boot 2.7 commit
+cli/bin/renova benchmark --suite benchmark/targets.yaml --out /tmp/targets --configs deterministic
+```
+
+The latest results of the targets suite are in [docs/verified-migrations.md](../docs/verified-migrations.md).
+
 ## Suite
 
 [`suite.yaml`](suite.yaml) lists the apps, their checks and the configurations. The apps are synthetic

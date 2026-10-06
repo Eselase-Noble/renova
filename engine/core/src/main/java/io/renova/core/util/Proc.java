@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -28,10 +29,17 @@ public final class Proc {
     }
 
     public static Result run(List<String> command, Path workingDir, Duration timeout) throws IOException, InterruptedException {
-        Process process = new ProcessBuilder(command)
+        return run(command, workingDir, timeout, Map.of());
+    }
+
+    /** @param environment variables to set for the tool, on top of the ones this process has */
+    public static Result run(List<String> command, Path workingDir, Duration timeout, Map<String, String> environment)
+            throws IOException, InterruptedException {
+        ProcessBuilder builder = new ProcessBuilder(command)
                 .directory(workingDir.toFile())
-                .redirectErrorStream(true)
-                .start();
+                .redirectErrorStream(true);
+        builder.environment().putAll(environment);
+        Process process = builder.start();
         process.getOutputStream().close();
         CompletableFuture<String> output = CompletableFuture.supplyAsync(() -> readAll(process.getInputStream()));
         boolean exited;
