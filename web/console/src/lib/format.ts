@@ -43,3 +43,26 @@ export const STRATEGY_NAMES: Record<string, string> = {
   ai: "AI",
   manual: "Manual",
 };
+
+/** "6 Oct 2026, 12:21", for tooltips beside a relative time. */
+export function dateTime(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));
+}
+
+export const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+/** Deterministic and judged work, as the three groups the console reports on. */
+export type Resolver = "automatic" | "ai" | "person";
+export const RESOLVER_OF: Record<string, Resolver> = { recipe: "automatic", replace: "automatic", maven: "automatic", ai: "ai", manual: "person" };
+export const RESOLVER_NAMES: Record<Resolver, string> = { automatic: "Automatic", ai: "AI, checked by the build", person: "A person" };
+export const resolverOf = (strategy: string): Resolver => RESOLVER_OF[strategy] ?? "person";
+
+export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

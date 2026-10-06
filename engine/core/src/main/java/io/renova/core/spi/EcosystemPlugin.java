@@ -23,6 +23,14 @@ public interface EcosystemPlugin {
 
     ProjectModel model(Path root) throws IOException;
 
+    /**
+     * File names that mark the root of a project of this ecosystem, such as {@code pom.xml}. A cheap hint for
+     * folder pickers; {@link #supports} stays the real check.
+     */
+    default List<String> projectMarkers() {
+        return List.of();
+    }
+
     default List<DetectorFactory> detectors() {
         return List.of();
     }

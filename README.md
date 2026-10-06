@@ -302,7 +302,7 @@ twenty lines and is a good starting point. See [`engine/README.md`](engine/READM
    ([design](docs/behavioural-verification-design.md)).
 3. **Benchmark harness:** `renova benchmark` scores migrations of synthetic legacy apps (see
    [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.
-4. **Web console:** single sign-on, audit log and licensing. **Desktop:** installers per OS.
+4. **Web console:** single sign-on and licensing (the audit log is in). **Desktop:** installers per OS.
 5. **More playbooks and ecosystems:** Spring Boot 2 → 3, Java EE → Quarkus, then .NET and Python.
 
 ## Contributing

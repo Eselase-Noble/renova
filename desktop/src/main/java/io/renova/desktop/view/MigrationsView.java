@@ -32,7 +32,7 @@ public final class MigrationsView {
     }
 
     public Node build() {
-        Button open = new Button("Open migrated folder…");
+        Button open = new Button("Open migrated folder…", Icons.of(Icons.FOLDER_OPEN, 14));
         open.setOnAction(e -> {
             DirectoryChooser chooser = new DirectoryChooser();
             chooser.setTitle("Open a migrated copy (a folder with .renova/report.json)");
@@ -44,7 +44,6 @@ public final class MigrationsView {
 
         List<MigrationHistory.Entry> entries = history.list();
         TableView<MigrationHistory.Entry> table = new TableView<>();
-        table.getStyleClass().addAll(Styles.STRIPED);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.setPlaceholder(Ui.label("No migrations yet. Open a project and choose Migrate.", Styles.TEXT_MUTED));
         TableColumn<MigrationHistory.Entry, String> project = column("Project", 180, MigrationHistory.Entry::projectName);
@@ -56,9 +55,9 @@ public final class MigrationsView {
                 super.updateItem(state, empty);
                 setText(null);
                 setGraphic(empty || state == null ? null : switch (state) {
-                    case "PASSED" -> Ui.badge("Passed", Ui.Tone.GOOD);
-                    case "FAILED" -> Ui.badge("Failed", Ui.Tone.BAD);
-                    default -> Ui.badge("Error", Ui.Tone.BAD);
+                    case "PASSED" -> Ui.badge("Passed", Ui.Tone.GOOD, Icons.CHECK);
+                    case "FAILED" -> Ui.badge("Failed", Ui.Tone.BAD, Icons.CROSS);
+                    default -> Ui.badge("Error", Ui.Tone.BAD, Icons.ALERT);
                 });
             }
         });
@@ -70,8 +69,8 @@ public final class MigrationsView {
         where.getStyleClass().add("mono");
         table.getColumns().setAll(List.of(project, when, result, build, behaviour, ai, where));
         table.getItems().setAll(entries);
-        table.setFixedCellSize(36);
-        table.setPrefHeight(Math.max(4, Math.min(16, entries.size() + 1)) * 36 + 8);
+        table.setFixedCellSize(40);
+        table.setPrefHeight(Math.max(4, Math.min(16, entries.size() + 1)) * 40 + 8);
         table.setRowFactory(t -> {
             TableRow<MigrationHistory.Entry> row = new TableRow<>();
             row.setOnMouseClicked(e -> {
@@ -82,9 +81,9 @@ public final class MigrationsView {
             return row;
         });
 
-        Button show = new Button("Show");
+        Button show = new Button("Show", Icons.of(Icons.WORKFLOW, 14));
         show.getStyleClass().add(Styles.ACCENT);
-        Button folder = new Button("Open folder");
+        Button folder = new Button("Open folder", Icons.of(Icons.FOLDER_OPEN, 14));
         Button forget = new Button("Remove from history");
         forget.getStyleClass().add(Styles.FLAT);
         show.disableProperty().bind(table.getSelectionModel().selectedItemProperty().isNull());
@@ -94,11 +93,14 @@ public final class MigrationsView {
         folder.setOnAction(e -> nav.openPath(Path.of(table.getSelectionModel().getSelectedItem().workspace())));
         forget.setOnAction(e -> nav.forget(Path.of(table.getSelectionModel().getSelectedItem().workspace())));
 
+        Node body = entries.isEmpty()
+                ? Ui.empty(Icons.WORKFLOW, "No migrations yet", "Open a project, review its assessment and choose Migrate. Each migration "
+                        + "is kept here with its results, changes and report.")
+                : new javafx.scene.layout.VBox(12, table, new javafx.scene.layout.HBox(8, show, folder, forget));
         return Ui.page(
                 Ui.header("Migrations", "Every migration run from this app. Removing one from the history leaves its "
                         + "migrated copy on disk.", open),
-                Ui.section("History", "Double-click a migration to see its results, changes, report and AI exchanges.",
-                        new javafx.scene.layout.VBox(8, table, new javafx.scene.layout.HBox(8, show, folder, forget))));
+                Ui.section("History", entries.isEmpty() ? null : "Double-click a migration to see its results, changes, report and AI exchanges.", body));
     }
 
     private static TableColumn<MigrationHistory.Entry, String> column(String title, double width,

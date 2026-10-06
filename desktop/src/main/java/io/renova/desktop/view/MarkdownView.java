@@ -31,12 +31,13 @@ public final class MarkdownView {
     }
 
     static String html(String markdown) {
-        String fg = dark ? "#e6edf3" : "#1f2328";
-        String bg = dark ? "#0d1117" : "#ffffff";
-        String muted = dark ? "#8b949e" : "#59636e";
-        String border = dark ? "#30363d" : "#d1d9e0";
-        String code = dark ? "#161b22" : "#f6f8fa";
-        String link = dark ? "#4493f8" : "#0969da";
+        // The app's own palette (app.css), so a report reads as part of the window around it.
+        String fg = dark ? "#e9ebf6" : "#1b1f36";
+        String bg = dark ? "#181d31" : "#ffffff";
+        String muted = dark ? "#a4aac6" : "#5b6182";
+        String border = dark ? "#2e3554" : "#d8dbe9";
+        String code = dark ? "#101425" : "#f6f7fb";
+        String link = dark ? "#97a3ff" : "#3646c8";
         return """
                 <!doctype html><html><head><meta charset="utf-8"><style>
                 body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 14px; line-height: 1.55;

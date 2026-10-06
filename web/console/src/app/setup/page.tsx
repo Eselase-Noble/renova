@@ -55,7 +55,7 @@ export default function SetupPage() {
             <AlertDescription>{setup.error.message}</AlertDescription>
           </Alert>
         )}
-        <Button type="submit" className="w-full" disabled={setup.isPending}>
+        <Button type="submit" size="lg" className="w-full" disabled={setup.isPending}>
           {setup.isPending ? "Setting up…" : "Create account and organisation"}
         </Button>
       </form>

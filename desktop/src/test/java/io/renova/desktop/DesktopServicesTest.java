@@ -6,12 +6,14 @@ import io.renova.core.engine.PluginRegistry;
 import io.renova.core.config.AiPreferences;
 import io.renova.desktop.service.MigrationHistory;
 import io.renova.desktop.service.MigrationResult;
+import io.renova.desktop.service.Phases;
 import io.renova.desktop.service.RecentProjects;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -123,5 +125,47 @@ class DesktopServicesTest {
     private static MigrationHistory.Entry entry(Path ws, String state) {
         return new MigrationHistory.Entry("shop", "/code/shop", ws.toString(), state, "2026-10-06T10:00:00Z",
                 "2026-10-06T10:05:00Z", "Passes", "Not checked", 0, 0);
+    }
+
+    @Test
+    void phasesFollowTheProgressLines() {
+        List<String> log = List.of("Plan: 7 steps for 20 findings, 80% automated", "Copying project to /tmp/out",
+                "Stage recipe: 5 step(s)", "Stage replace: 1 step(s)", "Checking 10 guard rule(s) on the migrated code");
+
+        // Running: everything before the phase of the last line is done; phases only some migrations have are not listed yet.
+        assertThat(Phases.of(log, false, false, false, null, null)).extracting(Phases.Phase::key, Phases.Phase::state).containsExactly(
+                org.assertj.core.groups.Tuple.tuple("plan", Phases.State.DONE),
+                org.assertj.core.groups.Tuple.tuple("rewrite", Phases.State.DONE),
+                org.assertj.core.groups.Tuple.tuple("guards", Phases.State.CURRENT),
+                org.assertj.core.groups.Tuple.tuple("build", Phases.State.PENDING));
+
+        // Finished with a failing build that AI could not repair, then no behaviour check.
+        List<String> failed = new java.util.ArrayList<>(log);
+        failed.addAll(List.of("Verifying build", "Build fails with 2 error(s); starting AI repair", "Finished: build FAILS"));
+        assertThat(Phases.of(failed, true, true, false, false, null)).extracting(Phases.Phase::key, Phases.Phase::state).containsExactly(
+                org.assertj.core.groups.Tuple.tuple("plan", Phases.State.DONE),
+                org.assertj.core.groups.Tuple.tuple("rewrite", Phases.State.DONE),
+                org.assertj.core.groups.Tuple.tuple("guards", Phases.State.DONE),
+                org.assertj.core.groups.Tuple.tuple("build", Phases.State.FAILED),
+                org.assertj.core.groups.Tuple.tuple("repair", Phases.State.WARN));
+
+        // Without AI the engine still announces the AI stage; it is not a phase then.
+        List<String> announced = List.of("Plan: 1 steps", "Stage recipe: 1 step(s)", "Stage ai: 4 step(s)");
+        assertThat(Phases.of(announced, false, false, false, null, null)).extracting(Phases.Phase::key).doesNotContain("ai");
+        assertThat(Phases.of(announced, true, false, false, null, null)).extracting(Phases.Phase::key).contains("ai");
+
+        // Stopped by an error while rewriting: that phase failed, the rest never ran.
+        assertThat(Phases.of(log.subList(0, 3), false, true, true, null, null)).extracting(Phases.Phase::state)
+                .containsExactly(Phases.State.DONE, Phases.State.FAILED, Phases.State.SKIPPED, Phases.State.SKIPPED);
+
+        // A behaviour difference is flagged on its own phase, with the line that reported it.
+        List<String> differs = new java.util.ArrayList<>(log);
+        differs.addAll(List.of("Verifying build", "Verifying behaviour: running both", "Sending 4 scenario(s) to both applications"));
+        assertThat(Phases.of(differs, false, true, false, true, "DIFFERENT")).last()
+                .satisfies(p -> {
+                    assertThat(p.key()).isEqualTo("behaviour");
+                    assertThat(p.state()).isEqualTo(Phases.State.WARN);
+                    assertThat(p.note()).startsWith("Sending 4");
+                });
     }
 }

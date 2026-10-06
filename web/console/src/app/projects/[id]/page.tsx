@@ -1,21 +1,23 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Play, Trash2 } from "lucide-react";
+import { BookOpenCheck, CalendarDays, FolderGit2, MoreHorizontal, Play, Trash2, Workflow } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useState } from "react";
 import { toast } from "sonner";
 
-import { AssessmentView } from "@/components/assessment";
+import { AssessmentView, FindingsView, PlanView } from "@/components/assessment";
 import { MigrationTable } from "@/components/migration-table";
-import { Empty, ErrorState, LoadingRows, PageHeader } from "@/components/page";
+import { CopyButton, Empty, ErrorState, LoadingRows, PageHeader, Panel } from "@/components/page";
 import { StartMigrationDialog } from "@/components/start-migration-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api } from "@/lib/api";
+import { active, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { dateTime } from "@/lib/format";
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -24,7 +26,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const migrations = useQuery({
     queryKey: ["migrations", "project", id],
     queryFn: () => api.projectMigrations(id),
-    refetchInterval: (q) => (q.state.data?.some((m) => m.status === "RUNNING" || m.status === "QUEUED") ? 3000 : false),
+    refetchInterval: (q) => (q.state.data?.some((m) => active(m.status)) ? 3000 : false),
   });
   const auth = useAuth();
   const [migrating, setMigrating] = useState(false);
@@ -44,19 +46,46 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   if (project.error) return <ErrorState error={project.error} />;
   if (!project.data) return <LoadingRows rows={6} />;
   const p = project.data;
+  const assessed = (render: (a: NonNullable<typeof assessment.data>) => React.ReactNode) =>
+    assessment.error ? <ErrorState error={assessment.error} /> : assessment.isPending ? <LoadingRows rows={6} /> : render(assessment.data);
 
   return (
     <>
       <PageHeader
-        eyebrow={<Link href="/projects" className="hover:underline">Projects</Link>}
+        icon={FolderGit2}
         title={p.name}
-        description={<span className="font-mono text-xs">{p.path}</span>}
+        description={
+          <span className="flex items-center gap-1">
+            <span className="truncate font-mono text-xs">{p.path}</span>
+            <CopyButton value={p.path} label="Copy path" />
+          </span>
+        }
+        meta={
+          <>
+            <span className="inline-flex items-center gap-1.5 capitalize">
+              <Workflow className="size-3.5" /> {p.ecosystem}
+            </span>
+            <Link href="/playbooks" className="inline-flex items-center gap-1.5 font-mono hover:text-foreground hover:underline">
+              <BookOpenCheck className="size-3.5" /> {p.playbook}
+            </Link>
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDays className="size-3.5" /> Added {dateTime(p.createdAt)}
+            </span>
+          </>
+        }
         actions={
           <>
             {auth.can("ADMIN") && (
-              <Button variant="outline" onClick={() => setDeleting(true)} aria-label="Remove project">
-                <Trash2 />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<Button variant="outline" size="icon" aria-label="More actions" />}>
+                  <MoreHorizontal />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem variant="destructive" onClick={() => setDeleting(true)}>
+                    <Trash2 /> Remove project
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             {auth.can("MEMBER") && (
               <Button onClick={() => setMigrating(true)}>
@@ -67,26 +96,48 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         }
       />
       <Tabs defaultValue="assessment">
-        <TabsList>
-          <TabsTrigger value="assessment">Assessment</TabsTrigger>
-          <TabsTrigger value="migrations">Migrations {migrations.data ? `(${migrations.data.length})` : ""}</TabsTrigger>
+        <TabsList variant="line" className="w-full justify-start border-b">
+          <TabsTrigger value="assessment" className="flex-none px-3">Assessment</TabsTrigger>
+          <TabsTrigger value="plan" className="flex-none px-3">
+            Plan {assessment.data && <Count n={assessment.data.plan.length} />}
+          </TabsTrigger>
+          <TabsTrigger value="findings" className="flex-none px-3">
+            Findings {assessment.data && <Count n={assessment.data.findings.length} />}
+          </TabsTrigger>
+          <TabsTrigger value="migrations" className="flex-none px-3">
+            Migrations {migrations.data && <Count n={migrations.data.length} />}
+          </TabsTrigger>
         </TabsList>
-        <TabsContent value="assessment" className="pt-4">
-          {assessment.error ? (
-            <ErrorState error={assessment.error} />
-          ) : assessment.isPending ? (
-            <LoadingRows rows={6} />
-          ) : (
-            <AssessmentView assessment={assessment.data} />
-          )}
+        <TabsContent value="assessment" className="pt-5">
+          {assessed((a) => <AssessmentView assessment={a} />)}
         </TabsContent>
-        <TabsContent value="migrations" className="pt-4">
+        <TabsContent value="plan" className="pt-5">
+          {assessed((a) => <PlanView plan={a.plan} />)}
+        </TabsContent>
+        <TabsContent value="findings" className="pt-5">
+          {assessed((a) => <FindingsView assessment={a} />)}
+        </TabsContent>
+        <TabsContent value="migrations" className="pt-5">
           {migrations.isPending ? (
             <LoadingRows />
           ) : migrations.data?.length ? (
-            <MigrationTable migrations={migrations.data} showProject={false} />
+            <Panel bodyClassName="p-0">
+              <MigrationTable migrations={migrations.data} showProject={false} />
+            </Panel>
           ) : (
-            <Empty title="Not migrated yet">Review the assessment, then start a migration.</Empty>
+            <Empty
+              title="Not migrated yet"
+              icon={Workflow}
+              action={
+                auth.can("MEMBER") && (
+                  <Button onClick={() => setMigrating(true)}>
+                    <Play /> Migrate
+                  </Button>
+                )
+              }
+            >
+              Review the assessment and the plan, then start a migration. It works on a copy.
+            </Empty>
           )}
         </TabsContent>
       </Tabs>
@@ -96,16 +147,23 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           <DialogHeader>
             <DialogTitle>Remove {p.name}?</DialogTitle>
             <DialogDescription>
-              Renova forgets the project. The project directory and existing migration workspaces are left as they are.
+              Renova forgets the project. The project folder and existing migration workspaces are left as they are.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleting(false)}>
+              Keep it
+            </Button>
             <Button variant="destructive" onClick={() => remove.mutate()} disabled={remove.isPending}>
-              Remove
+              Remove project
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
   );
+}
+
+function Count({ n }: { n: number }) {
+  return <span className="rounded-full bg-muted px-1.5 text-[11px] leading-[18px] font-medium text-muted-foreground tabular-nums">{n}</span>;
 }

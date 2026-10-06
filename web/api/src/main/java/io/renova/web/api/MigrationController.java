@@ -1,6 +1,9 @@
 package io.renova.web.api;
 
 import io.renova.web.account.Access;
+import io.renova.web.account.Role;
+import io.renova.web.audit.AuditLog;
+import io.renova.web.migration.MigrationService;
 import io.renova.core.workspace.WorkspaceHistory;
 import io.renova.web.store.DataStore;
 import io.renova.web.store.MigrationRecord;
@@ -8,6 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,10 +29,14 @@ public class MigrationController {
 
     private final DataStore store;
     private final Access access;
+    private final MigrationService migrations;
+    private final AuditLog audit;
 
-    public MigrationController(DataStore store, Access access) {
+    public MigrationController(DataStore store, Access access, MigrationService migrations, AuditLog audit) {
         this.store = store;
         this.access = access;
+        this.migrations = migrations;
+        this.audit = audit;
     }
 
     /** A migration with its progress lines from {@code since} on, for polling. */
@@ -47,6 +55,16 @@ public class MigrationController {
         List<String> progress = store.progress(id);
         int from = Math.max(0, Math.min(since, progress.size()));
         return new Detail(record, progress.subList(from, progress.size()), progress.size());
+    }
+
+    /** Stops a queued or running migration; what it has committed so far stays in the workspace. */
+    @PostMapping("/{id}/cancel")
+    public MigrationRecord cancel(@PathVariable String id, HttpServletRequest request) {
+        Access.Caller caller = access.require(request, Role.MEMBER);
+        MigrationRecord record = migration(id, request);
+        MigrationRecord stopped = migrations.cancel(record);
+        audit.record(caller, "migration.cancelled", record.projectName(), "Migration " + id);
+        return stopped;
     }
 
     /** The migration report (JSON): plan, stages, verification, behaviour, AI usage. */

@@ -1,51 +1,270 @@
-/* Renova desktop: additions to the AtlantaFX Primer theme. Colours come from the theme's variables, so they
-   follow light and dark mode. */
+/* Renova desktop. AtlantaFX's Primer theme supplies the controls; this sheet gives them Renova's colours (the same
+   palette as the web console) and adds the app's own components. The root carries "renova-light" or "renova-dark". */
+
+.root {
+    /* The sidebar is the same deep navy in both themes. */
+    -renova-sidebar: #171c36;
+    -renova-sidebar-hover: #232a4d;
+    -renova-sidebar-fg: #c9cde0;
+    -renova-sidebar-fg-strong: #ffffff;
+    -renova-sidebar-fg-faint: #7f86a6;
+    -renova-sidebar-border: rgba(255, 255, 255, 0.09);
+    -renova-brand: #5a6cf0;
+    /* Chart marks: one colour per category or resolver, the same in every screen. */
+    -renova-series-1: #2a78d6;
+    -renova-series-2: #eb6834;
+    -renova-series-3: #1baf7a;
+    -renova-series-4: #eda100;
+    -renova-series-5: #e87ba4;
+    /* The log and diffs of code read as a terminal in both themes. */
+    -renova-console: #12152a;
+    -renova-console-fg: #c9d1e6;
+    -renova-console-dim: #6f7799;
+}
+
+.root.renova-light {
+    -color-bg-default: #ffffff;
+    -color-bg-overlay: #ffffff;
+    -color-bg-subtle: #f6f7fb;
+    -color-bg-inset: #eff1f8;
+    -color-fg-default: #1b1f36;
+    -color-fg-muted: #5b6182;
+    -color-fg-subtle: #7c82a1;
+    -color-border-default: #d8dbe9;
+    -color-border-muted: #e5e7f1;
+    -color-border-subtle: #eceef6;
+    -color-neutral-muted: rgba(108, 116, 160, 0.16);
+    -color-neutral-subtle: #f1f2f8;
+    -color-accent-fg: #3646c8;
+    -color-accent-emphasis: #3f51d8;
+    -color-accent-muted: rgba(63, 81, 216, 0.38);
+    -color-accent-subtle: #eef0fd;
+    -color-success-fg: #17794a;
+    -color-success-emphasis: #1f8f57;
+    -color-success-muted: rgba(31, 143, 87, 0.35);
+    -color-success-subtle: #e7f6ee;
+    -color-warning-fg: #8a5a00;
+    -color-warning-emphasis: #b47a00;
+    -color-warning-muted: rgba(180, 122, 0, 0.4);
+    -color-warning-subtle: #fdf4de;
+    -color-danger-fg: #c0322e;
+    -color-danger-emphasis: #d03b3b;
+    -color-danger-muted: rgba(208, 59, 59, 0.35);
+    -color-danger-subtle: #fdeceb;
+    -renova-shadow: rgba(27, 31, 54, 0.07);
+}
+
+.root.renova-dark {
+    -color-bg-default: #181d31;
+    -color-bg-overlay: #1e2440;
+    -color-bg-subtle: #101425;
+    -color-bg-inset: #0c0f1d;
+    -color-fg-default: #e9ebf6;
+    -color-fg-muted: #a4aac6;
+    -color-fg-subtle: #7f86a6;
+    -color-border-default: #2e3554;
+    -color-border-muted: #252c48;
+    -color-border-subtle: #1f2540;
+    -color-neutral-muted: rgba(140, 150, 205, 0.2);
+    -color-neutral-subtle: #1c2238;
+    -color-accent-fg: #97a3ff;
+    -color-accent-emphasis: #5568e8;
+    -color-accent-muted: rgba(85, 104, 232, 0.45);
+    -color-accent-subtle: #1d2452;
+    -color-success-fg: #56d394;
+    -color-success-emphasis: #238f5c;
+    -color-success-muted: rgba(35, 143, 92, 0.5);
+    -color-success-subtle: #12301f;
+    -color-warning-fg: #ebb955;
+    -color-warning-emphasis: #b47a00;
+    -color-warning-muted: rgba(180, 122, 0, 0.5);
+    -color-warning-subtle: #33280f;
+    -color-danger-fg: #ff857d;
+    -color-danger-emphasis: #d03b3b;
+    -color-danger-muted: rgba(208, 59, 59, 0.5);
+    -color-danger-subtle: #3a1819;
+    -renova-series-1: #3987e5;
+    -renova-series-2: #d95926;
+    -renova-series-3: #199e70;
+    -renova-series-4: #c98500;
+    -renova-series-5: #d55181;
+    -renova-shadow: rgba(0, 0, 0, 0.35);
+}
+
+/* ---- Window ------------------------------------------------------------------------------------------------- */
+
+.canvas, .canvas > .viewport {
+    -fx-background-color: -color-bg-subtle;
+}
+
+.icon {
+    -fx-fill: transparent;
+    -fx-stroke: -color-fg-muted;
+    -fx-stroke-width: 2;
+    -fx-stroke-line-cap: round;
+    -fx-stroke-line-join: round;
+}
+
+.button.accent .icon { -fx-stroke: white; }
+.icon.accent { -fx-stroke: -color-accent-fg; }
+.icon.good { -fx-stroke: -color-success-fg; }
+.icon.bad { -fx-stroke: -color-danger-fg; }
+.icon.warn { -fx-stroke: -color-warning-fg; }
+.icon.on-colour { -fx-stroke: white; -fx-stroke-width: 3; }
+
+/* ---- Sidebar ------------------------------------------------------------------------------------------------ */
 
 .sidebar {
-    -fx-background-color: -color-bg-subtle;
-    -fx-border-color: transparent -color-border-muted transparent transparent;
-    -fx-padding: 16 12 16 12;
-    -fx-spacing: 4;
-    -fx-min-width: 220;
-    -fx-pref-width: 220;
+    -fx-background-color: -renova-sidebar;
+    -fx-padding: 14 10 10 10;
+    -fx-spacing: 2;
+    -fx-min-width: 232;
+    -fx-pref-width: 232;
 }
 
 .brand-mark {
-    -fx-background-color: -color-fg-default;
-    -fx-text-fill: -color-bg-default;
+    -fx-background-color: linear-gradient(to bottom right, #6f80f5, #4b3fd6);
+    -fx-background-radius: 8;
+    -fx-min-width: 30;
+    -fx-min-height: 30;
+    -fx-max-width: 30;
+    -fx-max-height: 30;
+}
+
+.brand-mark .chevron {
+    -fx-fill: transparent;
+    -fx-stroke: white;
+    -fx-stroke-width: 2.6;
+    -fx-stroke-line-cap: round;
+    -fx-stroke-line-join: round;
+}
+
+.brand-mark .chevron.faint { -fx-stroke: rgba(255, 255, 255, 0.55); }
+
+.brand-name {
+    -fx-text-fill: -renova-sidebar-fg-strong;
+    -fx-font-size: 1.15em;
     -fx-font-weight: bold;
-    -fx-background-radius: 6;
-    -fx-min-width: 26;
-    -fx-min-height: 26;
-    -fx-alignment: center;
 }
 
 .nav-button {
     -fx-background-color: transparent;
-    -fx-text-fill: -color-fg-muted;
+    -fx-text-fill: -renova-sidebar-fg;
+    -fx-alignment: center-left;
+    -fx-max-width: infinity;
+    -fx-padding: 7 10 7 10;
+    -fx-background-radius: 6;
+    -fx-graphic-text-gap: 10;
+    -fx-cursor: hand;
+}
+
+.nav-button .icon { -fx-stroke: -renova-sidebar-fg; }
+
+.nav-button:hover, .nav-button.active {
+    -fx-background-color: -renova-sidebar-hover;
+    -fx-text-fill: -renova-sidebar-fg-strong;
+}
+
+.nav-button:hover .icon, .nav-button.active .icon { -fx-stroke: -renova-sidebar-fg-strong; }
+
+/* The active item carries a bar in the brand colour on its left edge. */
+.nav-button.active {
+    -fx-border-color: transparent transparent transparent -renova-brand;
+    -fx-border-width: 0 0 0 3;
+    -fx-border-radius: 6 0 0 6;
+    -fx-padding: 7 10 7 7;
+}
+
+.nav-caption {
+    -fx-text-fill: -renova-sidebar-fg-faint;
+    -fx-font-size: 0.8em;
+    -fx-font-weight: bold;
+    -fx-padding: 18 10 6 10;
+}
+
+.run-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: -renova-sidebar-fg;
     -fx-alignment: center-left;
     -fx-max-width: infinity;
     -fx-padding: 6 10 6 10;
     -fx-background-radius: 6;
+    -fx-graphic-text-gap: 10;
+    -fx-font-size: 0.92em;
+    -fx-cursor: hand;
 }
 
-.nav-button:hover, .nav-button.active {
-    -fx-background-color: -color-neutral-muted;
-    -fx-text-fill: -color-fg-default;
+.run-button:hover { -fx-background-color: -renova-sidebar-hover; -fx-text-fill: -renova-sidebar-fg-strong; }
+
+.sidebar-foot {
+    -fx-border-color: -renova-sidebar-border transparent transparent transparent;
+    -fx-padding: 8 0 0 0;
 }
 
-.nav-caption {
-    -fx-text-fill: -color-fg-subtle;
-    -fx-font-size: 0.85em;
-    -fx-padding: 12 10 2 10;
+.sidebar-note {
+    -fx-text-fill: -renova-sidebar-fg-faint;
+    -fx-font-size: 0.82em;
+    -fx-padding: 0 10 6 10;
 }
+
+/* ---- Page pieces -------------------------------------------------------------------------------------------- */
+
+.page-title { -fx-font-size: 1.7em; -fx-font-weight: bold; }
+
+.icon-tile {
+    -fx-background-color: -color-bg-default;
+    -fx-border-color: -color-border-default;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-min-width: 42;
+    -fx-min-height: 42;
+    -fx-max-width: 42;
+    -fx-max-height: 42;
+    -fx-effect: dropshadow(gaussian, -renova-shadow, 3, 0, 0, 1);
+}
+
+.icon-tile.tint {
+    -fx-background-color: -color-accent-subtle;
+    -fx-border-color: transparent;
+    -fx-effect: null;
+}
+
+.panel {
+    -fx-background-color: -color-bg-default;
+    -fx-border-color: -color-border-default;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+    -fx-effect: dropshadow(gaussian, -renova-shadow, 4, 0, 0, 1);
+}
+
+.panel-head {
+    -fx-padding: 12 18 12 18;
+    -fx-border-color: transparent transparent -color-border-muted transparent;
+}
+
+.panel-title { -fx-font-size: 1.08em; -fx-font-weight: bold; }
+.panel-body { -fx-padding: 16 18 18 18; }
+
+.stat-card {
+    -fx-background-color: -color-bg-default;
+    -fx-border-color: -color-border-default;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+    -fx-padding: 14 16 14 16;
+    -fx-spacing: 4;
+    -fx-effect: dropshadow(gaussian, -renova-shadow, 4, 0, 0, 1);
+}
+
+.stat-value { -fx-font-size: 1.7em; -fx-font-weight: bold; }
 
 .badge {
     -fx-padding: 2 8 2 8;
-    -fx-background-radius: 999;
-    -fx-border-radius: 999;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
     -fx-border-width: 1;
     -fx-font-size: 0.85em;
+    -fx-font-weight: bold;
+    -fx-graphic-text-gap: 5;
 }
 
 .badge-good { -fx-background-color: -color-success-subtle; -fx-text-fill: -color-success-fg; -fx-border-color: -color-success-muted; }
@@ -54,9 +273,77 @@
 .badge-info { -fx-background-color: -color-accent-subtle; -fx-text-fill: -color-accent-fg; -fx-border-color: -color-accent-muted; }
 .badge-muted { -fx-background-color: -color-bg-subtle; -fx-text-fill: -color-fg-muted; -fx-border-color: -color-border-default; }
 
-.category-bar .bar {
-    -fx-background-color: -color-accent-emphasis;
+.dot { -fx-background-radius: 99; -fx-min-width: 8; -fx-min-height: 8; -fx-max-width: 8; -fx-max-height: 8; }
+.dot-good { -fx-background-color: -color-success-emphasis; }
+.dot-bad { -fx-background-color: -color-danger-emphasis; }
+.dot-warn { -fx-background-color: -color-warning-emphasis; }
+.dot-info { -fx-background-color: -renova-brand; }
+.dot-muted { -fx-background-color: -color-fg-subtle; }
+
+.empty {
+    -fx-border-color: -color-border-default;
+    -fx-border-style: dashed;
+    -fx-border-radius: 10;
+    -fx-padding: 36 24 36 24;
+    -fx-alignment: center;
+    -fx-spacing: 6;
 }
+
+.empty .icon-tile { -fx-background-radius: 99; -fx-border-radius: 99; -fx-border-color: transparent;
+    -fx-background-color: -color-bg-inset; -fx-effect: null; }
+
+/* ---- Charts ------------------------------------------------------------------------------------------------- */
+
+.gauge-track { -fx-stroke: -color-accent-subtle; -fx-fill: transparent; -fx-stroke-width: 10; }
+.gauge-value { -fx-stroke: -color-accent-emphasis; -fx-fill: transparent; -fx-stroke-width: 10; -fx-stroke-line-cap: round; }
+.gauge-figure { -fx-font-size: 2em; -fx-font-weight: bold; }
+
+.swatch { -fx-background-radius: 3; -fx-min-width: 10; -fx-min-height: 10; -fx-max-width: 10; -fx-max-height: 10; }
+.bar-track { -fx-background-color: -color-bg-inset; -fx-background-radius: 99; }
+.code-chip {
+    -fx-background-color: -color-bg-inset;
+    -fx-background-radius: 4;
+    -fx-min-width: 22;
+    -fx-min-height: 22;
+    -fx-alignment: center;
+    -fx-font-weight: bold;
+    -fx-font-family: "JetBrains Mono", "DejaVu Sans Mono", "Monospaced";
+    -fx-font-size: 0.85em;
+}
+
+.series-1 { -fx-background-color: -renova-series-1; }
+.series-2 { -fx-background-color: -renova-series-2; }
+.series-3 { -fx-background-color: -renova-series-3; }
+.series-4 { -fx-background-color: -renova-series-4; }
+.series-5 { -fx-background-color: -renova-series-5; }
+
+/* ---- Pipeline ----------------------------------------------------------------------------------------------- */
+
+.phase-dot {
+    -fx-background-radius: 99;
+    -fx-border-radius: 99;
+    -fx-border-width: 2;
+    -fx-min-width: 26;
+    -fx-min-height: 26;
+    -fx-max-width: 26;
+    -fx-max-height: 26;
+    -fx-alignment: center;
+    -fx-font-size: 0.8em;
+    -fx-font-weight: bold;
+}
+
+.phase-done { -fx-background-color: -color-success-emphasis; -fx-border-color: -color-success-emphasis; }
+.phase-failed { -fx-background-color: -color-danger-emphasis; -fx-border-color: -color-danger-emphasis; }
+.phase-warn { -fx-background-color: -color-warning-emphasis; -fx-border-color: -color-warning-emphasis; }
+.phase-current { -fx-background-color: -color-accent-subtle; -fx-border-color: -color-accent-emphasis; }
+.phase-pending { -fx-background-color: -color-bg-default; -fx-border-color: -color-border-default; -fx-text-fill: -color-fg-muted; }
+.phase-skipped { -fx-background-color: -color-bg-default; -fx-border-color: -color-border-default; -fx-border-style: dashed; }
+.phase-line { -fx-background-color: -color-border-default; -fx-min-height: 2; -fx-max-height: 2; }
+.phase-line.reached { -fx-background-color: -color-success-muted; }
+.phase-pulse { -fx-background-color: -color-accent-emphasis; -fx-background-radius: 99; -fx-min-width: 8; -fx-min-height: 8;
+    -fx-max-width: 8; -fx-max-height: 8; }
+
+/* ---- Code, logs and diffs ----------------------------------------------------------------------------------- */
 
 .mono, .log, .diff {
     -fx-font-family: "JetBrains Mono", "DejaVu Sans Mono", "Monospaced";
@@ -64,27 +351,75 @@
 }
 
 .diff .list-cell, .log .list-cell {
-    -fx-padding: 0 8 0 8;
+    -fx-padding: 1 10 1 10;
     -fx-font-family: "JetBrains Mono", "DejaVu Sans Mono", "Monospaced";
 }
+
+.list-view.console {
+    -fx-background-color: -renova-console;
+    -fx-border-color: -color-border-default;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 8 0 8 0;
+}
+
+.list-view.console .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: -renova-console-fg;
+    -fx-border-width: 0;
+}
+
+.list-view.console .list-cell:filled:hover { -fx-background-color: rgba(255, 255, 255, 0.05); }
+.list-view.console .list-cell.strong { -fx-text-fill: white; -fx-font-weight: bold; }
+.list-view.console .list-cell.trouble { -fx-text-fill: #ff9d96; }
+.list-view.console .list-cell.fine { -fx-text-fill: #6fe0a6; }
+.list-view.console .placeholder .label { -fx-text-fill: -renova-console-dim; }
 
 .diff .list-cell.added { -fx-background-color: -color-success-subtle; -fx-text-fill: -color-success-fg; }
 .diff .list-cell.removed { -fx-background-color: -color-danger-subtle; -fx-text-fill: -color-danger-fg; }
 .diff .list-cell.hunk { -fx-background-color: -color-accent-subtle; -fx-text-fill: -color-accent-fg; }
 .diff .list-cell.file {
-    -fx-background-color: -color-neutral-muted;
+    -fx-background-color: -color-bg-inset;
     -fx-font-weight: bold;
+    -fx-padding: 6 10 6 10;
+    -fx-border-color: -color-border-muted transparent -color-border-muted transparent;
 }
+
+/* ---- Lists of things to open -------------------------------------------------------------------------------- */
 
 .recent-tile {
     -fx-background-color: -color-bg-default;
     -fx-border-color: -color-border-default;
-    -fx-border-radius: 8;
-    -fx-background-radius: 8;
-    -fx-padding: 12;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+    -fx-padding: 14;
+    -fx-spacing: 12;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, -renova-shadow, 4, 0, 0, 1);
+}
+
+.recent-tile:hover { -fx-border-color: -color-accent-emphasis; }
+
+.row-item {
+    -fx-padding: 10 18 10 18;
+    -fx-border-color: transparent transparent -color-border-muted transparent;
     -fx-cursor: hand;
 }
 
-.recent-tile:hover {
-    -fx-border-color: -color-accent-emphasis;
+.row-item:hover { -fx-background-color: -color-bg-subtle; }
+
+.stage-row { -fx-padding: 8 0 8 0; }
+
+/* Primer's tabs, as an underline strip like the web console's. */
+.tab-pane, .tab-pane > .tab-header-area, .tab-pane > .tab-content-area { -fx-background-color: transparent; }
+.tab-pane > .tab-header-area > .tab-header-background {
+    -fx-background-color: -color-border-default, -color-bg-subtle;
+    -fx-background-insets: 0, 0 0 1 0;
 }
+.tab-pane > .tab-header-area > .headers-region > .tab { -fx-background-color: transparent; -fx-padding: 6 14 8 14; }
+.table-view { -fx-border-color: -color-border-default; -fx-border-radius: 8; -fx-background-radius: 8; }
+.tab-pane > .tab-header-area > .headers-region > .tab:selected {
+    -fx-border-color: transparent transparent -color-accent-emphasis transparent;
+    -fx-border-width: 0 0 2 0;
+}
+.tab-pane > .tab-header-area > .headers-region > .tab:selected .tab-label { -fx-font-weight: bold; }

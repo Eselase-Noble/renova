@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Play } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -11,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { api, type Project } from "@/lib/api";
+import { api, type MigrationOptions, type Project } from "@/lib/api";
 
 const ROUNDS: Record<string, string> = { "0": "No repair", "1": "1 round", "2": "2 rounds", "3": "3 rounds", "5": "5 rounds" };
 
@@ -19,20 +20,23 @@ export function StartMigrationDialog({
   project,
   open,
   onOpenChange,
+  initial,
 }: {
-  project: Project;
+  project: Pick<Project, "id" | "name">;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Options to start from, when running an earlier migration again. */
+  initial?: MigrationOptions;
 }) {
   const settings = useQuery({ queryKey: ["settings"], queryFn: api.settings, enabled: open });
   const aiReady =
     !!settings.data && settings.data.provider !== "none" &&
     !!settings.data.providers.find((p) => p.name === settings.data.provider)?.keyConfigured;
-  const [ai, setAi] = useState(true);
-  const [rag, setRag] = useState(true);
-  const [behaviour, setBehaviour] = useState(true);
-  const [tests, setTests] = useState(true);
-  const [rounds, setRounds] = useState("3");
+  const [ai, setAi] = useState(initial?.ai ?? true);
+  const [rag, setRag] = useState(initial?.rag ?? true);
+  const [behaviour, setBehaviour] = useState(initial?.verifyBehaviour ?? true);
+  const [tests, setTests] = useState(!(initial?.skipTests ?? false));
+  const [rounds, setRounds] = useState(String(initial?.maxAiIterations ?? 3) in ROUNDS ? String(initial?.maxAiIterations ?? 3) : "3");
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -55,14 +59,14 @@ export function StartMigrationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Migrate {project.name}</DialogTitle>
           <DialogDescription>
             Renova migrates a copy into its own workspace. Each stage is a commit you can review.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="divide-y rounded-lg border [&>*]:px-3.5 [&>*]:py-3">
           <Option
             id="ai"
             label="Use AI"
@@ -104,9 +108,9 @@ export function StartMigrationDialog({
             onChange={setBehaviour}
           />
           <div className="flex items-center justify-between gap-4">
-            <div>
+            <div className="space-y-0.5">
               <Label>AI repair rounds</Label>
-              <p className="text-xs text-muted-foreground">For build errors and behaviour differences.</p>
+              <p className="text-[13px] text-muted-foreground">For build errors and behaviour differences.</p>
             </div>
             <Select value={rounds} onValueChange={(v) => v && setRounds(v)} items={ROUNDS} disabled={!(ai && aiReady)}>
               <SelectTrigger className="w-32">
@@ -123,8 +127,11 @@ export function StartMigrationDialog({
           </div>
         </div>
         <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <Button onClick={() => start.mutate()} disabled={start.isPending}>
-            {start.isPending ? "Starting…" : "Start migration"}
+            <Play /> {start.isPending ? "Starting…" : "Start migration"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -149,9 +156,9 @@ function Option({
 }) {
   return (
     <div className="flex items-start justify-between gap-4">
-      <div>
+      <div className="space-y-0.5">
         <Label htmlFor={id}>{label}</Label>
-        <p className="text-xs text-muted-foreground">{description}</p>
+        <p className="text-[13px] text-muted-foreground">{description}</p>
       </div>
       <Switch id={id} checked={checked} disabled={disabled} onCheckedChange={(c) => onChange(c)} />
     </div>
