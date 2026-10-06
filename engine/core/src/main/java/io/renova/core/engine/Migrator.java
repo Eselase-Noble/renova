@@ -53,8 +53,24 @@ public final class Migrator {
         try (MeteredAiProvider ai = new MeteredAiProvider(registry.ai(options.ai()))) {
             progress.accept("Copying project to " + options.outputDir());
             Workspace workspace = Workspace.create(analysis.project().root(), options.outputDir());
-            MigrationOutcome outcome = run(new MigrationContext(workspace, analysis.project(), plan.playbook(), options, ai,
-                    registry.plugin(plan.playbook().ecosystem())), plan);
+            io.renova.core.spi.EcosystemPlugin plugin = registry.plugin(plan.playbook().ecosystem());
+            ProjectModel project = analysis.project();
+            List<StageResult> prepared = new ArrayList<>();
+            Optional<StageResult> preparation = plugin.prepare(workspace.root(), options.toolOptions());
+            if (preparation.isPresent()) {
+                StageResult stage = preparation.get();
+                progress.accept("Stage " + stage.stage() + ": " + stage.summary());
+                workspace.commitAll("renova: " + stage.stage() + " stage: " + stage.summary());
+                prepared.add(stage);
+                if (stage.status() != StageResult.Status.FAILED) {
+                    // The plan was made for the project as it came; it is made again for the project as prepared.
+                    AnalysisResult again = new Analyzer(registry).analyze(workspace.root(), plan.playbook());
+                    project = again.project();
+                    plan = new Planner().plan(again);
+                }
+            }
+            MigrationOutcome outcome = run(new MigrationContext(workspace, project, plan.playbook(), options, ai, plugin), plan,
+                    prepared);
             int rounds = (int) outcome.stages().stream().filter(s -> s.stage().equals("ai-repair") || s.stage().equals("ai-behaviour-repair"))
                     .flatMap(s -> s.details().stream()).filter(l -> REPAIR_ROUND.matcher(l).find()).count();
             return new MigrationOutcome(outcome.workspace(), outcome.stages(), outcome.verification(), outcome.manualSteps(),
@@ -62,7 +78,7 @@ public final class Migrator {
         }
     }
 
-    private MigrationOutcome run(MigrationContext context, MigrationPlan plan) throws Exception {
+    private MigrationOutcome run(MigrationContext context, MigrationPlan plan, List<StageResult> prepared) throws Exception {
         String ecosystem = plan.playbook().ecosystem();
         MigrationOptions options = context.options();
         Workspace workspace = context.workspace();
@@ -72,8 +88,10 @@ public final class Migrator {
             registry.plugin(ecosystem).verifier().ifPresent(v -> v.preflight(context));
         }
 
-        List<StageResult> stages = new ArrayList<>();
-        applyPlan(context, plan, "", stages);
+        List<StageResult> stages = new ArrayList<>(prepared);
+        if (stages.stream().noneMatch(s -> s.status() == StageResult.Status.FAILED)) {
+            applyPlan(context, plan, "", stages);
+        }
         List<PlanStep> manual = new ArrayList<>(plan.steps(FixSpec.MANUAL));
         Optional<StageResult> failed = stages.stream().filter(s -> s.status() == StageResult.Status.FAILED).findFirst();
         if (failed.isPresent()) {

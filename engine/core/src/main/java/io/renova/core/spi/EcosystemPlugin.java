@@ -49,6 +49,20 @@ public interface EcosystemPlugin {
         return candidates.getFirst();
     }
 
+    /**
+     * Makes the migration's copy of the project something this ecosystem's tools can work on, before anything
+     * else runs: for example a build file for a project that has none the tools understand. The project is
+     * analysed again afterwards, so rules see the prepared project.
+     *
+     * @param workspace the copy; the original is never touched
+     * @param options   the migration's tool options
+     * @return the stage to report, or empty when there was nothing to prepare
+     */
+    default Optional<io.renova.core.engine.StageResult> prepare(Path workspace, java.util.Map<String, String> options)
+            throws Exception {
+        return Optional.empty();
+    }
+
     default List<DetectorFactory> detectors() {
         return List.of();
     }

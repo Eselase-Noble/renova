@@ -123,3 +123,16 @@ apps:
       - { file: pom.xml, matches: '(?s)<groupId>io.micronaut.platform</groupId>\s*<artifactId>micronaut-parent</artifactId>\s*<version>4\.', why: "the Micronaut 4 platform parent" }
       - { file: pom.xml, contains: "micronaut-validation-processor", why: "without the processor, invalid requests are accepted silently" }
       - { file: "**/*.java", absent: "import javax.validation", why: "Jakarta" }
+
+  # No Maven or Gradle build: an Ant web application with its libraries as jar files. Renova gives the copy a
+  # Maven build in the standard layout, then migrates it like any other project. (Identifying the jars asks
+  # Maven Central; offline they stay files and are not upgraded.)
+  - id: ant-to-maven-jakarta
+    path: payroll-ant
+    playbook: java8-to-21-jakarta-ee10
+    checks:
+      - { file: pom.xml, contains: "<packaging>war</packaging>", why: "a Maven build was generated" }
+      - { file: pom.xml, contains: "renova-libs", why: "a library nobody published is kept, as a file" }
+      - { file: src/main/java/com/acme/payroll/PayslipServlet.java, contains: "import jakarta.servlet", why: "Jakarta EE" }
+      - { file: src/test/java/com/acme/payroll/PayslipTest.java, contains: "class PayslipTest", why: "tests are in the standard place, and run" }
+      - { file: src/main/resources/com/acme/payroll/labels.properties, contains: "net=", why: "resources beside the sources still reach the classpath" }

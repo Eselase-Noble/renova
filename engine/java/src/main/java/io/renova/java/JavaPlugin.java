@@ -59,9 +59,12 @@ public final class JavaPlugin implements EcosystemPlugin {
         return "Java (Maven/Gradle)";
     }
 
-    /** Java code without a Maven or Gradle build: Ant, an IDE project, or loose sources. */
+    /** Java code that is not laid out as any project Renova can read. */
     @Override
     public Optional<String> unsupportedReason(Path root) {
+        if (supports(root)) {
+            return Optional.empty();
+        }
         boolean ant = Files.isRegularFile(root.resolve("build.xml"));
         boolean sources;
         try (java.util.stream.Stream<Path> files = Files.find(root, 6, (p, attrs) -> attrs.isRegularFile() && p.toString().endsWith(".java"))) {
@@ -72,23 +75,23 @@ public final class JavaPlugin implements EcosystemPlugin {
         if (!ant && !sources) {
             return Optional.empty();
         }
-        return Optional.of((ant ? "This is an Ant project (build.xml)" : "This Java project has no build file Renova recognises")
-                + ". Renova runs its recipes and verifies the result through a Maven or Gradle build, which knows the project's "
-                + "dependencies; " + (ant ? "Ant builds do not declare them in a form it can use" : "without one it cannot resolve them")
-                + ". Add a pom.xml or build.gradle that builds the same sources with the same libraries (it can sit beside the "
-                + (ant ? "Ant build" : "existing setup") + "), check that it compiles, then assess the project again.");
+        return Optional.of((ant ? "This is an Ant project (build.xml)" : "This Java project has no build file")
+                + ", and Renova did not find its sources: it looks at the folders the build compiles, then at src, "
+                + "src/main/java, src/java, source and JavaSource. Point Renova at the folder that holds the sources' own "
+                + "project, or add a pom.xml or build.gradle that builds them, then assess the project again.");
     }
 
     @Override
     public List<String> projectMarkers() {
-        return List.of("pom.xml", "build.gradle", "build.gradle.kts");
+        return List.of("pom.xml", "build.gradle", "build.gradle.kts", "build.xml");
     }
 
     @Override
     public boolean supports(Path root) {
         try {
-            return !buildFiles(root).isEmpty();
-        } catch (IOException e) {
+            // Without a Maven or Gradle build, an Ant or IDE project is given one when it is migrated.
+            return !buildFiles(root).isEmpty() || io.renova.java.build.LegacyLayout.read(root).isPresent();
+        } catch (IOException | java.io.UncheckedIOException e) {
             return false;
         }
     }
@@ -99,7 +102,17 @@ public final class JavaPlugin implements EcosystemPlugin {
         List<Module> modules = new ArrayList<>();
         Set<String> buildTools = new TreeSet<>();
         Set<String> javaVersions = new TreeSet<>();
-        for (Path buildFile : buildFiles(base)) {
+        List<Path> buildFiles = buildFiles(base);
+        if (buildFiles.isEmpty()) {
+            legacyModule(base).ifPresent(module -> {
+                modules.add(module);
+                buildTools.add(module.fact("buildTool").toString());
+                if (module.fact("javaVersion") != null) {
+                    javaVersions.add(module.fact("javaVersion").toString());
+                }
+            });
+        }
+        for (Path buildFile : buildFiles) {
             Path dir = buildFile.getParent();
             String relDir = base.relativize(dir).toString().replace('\\', '/');
             String relFile = base.relativize(buildFile).toString().replace('\\', '/');
@@ -145,6 +158,40 @@ public final class JavaPlugin implements EcosystemPlugin {
         facts.put("containers", containers(modules));
         facts.put("hasWrapper", Files.exists(base.resolve("mvnw")) || Files.exists(base.resolve("gradlew")));
         return new ProjectModel(base, ID, modules, facts);
+    }
+
+    /**
+     * An Ant or IDE project as one module. Its libraries are the jars it carries; those that name their own
+     * coordinates are listed as dependencies, so rules about libraries apply before a build file exists.
+     */
+    private static Optional<Module> legacyModule(Path base) throws IOException {
+        Optional<io.renova.java.build.LegacyLayout> found = io.renova.java.build.LegacyLayout.read(base);
+        if (found.isEmpty()) {
+            return Optional.empty();
+        }
+        io.renova.java.build.LegacyLayout layout = found.get();
+        Map<String, Object> facts = new LinkedHashMap<>();
+        facts.put("buildTool", layout.ant() ? "ant" : "none");
+        facts.put("packaging", layout.webApplication() ? "war" : "jar");
+        // A build that names no level compiles for whatever JDK ran it; such projects predate Java 9.
+        facts.put("javaVersion", layout.javaVersion() == null ? "8" : layout.javaVersion());
+        facts.put("dependencies", layout.jars().stream()
+                .map(jar -> io.renova.java.build.JarCoordinates.embedded(base.resolve(jar)))
+                .flatMap(Optional::stream).map(io.renova.java.build.JarCoordinates.Gav::coordinates).distinct().toList());
+        facts.put("libraries", layout.jars().size());
+        facts.put("generatedBuild", "A Maven build (pom.xml, standard layout) is generated in the migrated copy");
+        if (layout.webApplication() && Files.isRegularFile(base.resolve(layout.webRoot()).resolve("WEB-INF/web.xml"))) {
+            facts.put("servletSpec", "unknown");
+        }
+        return Optional.of(new Module(layout.name(), ".", layout.ant() ? "build.xml" : layout.sources().getFirst(), facts));
+    }
+
+    @Override
+    public Optional<io.renova.core.engine.StageResult> prepare(Path workspace, Map<String, String> options) throws Exception {
+        if (!buildFiles(workspace).isEmpty()) {
+            return Optional.empty();
+        }
+        return io.renova.java.build.Mavenizer.apply(workspace, !"true".equals(options.get("maven.offline")));
     }
 
     @Override
@@ -287,6 +334,11 @@ public final class JavaPlugin implements EcosystemPlugin {
                             && io.renova.core.util.Versions.isBelow(d.version(), "6"));
                 }
                 javaEe |= pom.packaging().equals("war") && !boot;
+            }
+            Optional<Module> legacy = buildFiles(root).isEmpty() ? legacyModule(root) : Optional.empty();
+            if (legacy.isPresent()) {
+                javaEe |= "war".equals(legacy.get().fact("packaging"));
+                struts |= legacy.get().fact("dependencies").toString().contains("org.apache.struts:struts2");
             }
             // Java EE APIs can come from a parent or the server without being declared here: look at the code too.
             javaEe = javaEe || (!boot && importsJavaEe(root));
