@@ -84,6 +84,22 @@ rules:
       strategy: recipe
       recipes: [org.openrewrite.java.migrate.jakarta.JakartaEE10]
 
+  - id: faces-xhtml
+    title: Move Faces (JSF) pages and descriptors to the Jakarta namespaces
+    category: B
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.xhtml", "**/faces-config.xml", "**/*.taglib.xml"]
+      pattern: "xmlns\\.jcp\\.org/jsf|java\\.sun\\.com/jsf|xmlns\\.jcp\\.org/xml/ns/javaee|javax\\.faces"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.migrate.jakarta.JakartaEE10]
+    rationale: >
+      Faces 4 dropped the old page namespaces (xmlns.jcp.org/jsf, java.sun.com/jsf) for jakarta.faces.*, and
+      faces-config.xml and tag libraries use the Jakarta EE schemas. Pages that keep the old ones render as
+      plain text.
+
   - id: javax-in-jsp
     title: Rename javax.servlet references in JSP pages and tag files
     category: B

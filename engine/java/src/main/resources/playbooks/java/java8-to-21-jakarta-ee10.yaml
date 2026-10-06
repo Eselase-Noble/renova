@@ -28,6 +28,7 @@ settings:
     artifacts:
       - org.openrewrite.recipe:rewrite-migrate-java:3.42.1
       - org.openrewrite.recipe:rewrite-spring:6.37.1
+      - org.openrewrite.recipe:rewrite-hibernate:2.25.0
   # Behavioural verification (--verify-behaviour): where the original and the migrated app run side by side.
   behaviour:
     baseline: { build: "maven:3.9-eclipse-temurin-8", server: "tomcat:9.0-jdk8", platform: "Java 8, Tomcat 9" }
@@ -52,3 +53,21 @@ rules:
       strategy: recipe
       recipes: [org.openrewrite.java.migrate.UpgradeToJava21]
     rationale: The build must compile for the target JDK; the recipe also replaces APIs removed between 8 and 21.
+
+  - id: hibernate-6
+    title: Upgrade Hibernate to 6.6
+    category: C
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates: ["org.hibernate:hibernate-*", "org.hibernate.orm:hibernate-*"]
+      versionBelow: "6"
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.hibernate.MigrateToHibernate66]
+    rationale: >
+      Hibernate 5 implements javax.persistence; the jakarta.persistence API needs Hibernate 6.6 (Jakarta Persistence 3.1). The
+      recipe moves the artifacts to org.hibernate.orm, renames what changed and replaces removed type and
+      dialect names. Legacy Criteria queries (session.createCriteria) were removed in Hibernate 6 and are not
+      converted: the build shows where they are.
+
