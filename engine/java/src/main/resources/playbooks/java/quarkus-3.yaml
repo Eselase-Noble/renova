@@ -1,0 +1,99 @@
+# Quarkus 1 or 2 applications → Quarkus 3, which uses jakarta.* throughout (Jakarta EE 10) and needs Java 17 or later.
+
+id: quarkus-3
+name: "Quarkus 2 → 3 (Java 21)"
+ecosystem: java
+version: 0.1.0
+description: >
+  Moves a Quarkus 2 application to Quarkus 3 on Java 21 with the upgrade recipes the Quarkus project
+  publishes for each release: the platform version, javax to jakarta, renamed extensions and renamed
+  configuration properties.
+targets:
+  java: "21"
+  quarkus: "3.33"
+
+settings:
+  openrewrite:
+    plugin: org.openrewrite.maven:rewrite-maven-plugin:6.46.1
+    artifacts:
+      - org.openrewrite.recipe:rewrite-migrate-java:3.42.1
+      - org.openrewrite.recipe:rewrite-testing-frameworks:3.44.0
+      - io.quarkus:quarkus-update-recipes:1.15.2
+    # Quarkus ships one file of recipes per release; they are run in release order up to the target.
+    bundles:
+      - recipe: io.renova.java.QuarkusUpdate
+        artifact: io.quarkus:quarkus-update-recipes:1.15.2
+        path: quarkus-updates/core/
+        upTo: "3.33"
+        first:
+          - org.openrewrite.maven.ChangePropertyValue: { key: quarkus.platform.version, newValue: 3.33.4 }
+          - org.openrewrite.maven.ChangePropertyValue: { key: quarkus.version, newValue: 3.33.4 }
+          - org.openrewrite.maven.ChangePropertyValue: { key: quarkus-plugin.version, newValue: 3.33.4 }
+          - org.openrewrite.properties.ChangePropertyValue: { propertyKey: quarkusPlatformVersion, newValue: 3.33.4 }
+          - org.openrewrite.properties.ChangePropertyValue: { propertyKey: quarkusPluginVersion, newValue: 3.33.4 }
+
+include:
+  - packs/jdk-removed-apis.yaml
+  - packs/maven-build-guards.yaml
+
+rules:
+
+  - id: java-level
+    title: Raise the Java language level to 21
+    category: A
+    severity: BLOCKER
+    detect: { type: javaVersionBelow, version: 21 }
+    fix:
+      strategy: recipe
+      recipes: [org.openrewrite.java.migrate.UpgradeToJava21]
+    rationale: Quarkus 3.7 and later need Java 17; 21 is the long-term-support release Quarkus recommends.
+
+  - id: quarkus-3
+    title: Upgrade Quarkus to 3
+    category: A
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/pom.xml", "**/gradle.properties"]
+      pattern: "(<quarkus(\\.platform|-plugin)?\\.version>|quarkusPlatformVersion\\s*=|quarkusPluginVersion\\s*=)\\s*[12]\\."
+    fix:
+      strategy: recipe
+      recipes: [io.renova.java.QuarkusUpdate]
+    rationale: >
+      Quarkus 3 is built on Jakarta EE 10. The Quarkus project publishes the code changes each release needs
+      as recipes; Renova runs all of them from 3.0 to the target in order, as "quarkus update" does.
+
+  - id: quarkus-javax-imports
+    title: Rename javax.* imports to jakarta.*
+    category: B
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [javax.ws.rs, javax.inject, javax.enterprise, javax.persistence, javax.validation, javax.transaction,
+                 javax.annotation, javax.json, javax.servlet, javax.interceptor, javax.decorator, javax.websocket]
+      exclude:
+        - javax.annotation.processing
+        - javax.annotation.Nonnull
+        - javax.annotation.Nullable
+        - javax.annotation.concurrent
+        - javax.annotation.meta
+        - javax.transaction.xa
+    fix:
+      strategy: recipe
+      recipes: [io.renova.java.QuarkusUpdate]
+    rationale: Quarkus 3 ships the Jakarta EE 10 APIs only; the Quarkus 3.0 recipes rename the imports.
+
+knowledge:
+
+  - id: quarkus-3-baseline
+    title: What Quarkus 3 requires and changed
+    triggers: ["io.quarkus", "quarkus.platform.version", "@QuarkusTest", "javax.ws.rs", "javax.enterprise"]
+    body: |
+      Quarkus 3 uses jakarta.* for REST (jakarta.ws.rs), CDI (jakarta.enterprise, jakarta.inject), persistence,
+      validation and transactions; javax.* imports from those APIs do not compile. Quarkus 3.7 and later need
+      Java 17. Hibernate ORM is 6 (HQL is stricter; implicit joins and some id generators changed). The
+      RESTEasy Reactive extensions were renamed in 3.9: quarkus-resteasy-reactive is quarkus-rest,
+      quarkus-resteasy-reactive-jackson is quarkus-rest-jackson, and the reactive REST client is
+      quarkus-rest-client. Configuration keys follow: quarkus.resteasy-reactive.* is quarkus.rest.*.
+      @InjectMock moved to io.quarkus.test.InjectMock. quarkus.platform.version in the build selects the
+      release; the quarkus-maven-plugin uses the same version.

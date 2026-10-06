@@ -46,6 +46,13 @@ class JavaTargetsTest {
         assertThat(REGISTRY.defaultPlaybook(webapp).id()).isEqualTo("java8-to-21-jakarta-ee10");
         assertThat(REGISTRY.defaultPlaybook(boot2).id()).isEqualTo("spring-boot-3");
         assertThat(REGISTRY.defaultPlaybook(boot3).id()).isEqualTo("spring-boot-4");
+        Path micronaut = project(root.resolve("micronaut"), "<parent><groupId>io.micronaut</groupId><artifactId>micronaut-parent"
+                + "</artifactId><version>3.10.4</version></parent><artifactId>svc</artifactId>");
+        Path quarkus = project(root.resolve("quarkus"), "<groupId>g</groupId><artifactId>svc</artifactId><version>1</version>"
+                + "<build><plugins><plugin><groupId>io.quarkus.platform</groupId><artifactId>quarkus-maven-plugin</artifactId>"
+                + "<version>2.16.12.Final</version></plugin></plugins></build>");
+        assertThat(REGISTRY.defaultPlaybook(micronaut).id()).isEqualTo("micronaut-4");
+        assertThat(REGISTRY.defaultPlaybook(quarkus).id()).isEqualTo("quarkus-3");
         // Every Java path stays available for whoever wants a different target.
         assertThat(REGISTRY.playbooksFor(plain)).extracting(Playbook::id)
                 .contains("java-to-17", "java-to-21", "java-to-25", "spring-boot-3", "spring-boot-4", "java8-to-21-jakarta-ee10",

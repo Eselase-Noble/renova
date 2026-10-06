@@ -46,9 +46,28 @@ public final class OpenRewriteFixer implements Fixer {
             return StageResult.skipped("recipe", "no Maven or Gradle build found");
         }
         List<String> details = new ArrayList<>();
+        // Recipes an artifact ships as files OpenRewrite does not discover are handed over as a configuration file.
+        Path config;
+        try {
+            config = RecipeBundles.configFile(context, roots.isEmpty() ? gradleRoots.getFirst() : roots.getFirst());
+        } catch (java.io.IOException e) {
+            return new StageResult("recipe", StageResult.Status.FAILED, e.getMessage().lines().findFirst().orElse("no recipes"),
+                    List.of(e.getMessage()));
+        }
+        try {
+            return run(context, recipes, plugin, goal, artifacts, roots, gradleRoots, config, details);
+        } finally {
+            if (config != null) {
+                java.nio.file.Files.deleteIfExists(config);
+            }
+        }
+    }
+
+    private StageResult run(MigrationContext context, Set<String> recipes, String plugin, String goal, List<String> artifacts,
+                            List<Path> roots, List<Path> gradleRoots, Path config, List<String> details) throws Exception {
         int succeeded = 0;
         for (Path root : gradleRoots) {
-            Proc.Result result = retryingOnNetworkErrors(() -> runGradle(context, root, recipes, artifacts), details);
+            Proc.Result result = retryingOnNetworkErrors(() -> runGradle(context, root, recipes, artifacts, config), details);
             String name = context.workspace().root().relativize(root).toString();
             details.add("== " + (name.isEmpty() ? "." : name) + " (gradle): exit " + result.exitCode());
             details.add(result.tail(result.ok() ? 8 : 40));
@@ -68,6 +87,9 @@ public final class OpenRewriteFixer implements Fixer {
                 cmd.add("-Drewrite.recipeArtifactCoordinates=" + String.join(",", artifacts));
             }
             cmd.add("-Drewrite.exportDatatables=false");
+            if (config != null) {
+                cmd.add("-Drewrite.configLocation=" + config);
+            }
             if (isReactor(context, root)) {
                 // runNoFork runs no build phases, so a module cannot resolve a sibling it depends on
                 // and Maven fails the run. Including the compile phase lets Maven resolve siblings
@@ -97,8 +119,8 @@ public final class OpenRewriteFixer implements Fixer {
      * OpenRewrite plugin to the root project for this one invocation. The script is kept outside the workspace,
      * so it never becomes part of a stage's commit.
      */
-    private static Proc.Result runGradle(MigrationContext context, Path root, Set<String> recipes, List<String> artifacts)
-            throws Exception {
+    private static Proc.Result runGradle(MigrationContext context, Path root, Set<String> recipes, List<String> artifacts,
+                                         Path config) throws Exception {
         String plugin = setting(context, "openrewrite.gradlePlugin", DEFAULT_GRADLE_PLUGIN);
         StringBuilder script = new StringBuilder();
         script.append("initscript {\n")
@@ -110,7 +132,12 @@ public final class OpenRewriteFixer implements Fixer {
                 .append("    plugins.apply(org.openrewrite.gradle.RewritePlugin)\n")
                 .append("    dependencies {\n");
         artifacts.forEach(a -> script.append("        rewrite(\"").append(a).append("\")\n"));
-        script.append("    }\n")
+        script.append("    }\n");
+        if (config != null) {
+            script.append("    extensions.getByName(\"rewrite\").configFile = new File(\"")
+                    .append(config.toString().replace("\\", "\\\\")).append("\")\n");
+        }
+        script
                 // The recipe artifacts are resolved from the project's repositories; a build without any gets Central.
                 .append("    afterEvaluate {\n")
                 .append("        if (repositories.isEmpty()) {\n")

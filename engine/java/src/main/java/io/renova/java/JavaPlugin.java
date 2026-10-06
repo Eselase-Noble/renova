@@ -232,7 +232,7 @@ public final class JavaPlugin implements EcosystemPlugin {
     @Override
     public List<String> bundledPlaybooks() {
         return List.of("playbooks/java/java8-to-21-jakarta-ee10.yaml", "playbooks/java/java-to-21-jakarta-ee11-spring7.yaml",
-                "playbooks/java/spring-boot-3.yaml", "playbooks/java/spring-boot-4.yaml", "playbooks/java/micronaut-4.yaml",
+                "playbooks/java/spring-boot-3.yaml", "playbooks/java/spring-boot-4.yaml", "playbooks/java/micronaut-4.yaml", "playbooks/java/quarkus-3.yaml",
                 "playbooks/java/java-to-17.yaml", "playbooks/java/java-to-21.yaml", "playbooks/java/java-to-25.yaml",
                 // Add-ons: optional, combined with a target (java-to-21+junit5).
                 "playbooks/java/addons/junit5.yaml", "playbooks/java/addons/mockito5.yaml", "playbooks/java/addons/log4j2.yaml",
@@ -254,12 +254,14 @@ public final class JavaPlugin implements EcosystemPlugin {
         boolean javaEe = false;
         boolean struts = false;
         boolean micronaut = false;
+        boolean quarkus = false;
         try {
             for (Path buildFile : buildFiles(root)) {
                 if (!buildFile.getFileName().toString().startsWith("pom")) {
                     String text = Files.readString(buildFile);
                     boot |= text.contains("org.springframework.boot");
                     micronaut |= text.contains("io.micronaut.application") || text.contains("io.micronaut.library");
+                    quarkus |= text.contains("io.quarkus");
                     Matcher bootPlugin = GradlePluginDetector.declaration("org.springframework.boot").matcher(text);
                     // Already on Spring Boot 3: the next step is 4.
                     boot3 |= bootPlugin.find() && bootPlugin.group(1).matches("\\d.*")
@@ -268,6 +270,8 @@ public final class JavaPlugin implements EcosystemPlugin {
                     continue;
                 }
                 PomReader.Pom pom = PomReader.read(buildFile);
+                // Quarkus comes in through its BOM and build plugin, which a dependency list does not show.
+                quarkus |= Files.readString(buildFile).contains("quarkus-maven-plugin");
                 micronaut |= pom.parent() != null && pom.parent().startsWith("io.micronaut");
                 if (pom.parent() != null && pom.parent().startsWith("org.springframework.boot:")) {
                     boot = true;
@@ -289,7 +293,7 @@ public final class JavaPlugin implements EcosystemPlugin {
         } catch (IOException | RuntimeException e) {
             // An unreadable build file: fall through to the plain Java path, which the analysis will report on.
         }
-        String wanted = micronaut ? "micronaut-4" : boot3 ? "spring-boot-4" : boot ? "spring-boot-3" : javaEe ? "java8-to-21-jakarta-ee10" : "java-to-21";
+        String wanted = micronaut ? "micronaut-4" : quarkus ? "quarkus-3" : boot3 ? "spring-boot-4" : boot ? "spring-boot-3" : javaEe ? "java8-to-21-jakarta-ee10" : "java-to-21";
         if (!candidates.contains(wanted)) {
             return candidates.getFirst();
         }
