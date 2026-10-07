@@ -188,4 +188,90 @@ class AiFixerTest {
         assertThat(Files.readString(base.workspace().root().resolve("src/ATest.java"))).isEqualTo("assertEquals(1, a())\n");
         assertThat(log).anyMatch(l -> l.contains("rejected edit to src/ATest.java"));
     }
+
+    @Test
+    void aTestTheMigrationLeftUncompilableMayBeRepaired(@TempDir Path tmp) throws Exception {
+        ScriptedAi ai = new ScriptedAi(request -> Map.of("src/A.java", "accept(builder)\n"));
+        MigrationContext base = context(tmp, ai);
+        Path rewritten = base.workspace().root().resolve("src/A.java");
+        Files.writeString(rewritten, "accept(builder.build())\n");
+        base.workspace().commitAll("recipe stage");
+        // Every source file of this project is a test; no build file to group them under.
+        ToyPlugin plugin = new ToyPlugin() {
+            @Override
+            public boolean isTestFile(String file) {
+                return file.startsWith("src/");
+            }
+            @Override
+            public List<RelatedFile> relatedFiles(ProjectModel model, String file) {
+                return List.of();
+            }
+        };
+        MigrationContext ctx = new MigrationContext(base.workspace(), base.project(), base.playbook(), base.options(), ai, plugin);
+        VerifyResult failing = new VerifyResult(false, List.of(
+                new BuildError("src/A.java", 1, "incompatible types: Response cannot be converted to Builder"),
+                new BuildError("src/B.java", 1, "cannot find symbol")), "");
+
+        new AiFixer().repair(ctx, c -> new VerifyResult(true, List.of(), ""), failing, 1, new ArrayList<>());
+
+        // Rewritten by a stage and rejected by the compiler: editable. Never touched by the migration: not.
+        assertThat(ai.requests.getFirst().files()).extracting(RequestFile::path, RequestFile::role).containsExactly(
+                org.assertj.core.groups.Tuple.tuple("src/A.java", RequestFile.Role.TARGET),
+                org.assertj.core.groups.Tuple.tuple("src/B.java", RequestFile.Role.REFERENCE));
+        assertThat(Files.readString(rewritten)).isEqualTo("accept(builder)\n");
+    }
+
+    @Test
+    void aTestThatRunsAndFailsIsNeverEditedEvenIfTheMigrationChangedIt(@TempDir Path tmp) throws Exception {
+        ScriptedAi ai = new ScriptedAi(request -> Map.of("src/A.java", "assertTrue(true)\n"));
+        MigrationContext base = context(tmp, ai);
+        Path test = base.workspace().root().resolve("src/A.java");
+        Files.writeString(test, "assertEquals(1, a())\n");
+        base.workspace().commitAll("recipe stage");
+        ToyPlugin plugin = new ToyPlugin() {
+            @Override
+            public boolean isTestFile(String file) {
+                return file.startsWith("src/");
+            }
+        };
+        MigrationContext ctx = new MigrationContext(base.workspace(), base.project(), base.playbook(), base.options(), ai, plugin);
+        VerifyResult failing = new VerifyResult(false,
+                List.of(new BuildError("src/A.java", 1, "test A.adds failed: expected 1 but was 2")), "");
+
+        new AiFixer().repair(ctx, c -> new VerifyResult(true, List.of(), ""), failing, 1, new ArrayList<>());
+
+        assertThat(ai.requests.getFirst().files().getFirst().role()).isEqualTo(RequestFile.Role.REFERENCE);
+        assertThat(Files.readString(test)).isEqualTo("assertEquals(1, a())\n");
+    }
+
+    @Test
+    void aRuleThatReplacesAWholeLayerSendsItsFilesTogetherAndMayAddNewOnes(@TempDir Path tmp) throws Exception {
+        ScriptedAi ai = new ScriptedAi(request -> Map.of(
+                "src/A.java", "controller A\n", "pages/a.page", "new tags\n",
+                "src/Config.java", "wiring\n",          // allowed: matches params.create
+                "notes/README.txt", "not asked for\n")); // not offered and not creatable
+        MigrationContext ctx = context(tmp, ai);
+        Path root = ctx.workspace().root();
+        Files.createDirectories(root.resolve("pages"));
+        Files.writeString(root.resolve("pages/a.page"), "old tags\n");
+        io.renova.core.playbook.FixSpec fix = new io.renova.core.playbook.FixSpec("ai", null, "replace the framework", null, null, null,
+                false, Map.of("together", true, "with", List.of("pages/*.page"), "create", List.of("src/*.java")));
+        io.renova.core.playbook.Rule rule = new io.renova.core.playbook.Rule("old-framework", "Old framework",
+                io.renova.core.model.Category.API, io.renova.core.model.Severity.BLOCKER, Map.of("type", "fileExists"), fix, null, null);
+        io.renova.core.engine.PlanStep step = new io.renova.core.engine.PlanStep(1, rule, 2, List.of("src/A.java", "src/B.java"), List.of());
+
+        new AiFixer().apply(ctx, List.of(step));
+
+        assertThat(ai.requests).hasSize(1);
+        assertThat(ai.requests.getFirst().files()).extracting(RequestFile::path, RequestFile::role).containsExactly(
+                org.assertj.core.groups.Tuple.tuple("src/A.java", RequestFile.Role.TARGET),
+                org.assertj.core.groups.Tuple.tuple("src/B.java", RequestFile.Role.TARGET),
+                org.assertj.core.groups.Tuple.tuple("build.txt", RequestFile.Role.RELATED),
+                org.assertj.core.groups.Tuple.tuple("pages/a.page", RequestFile.Role.RELATED));
+        assertThat(ai.requests.getFirst().creatable()).containsExactly("src/*.java");
+        assertThat(Files.readString(root.resolve("src/A.java"))).isEqualTo("controller A\n");
+        assertThat(Files.readString(root.resolve("pages/a.page"))).isEqualTo("new tags\n");
+        assertThat(Files.readString(root.resolve("src/Config.java"))).isEqualTo("wiring\n");
+        assertThat(root.resolve("notes/README.txt")).doesNotExist();
+    }
 }

@@ -6,6 +6,8 @@ import io.renova.core.engine.PlanStep;
 import io.renova.core.engine.StageResult;
 import io.renova.core.engine.VerifyResult;
 import io.renova.core.playbook.FixSpec;
+import io.renova.core.playbook.Params;
+import io.renova.core.scan.ScanContext;
 import io.renova.core.rag.ContextAssembler;
 import io.renova.core.rag.ContextItem;
 import io.renova.core.rag.RetrievalQuery;
@@ -35,8 +37,14 @@ import java.util.TreeSet;
  * (for Java, the owning build file), so a fix that spans a source file and its build file is one
  * edit. The model may only change files it was given as editable; anything else is rejected.
  * With RAG enabled, retrieved code is added as reference files and retrieved knowledge as notes,
- * within a share of the request size. Test files are only ever sent as reference: a migration must keep
- * the behaviour they describe, not change them to pass.
+ * within a share of the request size. Test files are sent as reference: a migration must keep the
+ * behaviour they describe, not change them to pass. The one exception is a test that an earlier stage
+ * rewrote and left uncompilable: it describes nothing until it compiles, so its compiler errors may be
+ * repaired.
+ *
+ * <p>A rule whose fix has {@code params.together} replaces something no single file holds, such as a web
+ * framework: all its files go in one request, with the files named by {@code params.with} (pages,
+ * descriptors) editable beside them, and new files allowed where {@code params.create} says.
  */
 public final class AiFixer implements Fixer {
 
@@ -54,16 +62,34 @@ public final class AiFixer implements Fixer {
         if (!ai.available()) {
             return StageResult.skipped("ai", steps.size() + " step(s) need an AI provider or a person");
         }
-        // One request per file, carrying every rule that matched it.
+        // One request per file, carrying every rule that matched it; a rule that changes a whole layer
+        // goes first, in one request for all its files.
         Map<String, List<String>> hintsByFile = new LinkedHashMap<>();
+        Tally tally = new Tally();
+        ScanContext scan = null;
         for (PlanStep step : steps) {
-            for (String file : step.files()) {
+            Params params = step.rule().fix().params(step.rule().id());
+            if (!params.optString("together").map(Boolean::parseBoolean).orElse(false)) {
+                continue;
+            }
+            scan = scan == null ? ScanContext.of(context.project()) : scan;
+            List<String> companions = scan.files(params.strings("with")).stream().map(ScanContext::toProjectPath)
+                    .filter(f -> !context.plugin().isTestFile(f)).toList();
+            step.files().forEach(f -> hintsByFile.put(f, new ArrayList<>()));
+            send(context, step.files(), List.of(hint(step)), List.of(), tally,
+                    new Layer(companions, step.rule().title(), params.strings("create")));
+        }
+        for (PlanStep step : steps) {
+            boolean together = step.rule().fix().params(step.rule().id()).optString("together")
+                    .map(Boolean::parseBoolean).orElse(false);
+            for (String file : together ? List.<String>of() : step.files()) {
                 hintsByFile.computeIfAbsent(file, f -> new ArrayList<>()).add(hint(step));
             }
         }
-        Tally tally = new Tally();
         for (Map.Entry<String, List<String>> entry : hintsByFile.entrySet()) {
-            send(context, List.of(entry.getKey()), entry.getValue(), List.of(), tally);
+            if (!entry.getValue().isEmpty()) {
+                send(context, List.of(entry.getKey()), entry.getValue(), List.of(), tally);
+            }
         }
         context.workspace().commitAll("renova: AI-assisted rule fixes (" + tally.filesChanged.size() + " files)");
         int handled = tally.requestsChanged + tally.requestsUnchanged;
@@ -149,17 +175,39 @@ public final class AiFixer implements Fixer {
         return List.copyOf(groups.values());
     }
 
+    /**
+     * What a whole-layer request adds to its targets.
+     *
+     * @param companions files that change with the targets, editable
+     * @param what       the rule's title, to say why they are there
+     * @param creatable  globs of paths where new files may be added
+     */
+    private record Layer(List<String> companions, String what, List<String> creatable) {
+        static final Layer NONE = new Layer(List.of(), null, List.of());
+    }
+
     private static void send(MigrationContext context, List<String> targets, List<String> hints,
                              List<BuildError> errors, Tally tally) throws Exception {
+        send(context, targets, hints, errors, tally, Layer.NONE);
+    }
+
+    private static void send(MigrationContext context, List<String> targets, List<String> hints,
+                             List<BuildError> errors, Tally tally, Layer layer) throws Exception {
         List<RequestFile> files = new ArrayList<>();
         Set<String> included = new LinkedHashSet<>();
         for (String target : targets) {
             String content = read(context, target, tally);
             if (content != null && included.add(target)) {
-                files.add(context.plugin().isTestFile(target)
-                        ? new RequestFile(target, content, RequestFile.Role.REFERENCE,
-                                "the failing test; tests define the expected behaviour and are never changed")
-                        : new RequestFile(target, content, RequestFile.Role.TARGET, null));
+                if (!context.plugin().isTestFile(target)) {
+                    files.add(new RequestFile(target, content, RequestFile.Role.TARGET, null));
+                } else if (leftUncompilable(context, target, errors)) {
+                    files.add(new RequestFile(target, content, RequestFile.Role.TARGET,
+                            "a test the migration rewrote and left uncompilable; repair only what the compiler "
+                                    + "reports, and keep every call, value and assertion it had"));
+                } else {
+                    files.add(new RequestFile(target, content, RequestFile.Role.REFERENCE,
+                            "the failing test; tests define the expected behaviour and are never changed"));
+                }
             }
         }
         if (files.isEmpty()) {
@@ -176,6 +224,13 @@ public final class AiFixer implements Fixer {
                     files.add(new RequestFile(related.path(), content,
                             related.editable() ? RequestFile.Role.RELATED : RequestFile.Role.REFERENCE, related.why()));
                 }
+            }
+        }
+        for (String companion : layer.companions()) {
+            String content = included.contains(companion) ? null : read(context, companion, null);
+            if (content != null) {
+                included.add(companion);
+                files.add(new RequestFile(companion, content, RequestFile.Role.RELATED, "changes with the targets: " + layer.what()));
             }
         }
 
@@ -198,7 +253,13 @@ public final class AiFixer implements Fixer {
         }
 
         String label = String.join(", ", targets);
-        FixRequest request = new FixRequest(context.playbook().name(), files, hints, errors, knowledge);
+        FixRequest request = new FixRequest(context.playbook().name(), files, hints, errors, knowledge, layer.creatable());
+        if (request.totalChars() > MAX_REQUEST_CHARS && targets.size() > 1 && layer != Layer.NONE) {
+            // Too much for one response: half the targets at a time, each half with the layer's other files.
+            send(context, targets.subList(0, targets.size() / 2), hints, errors, tally, layer);
+            send(context, targets.subList(targets.size() / 2, targets.size()), hints, errors, tally, layer);
+            return;
+        }
         if (request.totalChars() > MAX_REQUEST_CHARS && targets.size() > 1) {
             // Too much for one response: fall back to one target per request.
             for (String target : targets) {
@@ -232,7 +293,20 @@ public final class AiFixer implements Fixer {
         }
     }
 
-    /** Writes only edits to files the request offered as editable, and only inside the workspace. */
+    /**
+     * A test whose errors all come from the compiler, in a file an earlier stage changed. A test that runs
+     * and fails, or one the migration never touched, still defines the behaviour to keep.
+     */
+    private static boolean leftUncompilable(MigrationContext context, String test, List<BuildError> errors) throws Exception {
+        List<BuildError> own = errors.stream().filter(e -> test.equals(e.file())).toList();
+        return !own.isEmpty() && own.stream().noneMatch(BuildError::fromFailedTest)
+                && context.workspace().changedSinceBaseline(test);
+    }
+
+    /**
+     * Writes only edits to files the request offered as editable, and new files only where the request
+     * allows them; always inside the workspace, and never a test.
+     */
     private static void write(MigrationContext context, FixRequest request, Proposal proposal, String label,
                               Tally tally) throws IOException {
         Path root = context.workspace().root();
@@ -241,12 +315,17 @@ public final class AiFixer implements Fixer {
         for (Map.Entry<String, String> edit : proposal.edits().entrySet()) {
             String path = edit.getKey();
             Path target = root.resolve(path).normalize();
-            if (!editable.contains(path) || !target.startsWith(root)) {
+            boolean added = !Files.exists(target) && target.startsWith(root) && !context.plugin().isTestFile(path)
+                    && request.creatable().stream().anyMatch(glob -> ScanContext.matches(glob, root.relativize(target)));
+            if (!(editable.contains(path) || added) || !target.startsWith(root)) {
                 tally.log.add(label + ": rejected edit to " + path + " (not offered as editable)");
                 continue;
             }
-            String before = Files.readString(target, StandardCharsets.UTF_8);
-            if (!before.equals(edit.getValue())) {
+            if (added) {
+                Files.createDirectories(target.getParent());
+            }
+            String before = added ? null : Files.readString(target, StandardCharsets.UTF_8);
+            if (!edit.getValue().equals(before)) {
                 Files.writeString(target, edit.getValue(), StandardCharsets.UTF_8);
                 written.add(path);
                 tally.filesChanged.add(path);

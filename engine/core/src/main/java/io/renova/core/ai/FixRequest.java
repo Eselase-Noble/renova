@@ -14,15 +14,22 @@ import java.util.stream.Collectors;
  * @param hints  rule titles and fix hints; empty for build repair
  * @param errors    build errors in the target files; empty for proactive rule fixes
  * @param knowledge retrieved migration knowledge notes (never editable); empty without RAG
+ * @param creatable globs of paths where the answer may add new files; empty when it may only change files
  */
 public record FixRequest(String goal, List<RequestFile> files, List<String> hints, List<BuildError> errors,
-                         List<ContextItem> knowledge) {
+                         List<ContextItem> knowledge, List<String> creatable) {
 
     public FixRequest {
         files = List.copyOf(files);
         hints = List.copyOf(hints);
         errors = List.copyOf(errors);
         knowledge = knowledge == null ? List.of() : List.copyOf(knowledge);
+        creatable = creatable == null ? List.of() : List.copyOf(creatable);
+    }
+
+    public FixRequest(String goal, List<RequestFile> files, List<String> hints, List<BuildError> errors,
+                      List<ContextItem> knowledge) {
+        this(goal, files, hints, errors, knowledge, List.of());
     }
 
     public FixRequest(String goal, List<RequestFile> files, List<String> hints, List<BuildError> errors) {

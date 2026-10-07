@@ -63,6 +63,18 @@ class MavenParsingTest {
     }
 
     @Test
+    void aGoalFailureWithoutWordsIsNotAnEmptyError() {
+        Path ws = Path.of("/work/ws");
+        // Surefire 3.5: the reason is on the lines after, and the test reports carry the failures.
+        String tests = "[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.4:test (default-test) "
+                + "on project app: \n[ERROR] \n[ERROR] See /work/ws/app/target/surefire-reports for the individual test results.";
+        assertThat(MavenVerifierAccess.parse(tests, ws, ws.resolve("app"))).isEmpty();
+        String other = "[ERROR] Failed to execute goal com.acme:pack-maven-plugin:1.2:pack (default) on project app:  -> [Help 1]";
+        assertThat(MavenVerifierAccess.parse(other, ws, ws.resolve("app"))).containsExactly(new BuildError(
+                "app/pom.xml", 0, "goal com.acme:pack-maven-plugin:1.2:pack (default) failed"));
+    }
+
+    @Test
     void attributesProjectModelErrorsToTheModulePomAndLine() {
         Path ws = Path.of("/work/ws");
         String output = """

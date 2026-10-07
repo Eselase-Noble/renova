@@ -35,6 +35,7 @@ final class TestReports {
     private static final int MAX_MESSAGE = 400;
     private static final Pattern FRAME = Pattern.compile("^\\s+at ([\\w.$]+)\\.[\\w$<>]+\\(([\\w$]+)\\.java:(\\d+)\\)");
     private static final int MAX_FRAMES = 4;
+    private static final String CAUSED_BY = "Caused by: ";
 
     private TestReports() {
     }
@@ -110,11 +111,15 @@ final class TestReports {
             String testFile = null;
             int testLine = 0;
             List<String> frames = new ArrayList<>();
+            String rootCause = null;
             for (; j < lines.size(); j++) {
                 Matcher frame = FRAME.matcher(lines.get(j));
                 if (!frame.find()) {
                     if (FAILED_V2.matcher(lines.get(j)).find() || FAILED_V3.matcher(lines.get(j)).find()) {
                         break;
+                    }
+                    if (lines.get(j).startsWith(CAUSED_BY)) {
+                        rootCause = lines.get(j).substring(CAUSED_BY.length()).strip();
                     }
                     continue;
                 }
@@ -141,6 +146,12 @@ final class TestReports {
             } else if (file == null) {
                 file = testFile != null ? testFile : testClass == null ? null : testSources.get(testClass);
                 line = testFile != null ? testLine : 0;
+            }
+            // The last cause in the chain is what went wrong; the first lines only say that something did
+            // ("Failed to load ApplicationContext").
+            if (rootCause != null && exception.indexOf(rootCause.substring(0, Math.min(rootCause.length(), 80))) < 0) {
+                exception.append(" Root cause: ").append(rootCause.length() > MAX_MESSAGE
+                        ? rootCause.substring(0, MAX_MESSAGE) + "…" : rootCause);
             }
             errors.add(new BuildError(file, line, "test " + test + " failed: " + exception
                     + (frames.isEmpty() ? "" : " (at " + String.join(" ← ", frames) + ")")));

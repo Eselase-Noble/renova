@@ -25,7 +25,7 @@ public final class MavenVerifier implements Verifier {
     private static final Pattern KOTLIN_ERROR = Pattern.compile("^\\[ERROR\\] (?:file://)?(.+?\\.kts?):? ?\\(?(\\d+)[,:] ?\\d+\\)? (.*)$");
     private static final Pattern COMPILER_ERROR = Pattern.compile("^\\[ERROR\\] (.+?\\.(?:java|kt|groovy)):\\[(\\d+)(?:,\\d+)?\\] (.*)$");
     /** Plugin failures (bad build configuration, missing dependency): attributed to the build file. */
-    private static final Pattern GOAL_FAILURE = Pattern.compile("^\\[ERROR\\] Failed to execute goal .*? on project [^:]+: (.*?)(?: -> \\[Help \\d+])?$");
+    private static final Pattern GOAL_FAILURE = Pattern.compile("^\\[ERROR\\] Failed to execute goal (.*?) on project [^:]+:\\s*(.*?)(?:\\s*-> \\[Help \\d+])?$");
     /** Project-model errors: "The project g:a:v (/path/pom.xml) has 1 error", then the errors with "@ line N". */
     private static final Pattern MODEL_PROJECT = Pattern.compile("^\\[ERROR\\]\\s+The project \\S+ \\((.+?pom[^)]*\\.xml)\\) has \\d+ errors?");
     private static final Pattern MODEL_ERROR = Pattern.compile("^\\[ERROR\\]\\s+(.+?) @ (?:.*?, )?line (\\d+), column \\d+");
@@ -121,11 +121,14 @@ public final class MavenVerifier implements Verifier {
             if (goal.matches()) {
                 // Compilation failures repeat the per-file errors already collected; keep the rest.
                 // Compilation and test failures are reported in detail elsewhere; keep the rest.
-                String message = goal.group(1);
+                String message = goal.group(2).strip();
+                // Surefire 3.5 leaves the line empty and says "There are test failures" on the next one.
+                boolean tests = goal.group(1).contains("surefire") || goal.group(1).contains("failsafe");
                 if (!message.startsWith("Compilation failure") && !message.startsWith("There are test failures")
-                        && !message.startsWith("There was a timeout")) {
+                        && !message.startsWith("There was a timeout") && !(message.isEmpty() && tests)) {
                     String pom = workspace.relativize(buildRoot.resolve("pom.xml")).toString().replace('\\', '/');
-                    errors.add(new BuildError(pom, 0, goal.group(1).strip()));
+                    // An error without words sends a repair guessing: name the goal that failed at least.
+                    errors.add(new BuildError(pom, 0, message.isEmpty() ? "goal " + goal.group(1) + " failed" : message));
                 }
                 continue;
             }

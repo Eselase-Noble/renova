@@ -96,4 +96,31 @@ class TestReportsTest {
             assertThat(e.message()).contains("expected: <a").contains("(at TokenCodecTest.java:21)");
         });
     }
+
+    @Test
+    void reportsTheLastCauseOfAFailureThatOnlySaysSomethingFailed(@TempDir Path ws) throws Exception {
+        write(ws, "src/main/java/com/acme/web/GatewayController.java", "class GatewayController {}");
+        write(ws, "src/test/java/com/acme/web/GatewayControllerTest.java", "class GatewayControllerTest {}");
+        write(ws, "target/surefire-reports/com.acme.web.GatewayControllerTest.txt", """
+                Test set: com.acme.web.GatewayControllerTest
+                Tests run: 1, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 2.4 s <<< FAILURE! -- in com.acme.web.GatewayControllerTest
+                com.acme.web.GatewayControllerTest.answers -- Time elapsed: 0.01 s <<< ERROR!
+                java.lang.IllegalStateException: Failed to load ApplicationContext for [ReactiveWebMergedContextConfiguration@389a testClass = com.acme.web.GatewayControllerTest]
+                \tat org.springframework.test.context.cache.DefaultCacheAwareContextLoaderDelegate.loadContext(DefaultCacheAwareContextLoaderDelegate.java:180)
+                Caused by: org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'gatewayController'
+                \tat org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:804)
+                \t... 31 more
+                Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No qualifying bean of type 'io.github.resilience4j.bulkhead.BulkheadRegistry' available
+                \tat org.springframework.beans.factory.support.DefaultListableBeanFactory.raiseNoMatchingBeanFound(DefaultListableBeanFactory.java:2297)
+                """);
+
+        List<BuildError> errors = TestReports.parse(ws, ws);
+
+        assertThat(errors).hasSize(1);
+        assertThat(errors.getFirst().message()).startsWith("test GatewayControllerTest.answers failed: java.lang.IllegalStateException")
+                .contains("Root cause: org.springframework.beans.factory.NoSuchBeanDefinitionException: No qualifying bean of type "
+                        + "'io.github.resilience4j.bulkhead.BulkheadRegistry' available")
+                .doesNotContain("UnsatisfiedDependencyException");
+        assertThat(errors.getFirst().fromFailedTest()).isTrue();
+    }
 }

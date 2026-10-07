@@ -3,7 +3,7 @@ package io.renova.core.ai;
 /**
  * One file sent to the AI provider.
  *
- * @param why for related and reference files: why the file is included
+ * @param why why the file is included; null for an ordinary target
  */
 public record RequestFile(String path, String content, Role role, String why) {
 

@@ -104,6 +104,15 @@ public final class Workspace {
         return versioned ? git("diff", "--shortstat", since).output().strip() : "";
     }
 
+    /** True when a migration stage changed or added the file: it differs from the baseline commit. */
+    public boolean changedSinceBaseline(String file) throws IOException, InterruptedException {
+        if (!versioned) {
+            return false;
+        }
+        String baseline = git("rev-list", "--max-parents=0", "HEAD").output().strip();
+        return !git("diff", "--name-only", baseline, "HEAD", "--", file).output().isBlank();
+    }
+
     private Proc.Result git(String... args) throws IOException, InterruptedException {
         List<String> cmd = new ArrayList<>(List.of("git"));
         cmd.addAll(List.of(args));
