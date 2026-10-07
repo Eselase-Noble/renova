@@ -21,3 +21,5 @@ node_modules/
 
 # Renova workspace metadata
 .renova/
+# The Java engine has a source package named build; it is code, not build output.
+!engine/java/src/**/build/

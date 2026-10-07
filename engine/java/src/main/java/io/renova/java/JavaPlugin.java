@@ -90,7 +90,8 @@ public final class JavaPlugin implements EcosystemPlugin {
     public boolean supports(Path root) {
         try {
             // Without a Maven or Gradle build, an Ant or IDE project is given one when it is migrated.
-            return !buildFiles(root).isEmpty() || io.renova.java.build.LegacyLayout.read(root).isPresent();
+            return !buildFiles(root).isEmpty() || io.renova.java.build.LegacyLayout.read(root).isPresent()
+                    || !io.renova.java.build.LegacyLayout.modules(root).isEmpty();
         } catch (IOException | java.io.UncheckedIOException e) {
             return false;
         }
@@ -104,13 +105,20 @@ public final class JavaPlugin implements EcosystemPlugin {
         Set<String> javaVersions = new TreeSet<>();
         List<Path> buildFiles = buildFiles(base);
         if (buildFiles.isEmpty()) {
-            legacyModule(base).ifPresent(module -> {
-                modules.add(module);
-                buildTools.add(module.fact("buildTool").toString());
-                if (module.fact("javaVersion") != null) {
-                    javaVersions.add(module.fact("javaVersion").toString());
-                }
-            });
+            // One Ant or IDE project, or a build of several, each in a folder with its own build.xml.
+            List<String> dirs = new ArrayList<>(io.renova.java.build.LegacyLayout.modules(base));
+            if (dirs.isEmpty()) {
+                dirs.add(".");
+            }
+            for (String dir : dirs) {
+                legacyModule(base, dir).ifPresent(module -> {
+                    modules.add(module);
+                    buildTools.add(module.fact("buildTool").toString());
+                    if (module.fact("javaVersion") != null) {
+                        javaVersions.add(module.fact("javaVersion").toString());
+                    }
+                });
+            }
         }
         for (Path buildFile : buildFiles) {
             Path dir = buildFile.getParent();
@@ -161,10 +169,12 @@ public final class JavaPlugin implements EcosystemPlugin {
     }
 
     /**
-     * An Ant or IDE project as one module. Its libraries are the jars it carries; those that name their own
+     * An Ant or IDE project as one module, in the folder {@code dir} of the project. Its libraries are the jars it carries; those that name their own
      * coordinates are listed as dependencies, so rules about libraries apply before a build file exists.
      */
-    private static Optional<Module> legacyModule(Path base) throws IOException {
+    private static Optional<Module> legacyModule(Path root, String dir) throws IOException {
+        Path base = root.resolve(dir).normalize();
+        String prefix = dir.equals(".") ? "" : dir + "/";
         Optional<io.renova.java.build.LegacyLayout> found = io.renova.java.build.LegacyLayout.read(base);
         if (found.isEmpty()) {
             return Optional.empty();
@@ -183,7 +193,7 @@ public final class JavaPlugin implements EcosystemPlugin {
         if (layout.webApplication() && Files.isRegularFile(base.resolve(layout.webRoot()).resolve("WEB-INF/web.xml"))) {
             facts.put("servletSpec", "unknown");
         }
-        return Optional.of(new Module(layout.name(), ".", layout.ant() ? "build.xml" : layout.sources().getFirst(), facts));
+        return Optional.of(new Module(layout.name(), dir, prefix + (layout.ant() ? "build.xml" : layout.sources().getFirst()), facts));
     }
 
     @Override
@@ -338,10 +348,11 @@ public final class JavaPlugin implements EcosystemPlugin {
                 }
                 javaEe |= pom.packaging().equals("war") && !boot;
             }
-            Optional<Module> legacy = buildFiles(root).isEmpty() ? legacyModule(root) : Optional.empty();
-            if (legacy.isPresent()) {
-                javaEe |= "war".equals(legacy.get().fact("packaging"));
-                struts |= legacy.get().fact("dependencies").toString().contains("org.apache.struts:struts2");
+            if (buildFiles(root).isEmpty()) {
+                for (Module legacy : model(root).modules()) {
+                    javaEe |= "war".equals(legacy.fact("packaging"));
+                    struts |= String.valueOf(legacy.fact("dependencies")).contains("org.apache.struts:struts2");
+                }
             }
             // Java EE APIs can come from a parent or the server without being declared here: look at the code too.
             javaEe = javaEe || (!boot && importsJavaEe(root));
