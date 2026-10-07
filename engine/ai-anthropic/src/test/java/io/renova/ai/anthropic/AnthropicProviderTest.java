@@ -98,7 +98,7 @@ class AnthropicProviderTest {
         assertThat(body.path("stream").asBoolean()).isTrue();
         assertThat(body.path("output_config").path("effort").asText()).isEqualTo("medium");
         assertThat(body.path("output_config").path("format").path("schema").path("required"))
-                .extracting(JsonNode::asText).containsExactly("rationale", "edits");
+                .extracting(JsonNode::asText).containsExactly("rationale", "edits", "deletes");
         assertThat(body.has("thinking")).as("adaptive thinking is the model default").isFalse();
         assertThat(body.has("fallbacks")).as("no fallbacks through a custom base URL").isFalse();
         String userText = body.path("messages").get(0).path("content").asText();

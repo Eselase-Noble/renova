@@ -332,6 +332,18 @@ public final class AiFixer implements Fixer {
                 tally.writtenThisRound.add(path);
             }
         }
+        // Only a whole-layer request may remove files, and only ones it was given to change.
+        for (String path : proposal.deletes()) {
+            Path target = root.resolve(path).normalize();
+            if (request.creatable().isEmpty() || !editable.contains(path) || !target.startsWith(root)
+                    || context.plugin().isTestFile(path)) {
+                tally.log.add(label + ": rejected removal of " + path + " (not offered as removable)");
+            } else if (Files.deleteIfExists(target)) {
+                written.add(path + " (removed)");
+                tally.filesChanged.add(path);
+                tally.writtenThisRound.add(path);
+            }
+        }
         if (written.isEmpty()) {
             tally.requestsUnchanged++;
             tally.log.add(label + ": unchanged");

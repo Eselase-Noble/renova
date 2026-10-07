@@ -59,9 +59,10 @@ class AiFixerTest {
         final Function<FixRequest, Map<String, String>> script;
         ScriptedAi(Function<FixRequest, Map<String, String>> script) { this.script = script; }
         public String name() { return "scripted"; }
+        List<String> deletes = List.of();
         public Proposal propose(FixRequest request) {
             requests.add(request);
-            return Proposal.changed(script.apply(request), "scripted", 100, 10);
+            return Proposal.changed(script.apply(request), "scripted", 100, 10).withDeletes(deletes);
         }
     }
 
@@ -250,12 +251,13 @@ class AiFixerTest {
                 "src/A.java", "controller A\n", "pages/a.page", "new tags\n",
                 "src/Config.java", "wiring\n",          // allowed: matches params.create
                 "notes/README.txt", "not asked for\n")); // not offered and not creatable
+        ai.deletes = List.of("variant.txt", "secret.txt"); // one given to change with the layer, one never offered
         MigrationContext ctx = context(tmp, ai);
         Path root = ctx.workspace().root();
         Files.createDirectories(root.resolve("pages"));
         Files.writeString(root.resolve("pages/a.page"), "old tags\n");
         io.renova.core.playbook.FixSpec fix = new io.renova.core.playbook.FixSpec("ai", null, "replace the framework", null, null, null,
-                false, Map.of("together", true, "with", List.of("pages/*.page"), "create", List.of("src/*.java")));
+                false, Map.of("together", true, "with", List.of("pages/*.page", "variant.txt"), "create", List.of("src/*.java")));
         io.renova.core.playbook.Rule rule = new io.renova.core.playbook.Rule("old-framework", "Old framework",
                 io.renova.core.model.Category.API, io.renova.core.model.Severity.BLOCKER, Map.of("type", "fileExists"), fix, null, null);
         io.renova.core.engine.PlanStep step = new io.renova.core.engine.PlanStep(1, rule, 2, List.of("src/A.java", "src/B.java"), List.of());
@@ -267,7 +269,10 @@ class AiFixerTest {
                 org.assertj.core.groups.Tuple.tuple("src/A.java", RequestFile.Role.TARGET),
                 org.assertj.core.groups.Tuple.tuple("src/B.java", RequestFile.Role.TARGET),
                 org.assertj.core.groups.Tuple.tuple("build.txt", RequestFile.Role.RELATED),
-                org.assertj.core.groups.Tuple.tuple("pages/a.page", RequestFile.Role.RELATED));
+                org.assertj.core.groups.Tuple.tuple("pages/a.page", RequestFile.Role.RELATED),
+                org.assertj.core.groups.Tuple.tuple("variant.txt", RequestFile.Role.RELATED));
+        assertThat(root.resolve("variant.txt")).doesNotExist();
+        assertThat(root.resolve("secret.txt")).exists();
         assertThat(ai.requests.getFirst().creatable()).containsExactly("src/*.java");
         assertThat(Files.readString(root.resolve("src/A.java"))).isEqualTo("controller A\n");
         assertThat(Files.readString(root.resolve("pages/a.page"))).isEqualTo("new tags\n");
