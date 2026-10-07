@@ -421,8 +421,13 @@ the solution's tests check the result ([one run](docs/verified-migrations.md#wit
 
 Found and planned, not changed: Web Forms and WCF services hosted in IIS are left for a person with the
 mapping written out; BinaryFormatter and JavaScriptSerializer go to AI (not yet run); WCF hosting, Remoting,
-`Thread.Abort` and code-page encodings are listed for a person. Windows Forms and WPF projects are converted,
-and that has not been built here (it needs Windows).
+`Thread.Abort` and code-page encodings are listed for a person.
+
+**Windows Forms and WPF** projects (C# and Visual Basic, including Visual Basic's application framework)
+become `net10.0-windows` projects, and the tests that refer to them follow. They compile on any system with
+Microsoft's Windows targeting pack, which Renova turns on by itself; their tests and the applications run on
+Windows only, and the report says so when a migration is verified elsewhere. What still has to be shown on a
+Windows machine, and how, is in [docs/windows-test-plan.md](docs/windows-test-plan.md).
 
 ## Extending Renova
 

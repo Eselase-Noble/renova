@@ -79,7 +79,14 @@ before its maintainers moved it to the SDK style; `benchmark/fetch-public.sh` fe
 used `[ExpectedException]`, which Renova rewrote as `Assert.Throws`. The other three projects are synthetic
 and small. The .NET Framework originals could not be built on this machine (their format needs Visual Studio's
 MSBuild on Windows), so what is shown is that the migrated projects build and their tests pass, not that the
-originals did. Not run: Windows Forms and WPF, Entity Framework 6, multi-targeted libraries, Web Forms.
+originals did. Not run: Entity Framework 6, multi-targeted libraries, Web Forms.
+
+**Compiled, not yet run.** Three Windows desktop applications (`benchmark/dotnet-windows.yaml`) migrate to
+`net10.0-windows` and compile on Linux with the Windows targeting pack, 12 of 12 checks: Desk (C# Windows
+Forms, .NET Framework 4.7.2), Notes (C# WPF, 4.8) and Till (Visual Basic Windows Forms with the application
+framework, 4.8). Their tests and the applications themselves have not been run: that, the original .NET
+Framework builds, and the MVC application beside its original under IIS Express are the subject of
+[windows-test-plan.md](windows-test-plan.md).
 
 ## With AI
 
