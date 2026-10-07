@@ -74,6 +74,11 @@ Run on 7 October 2026 with the .NET SDK 10.0.401 on Linux, no AI:
 | Orders (same) | .NET Core 3.1 | .NET 8 | Pass (4 tests) | 2/2 |
 | Stateless (public, Apache-2.0: a portable class library, three console examples, tests on NUnit 2.4 kept as a file) | .NET Framework 4.0 / PCL profile 136, as of February 2016 | .NET 10, NUnit 3.14 | Pass (73 tests) | 6/6 |
 
+**Side by side.** With `--verify-behaviour`, the Orders API on .NET Core 3.1 and its migration on .NET 10 were
+published and started in Microsoft's runtime images and sent nine requests (the routes found in the
+controllers, and a scenario that places an order, reads it back, filters, and sends an invalid and an unknown
+one): all nine answers were the same.
+
 Stateless is the state-machine library at github.com/dotnet-state-machine/stateless, taken at a commit from
 before its maintainers moved it to the SDK style; `benchmark/fetch-public.sh` fetches it. Five of its tests
 used `[ExpectedException]`, which Renova rewrote as `Assert.Throws`. The other three projects are synthetic

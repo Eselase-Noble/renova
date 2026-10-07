@@ -168,6 +168,11 @@ public final class DotnetPlugin implements EcosystemPlugin {
         return Optional.of(new DotnetVerifier());
     }
 
+    @Override
+    public Optional<io.renova.core.behaviour.BehaviourRunner> behaviourRunner() {
+        return Optional.of(new io.renova.dotnet.behaviour.DotnetBehaviourRunner());
+    }
+
     /** A source file's related file is its project file: a missing package is fixed there, not in the code. */
     @Override
     public List<RelatedFile> relatedFiles(ProjectModel model, String file) {

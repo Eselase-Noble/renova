@@ -199,7 +199,9 @@ accept:
   - 'GET /items/: status 200 became 404'
 ```
 
-For PHP it runs the application on PHP's own web server in the official PHP image, the original on the PHP
+For .NET it publishes an ASP.NET Core application before and after and runs each in Microsoft's runtime image
+for its own target framework (classic ASP.NET needs IIS and is compared on Windows instead). For PHP it runs the
+application on PHP's own web server in the official PHP image, the original on the PHP
 it was written for and the migrated one on the target's; a Laravel application gets an SQLite database of its
 own from its migrations. For Java it needs Maven projects with one application: a Spring Boot application, started with
 `java -jar` (the original on the Java release it was written for, the migrated one on the target's), or a WAR
@@ -528,8 +530,8 @@ source migrates without one. See [docs/licensing.md](docs/licensing.md).
 6. **.NET:** .NET Framework, .NET Core and older .NET → .NET 10 or 8 is in for C# and Visual Basic class
    libraries, console applications, test projects and ASP.NET Core applications, with NUnit 2 → 3 and, with
    AI, ASP.NET MVC 5 and Web API 2 → ASP.NET Core. Next: a larger real MVC application, Entity Framework 6 →
-   EF Core, Windows Forms and WPF verified on Windows, behavioural verification for ASP.NET Core (the original
-   needs IIS on Windows), Web Forms.
+   EF Core, Windows Forms and WPF verified on Windows, Web Forms. Behavioural verification runs ASP.NET Core
+   applications; classic ASP.NET originals need IIS on Windows.
 7. **PHP:** a chosen PHP version (8.3, 8.4, 8.5), Laravel version (11, 12, 13) and Symfony version (6.4, 7.4)
    are in, with sites without Composer, a PHPUnit add-on and behavioural verification. Next: an option to
    change only what the target requires, a real Laravel or Symfony application with a database and security

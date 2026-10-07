@@ -65,6 +65,7 @@ was checked and what was not, is in [verified-migrations.md](verified-migrations
 | FastRoute 1.3 (public PHP library, written for PHP 5.4), → PHP 8.4 | Installs, 204 tests pass, no AI |
 | Laravel 8 and Laravel 10 applications → Laravel 13 on PHP 8.4 | 7 tests pass each, no AI; Laravel 8 beside 13: same answers to 8 of 9 requests, the ninth being the page that prints the version |
 | A Laravel 7 application (closure factories, PHP 7.4) → Laravel 13 on PHP 8.4 | 6 tests pass, no AI; same answers as the original to 9 of 9 requests |
+| An ASP.NET Core 3.1 API → .NET 10 | 4 tests pass, no AI; same answers as the original to 9 of 9 requests |
 | 21 Java, 5 .NET and 13 PHP paths in the benchmark suites | All pass without AI |
 
 ## What it does not do yet

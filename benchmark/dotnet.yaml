@@ -6,9 +6,11 @@
 id: dotnet-targets
 appsDir: ../../renova-test-apps
 
+# behaviour: an ASP.NET Core application is also run side by side with its original in Docker; class libraries
+# are reported as skipped.
 configurations:
   - id: deterministic
-    behaviour: false
+    behaviour: true
 
 apps:
   # C#, the format before the SDK: packages.config, an embedded resource, a file left on disk that was never
