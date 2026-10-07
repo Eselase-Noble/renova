@@ -211,6 +211,8 @@ export interface AuthState {
   organisations: Membership[];
   /** One person on their own machine: no sign-in and no members. */
   localMode?: boolean;
+  /** The identity provider people can sign in through; with `only`, passwords are switched off. */
+  sso?: { name: string; url: string; only: boolean } | null;
 }
 
 export interface Member {

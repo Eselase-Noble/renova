@@ -64,6 +64,34 @@ A released build assesses projects freely and asks for a licence before it migra
 [licensing.md](licensing.md). A build from source (a `-SNAPSHOT` version, including an installer made by hand
 with `desktop/package.sh`) does not ask.
 
+## Single sign-on for the web console
+
+The server edition signs people in with a password, or through your identity provider over OpenID Connect
+(Microsoft Entra ID, Okta, Google Workspace, Keycloak, anything that speaks it). SAML is not supported.
+
+1. Set Renova up as usual: the first account and organisation are made with a password. That account stays
+   the way in if the provider is ever unreachable.
+2. Register Renova with the provider as a web application with the redirect address
+   `<public address of the console>/api/auth/sso/callback/sso`, and let it release the `email` claim.
+3. Give the API these settings (in `application.properties`, or as environment variables such as
+   `RENOVA_SSO_CLIENT_ID`):
+
+   | Setting | What it is |
+   |---|---|
+   | `renova.public-url` | The address people open the console at, for example `https://renova.example.com` |
+   | `renova.sso.issuer` | The provider's issuer address; the rest is discovered from it the first time someone signs in |
+   | `renova.sso.client-id`, `renova.sso.client-secret` | What the provider gave the registration |
+   | `renova.sso.name` | The name on the button: "Sign in with …" |
+   | `renova.sso.allowed-domains` | Email domains whose people get in without an invitation; they join the first organisation |
+   | `renova.sso.role` | The role those people get: `viewer`, `member` (the default) or `admin` |
+   | `renova.sso.only` | `true` refuses passwords, so everyone signs in through the provider |
+
+The provider says who someone is; Renova decides whether they get in. Someone signs in if they have an
+account, if an invitation is waiting for their email address (it is used up, with the role it gave), or if
+their address is in an allowed domain. Anyone else the provider knows is sent back to the sign-in page and no
+account is made. Roles are managed in Renova and are not read from the provider's groups. Sign-ins through
+the provider are in the audit log. Local mode has no sign-in at all, so none of this applies to it.
+
 ## Building the same things by hand
 
 ```sh

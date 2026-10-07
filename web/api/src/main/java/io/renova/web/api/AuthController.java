@@ -40,9 +40,11 @@ public class AuthController {
     private final SecurityContextRepository contexts;
     private final AuditLog audit;
     private final LocalMode local;
+    private final io.renova.web.account.Sso sso;
 
     public AuthController(AccountService accounts, AccountStore store, Access access, DataStore data,
-                          SecurityContextRepository contexts, AuditLog audit, LocalMode local) {
+                          SecurityContextRepository contexts, AuditLog audit, LocalMode local, io.renova.web.account.Sso sso) {
+        this.sso = sso;
         this.audit = audit;
         this.local = local;
         this.accounts = accounts;
@@ -59,9 +61,10 @@ public class AuthController {
      * What the console needs to decide which page to show.
      *
      * @param localMode one person on their own machine: no sign-in, no members
+     * @param sso       the identity provider people can sign in through; null when none is configured
      */
     public record State(boolean setupRequired, User.View user, Membership organisation, List<Membership> organisations,
-                        boolean localMode) {
+                        boolean localMode, io.renova.web.account.Sso.View sso) {
     }
 
     public record Setup(String organisation, String name, String email, String password) {
@@ -85,13 +88,13 @@ public class AuthController {
     @GetMapping("/state")
     public State state(HttpServletRequest request) {
         if (access.user().isEmpty()) {
-            return new State(accounts.setupRequired(), null, null, List.of(), false);
+            return new State(accounts.setupRequired(), null, null, List.of(), false, sso.view());
         }
         Access.Caller caller = access.caller(request);
         List<Membership> mine = store.organisationsOf(caller.user().id()).stream()
                 .map(o -> new Membership(o.id(), o.name(), o.roleOf(caller.user().id()).orElseThrow())).toList();
         return new State(false, caller.user().view(),
-                new Membership(caller.organisationId(), caller.organisation().name(), caller.role()), mine, local.enabled());
+                new Membership(caller.organisationId(), caller.organisation().name(), caller.role()), mine, local.enabled(), local.enabled() ? null : sso.view());
     }
 
     @PostMapping("/setup")
@@ -109,6 +112,9 @@ public class AuthController {
     @PostMapping("/login")
     public State login(@RequestBody Login body, HttpServletRequest request, HttpServletResponse response) {
         noAccountsInLocalMode();
+        if (sso.only()) {
+            throw new IllegalStateException("Passwords are switched off here: sign in with " + sso.view().name());
+        }
         User user = accounts.authenticate(body.email(), body.password())
                 .orElseThrow(() -> new IllegalArgumentException("Wrong email or password"));
         signIn(user, request, response);

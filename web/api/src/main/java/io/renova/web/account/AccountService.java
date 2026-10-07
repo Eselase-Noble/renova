@@ -20,7 +20,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Accounts and organisations: first-run setup, sign-in, invitations and membership rules. New accounts are
- * created only by setup (the very first) or by accepting an invitation.
+ * created only by setup (the very first), by accepting an invitation, or by single sign-on for an invited
+ * address or an allowed domain.
  */
 @Service
 public class AccountService {
@@ -134,6 +135,50 @@ public class AccountService {
         String userId = user.id();
         store.updateOrganisation(invitation.organisationId(), o -> o.withMember(userId, invitation.role(), Instant.now().toString()));
         store.deleteInvitation(invitation.id());
+        return user;
+    }
+
+    /**
+     * Signs in someone the organisation's identity provider vouched for. They get in with an account, with an
+     * invitation waiting for their address (which is then used up, with the role it gave), or with an address in
+     * one of the allowed domains: then they join the first organisation with the given role. An account made
+     * this way has no password anyone knows.
+     */
+    public synchronized User signInWithSso(String email, String name, java.util.Collection<String> allowedDomains, Role role) {
+        String normalised = AccountStore.normaliseEmail(email == null ? "" : email);
+        if (!normalised.matches("[^@\\s]+@[^@\\s]+")) {
+            throw new SecurityException("The identity provider gave no email address; it must release the email claim to Renova");
+        }
+        if (store.users().isEmpty()) {
+            throw new SecurityException("Renova is not set up yet: create the first account and organisation with a password, "
+                    + "then members sign in through the identity provider");
+        }
+        String domain = normalised.substring(normalised.indexOf('@') + 1);
+        boolean allowed = allowedDomains.stream().anyMatch(d -> d.equalsIgnoreCase(domain));
+        List<Invitation> invited = store.invitations().stream()
+                .filter(i -> i.email().equals(normalised) && Instant.now().isBefore(Instant.parse(i.expiresAt()))).toList();
+        User found = store.userByEmail(normalised).orElse(null);
+        if (found == null) {
+            if (invited.isEmpty() && !allowed) {
+                throw new SecurityException("There is no Renova account for " + normalised + "; ask an admin of your organisation for an invitation");
+            }
+            byte[] unusable = new byte[32];
+            random.nextBytes(unusable);
+            found = new User(shortId(), normalised, name == null || name.isBlank() ? normalised.substring(0, normalised.indexOf('@')) : name.strip(),
+                    passwords.encode(Base64.getEncoder().encodeToString(unusable)), Instant.now().toString());
+            store.saveUser(found);
+        }
+        User user = found;
+        for (Invitation invitation : invited) {
+            store.updateOrganisation(invitation.organisationId(), o -> o.withMember(user.id(), invitation.role(), Instant.now().toString()));
+            store.deleteInvitation(invitation.id());
+        }
+        if (store.organisationsOf(user.id()).isEmpty()) {
+            if (!allowed) {
+                throw new SecurityException(normalised + " is not a member of any organisation; ask an admin for an invitation");
+            }
+            store.updateOrganisation(store.organisations().getFirst().id(), o -> o.withMember(user.id(), role, Instant.now().toString()));
+        }
         return user;
     }
 

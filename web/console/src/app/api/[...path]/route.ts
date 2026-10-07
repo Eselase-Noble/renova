@@ -5,7 +5,8 @@
 export const dynamic = "force-dynamic";
 
 const FORWARDED_REQUEST_HEADERS = ["accept", "content-type", "cookie", "x-xsrf-token"];
-const FORWARDED_RESPONSE_HEADERS = ["content-type", "content-disposition", "cache-control"];
+// location: single sign-on answers with redirects to the identity provider and back to the console.
+const FORWARDED_RESPONSE_HEADERS = ["content-type", "content-disposition", "cache-control", "location"];
 
 function apiUrl() {
   return (process.env.RENOVA_API_URL ?? "http://127.0.0.1:8787").replace(/\/+$/, "");
