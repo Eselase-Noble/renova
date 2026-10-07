@@ -29,7 +29,7 @@ public final class ScanContext {
 
     /** Directories that hold build output, tooling state or vendored packages, never source. */
     public static final Set<String> IGNORED_DIRS = Set.of(".git", ".svn", ".hg", "target", "build", "out",
-            "node_modules", ".idea", ".gradle", ".mvn", ".renova");
+            "node_modules", "vendor", ".idea", ".gradle", ".mvn", ".renova");
 
     private final ProjectModel model;
     private final List<Path> files;

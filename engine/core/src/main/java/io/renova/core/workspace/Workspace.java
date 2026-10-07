@@ -22,7 +22,7 @@ import java.util.stream.Stream;
  */
 public final class Workspace {
 
-    private static final Set<String> NOT_COPIED = Set.of(".git", ".svn", ".hg", "target", "node_modules",
+    private static final Set<String> NOT_COPIED = Set.of(".git", ".svn", ".hg", "target", "node_modules", "vendor",
             ".idea", ".gradle", ".renova");
     private static final Duration GIT_TIMEOUT = Duration.ofMinutes(5);
 
@@ -58,7 +58,7 @@ public final class Workspace {
             ws.git("config", "user.email", "renova@localhost");
             // Build output is never part of a stage: Maven's target, Gradle's .gradle and build (but a source
             // package that happens to be called build is kept).
-            Files.writeString(dst.resolve(".git/info/exclude"), ".renova/\ntarget/\n.gradle/\nbuild/\n!**/src/**/build/\n");
+            Files.writeString(dst.resolve(".git/info/exclude"), ".renova/\ntarget/\n.gradle/\nbuild/\n!**/src/**/build/\nvendor/\n");
             ws.commitAll("renova: baseline (unmodified copy of " + src.getFileName() + ")");
         }
         return ws;
