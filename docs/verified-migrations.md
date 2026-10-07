@@ -72,11 +72,14 @@ Run on 7 October 2026 with the .NET SDK 10.0.401 on Linux, no AI:
 | Ledger (Visual Basic library and tests on the MSTest that came with Visual Studio; no solution file) | .NET Framework 4.7.2 | .NET 10 | Pass (4 tests) | 5/5 |
 | Orders (ASP.NET Core web API, Entity Framework Core, xUnit tests that start the application in memory) | .NET Core 3.1 | .NET 10 | Pass (4 tests) | 3/3 |
 | Orders (same) | .NET Core 3.1 | .NET 8 | Pass (4 tests) | 2/2 |
+| Stateless (public, Apache-2.0: a portable class library, three console examples, tests on NUnit 2.4 kept as a file) | .NET Framework 4.0 / PCL profile 136, as of February 2016 | .NET 10, NUnit 3.14 | Pass (73 tests) | 6/6 |
 
-All three are synthetic and small. The two .NET Framework originals could not be built on this machine (their
-format needs Visual Studio's MSBuild on Windows), so what is shown is that the migrated projects build and their
-tests pass, not that the originals did. Not run: classic ASP.NET, Windows Forms and WPF, NUnit 2, Entity
-Framework 6, multi-targeted libraries, a project anyone else wrote, and any .NET path with AI.
+Stateless is the state-machine library at github.com/dotnet-state-machine/stateless, taken at a commit from
+before its maintainers moved it to the SDK style; `benchmark/fetch-public.sh` fetches it. Five of its tests
+used `[ExpectedException]`, which Renova rewrote as `Assert.Throws`. The other three projects are synthetic
+and small. The .NET Framework originals could not be built on this machine (their format needs Visual Studio's
+MSBuild on Windows), so what is shown is that the migrated projects build and their tests pass, not that the
+originals did. Not run: Windows Forms and WPF, Entity Framework 6, multi-targeted libraries, Web Forms.
 
 ## With AI
 
@@ -89,6 +92,7 @@ varies between runs; these are single runs, not averages. Repeat them with
 | Couriers (Jersey 1 resource and client, Commons HttpClient 3 client, 9 tests, two of the classes tested against a local HTTP server) | Jersey 1.19, HttpClient 3.1, Java 8 | Jersey 3.1, the JAX-RS client API, HttpClient 5, Jakarta EE 10, Java 21 | Pass | Same: 6 of 6 requests (Tomcat 9 beside Tomcat 10.1) | 18,536 / 10,551 |
 | Tickets (Struts 1 actions, form bean with validation, `struts-config.xml`, three pages with Struts tags) | Struts 1.3, Java 8 | Spring MVC 6.2 controllers on the same `*.do` addresses, Jakarta EE 10, Java 21 | Pass | 6 of 9 requests the same; 3 differ in the form's markup only (`name=` became `id=`, error text inside a `<span>`), with the same statuses and messages | 6,885 / 11,221 |
 | Spring PetClinic Microservices (seven modules, see below) | Spring Boot 2.6, Spring Cloud 2021 | Spring Boot 3.5, Spring Cloud 2025, Java 21 | Pass, in four repair rounds | Not run: several applications | 29,714 / 22,184 |
+| Shop (.NET: ASP.NET MVC 5 with a Web API 2 controller, three Razor views and a layout, a style bundle, `Global.asax`, `Web.config`; beside a class library with NUnit tests) | ASP.NET MVC 5.2 on .NET Framework 4.8 | ASP.NET Core on .NET 10 | Pass, in one repair round (3 tests, of the library) | Not compared: the original needs IIS on Windows. The migrated application was started and called: 11 addresses answer as the code says (pages, the `category/{category}` route, 404 and 400, JSON from the API, the stylesheet), the form saves, rejects invalid input with the same messages, and refuses a post without its anti-forgery token | 13,656 / 11,764 |
 
 What these runs changed in Renova:
 
@@ -103,6 +107,9 @@ What these runs changed in Renova:
 - **A failed test reports its last cause.** "Failed to load ApplicationContext", cut at 400 characters, sent
   repairs guessing; the report now carries the end of the chain ("No qualifying bean of type BulkheadRegistry").
   A build error without words is no longer passed on empty.
+- **A whole-layer request can remove files.** ASP.NET Core has no `Global.asax`, `Web.config` or `App_Start`;
+  left in place they stop the build. A request that replaces a layer may now list the files it was given that
+  the result no longer has. Nothing else can be removed, and never a test.
 - **`web.xml` follows Jersey.** A text rule renames the Jersey 1 servlet there; the build passed without it and
   the application would not have deployed.
 - **Struts 1 projects are no longer offered the Struts 2 → 7 add-on.**

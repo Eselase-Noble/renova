@@ -7,8 +7,9 @@ of the project. Deterministic rewrites handle the mechanical bulk. Context-depen
 AI model or a person, and the real build checks every change.
 
 > **Status:** early development (`0.1.0-SNAPSHOT`). The engine, command-line interface, web console and desktop
-> app, IntelliJ plugin and VS Code extension work for Java projects; .NET (C# and Visual Basic) has its first
-> targets. See the [roadmap](#roadmap).
+> app, IntelliJ plugin and VS Code extension work for Java and for .NET (C# and Visual Basic) projects. What
+> has been shown to work, and what has not, is in [docs/verified-migrations.md](docs/verified-migrations.md);
+> a one-page summary is in [docs/product-brief.md](docs/product-brief.md). See the [roadmap](#roadmap).
 
 ---
 
@@ -284,7 +285,8 @@ rules:
 | `gradle` | Edits to Gradle build files in the file's own style: `addDependency`, `removeDependency`, `setPluginVersion`, `setWrapperVersion` |
 | `maven` | Format-preserving pom.xml edits: `setScope`, `setPluginVersion`, `setProperty`, `changeProperty`, `setParentVersion`, `addDependency`, `addAnnotationProcessor`, `setVersion`, `removeDuplicates` |
 | `dotnet` | Edits to .NET project files: `convertToSdkStyle`, `setTargetFramework`, `setPackageVersion`, `addPackage`, `replacePackage`, `removePackage`, `setProperty` |
-| `ai` | The configured AI provider. The build verifies the result. One request per file; with `params.together`, one request for everything a rule found plus the files named in `params.with`, and new files where `params.create` allows: for a change no single file holds, such as replacing a web framework |
+| `dotnet-source` | Rewrites of C# that follow from the text alone: `nunit3` (NUnit 2 tests to NUnit 3) |
+| `ai` | The configured AI provider. The build verifies the result. One request per file; with `params.together`, one request for everything a rule found plus the files named in `params.with`, new files where `params.create` allows, and removal of files the result no longer has: for a change no single file holds, such as replacing a web framework |
 | `manual` | A person, guided by the rule's `hint` in the report |
 
 ### Targets
@@ -406,14 +408,21 @@ What these do today, with no AI, verified with `dotnet build` and `dotnet test`
 - **What .NET Framework had built in.** Where the code uses `System.Configuration`, `System.Data.SqlClient`,
   `System.Drawing`, WCF clients and others, a guard adds the NuGet package that now supplies it; the code is
   not touched.
-- **Tests.** NUnit, xUnit and MSTest (including the MSTest that came with Visual Studio) get the packages
-  `dotnet test` needs. A build that passes without running the project's tests is reported as failed.
+- **Tests.** NUnit, xUnit and MSTest (including the MSTest that came with Visual Studio, and NUnit kept as a
+  file beside the code) get the packages `dotnet test` needs. Tests written for NUnit 2 are rewritten for
+  NUnit 3: `[ExpectedException(typeof(X))]` becomes `Assert.Throws<X>` around the test's body. A build that
+  passes without running the project's tests is reported as failed.
 - **ASP.NET Core and Entity Framework Core** packages follow the target (`10.0.*`).
 
-Found and planned, not yet changed: classic ASP.NET (Web Forms, MVC 5, Web API 2, WCF hosted in IIS) is left
-for a person with the mapping written out; BinaryFormatter and JavaScriptSerializer go to AI; WCF hosting,
-Remoting, `Thread.Abort` and code-page encodings are listed for a person. Windows Forms and WPF projects are
-converted, and that has not been built here (it needs Windows).
+**ASP.NET MVC 5 and Web API 2 to ASP.NET Core, with AI.** A project on System.Web is moved as one change:
+controllers, Razor views, routes, `Global.asax`, `App_Start` and `Web.config` together, with `Program.cs`,
+`appsettings.json` and `_ViewImports.cshtml` added and the files only System.Web read removed. The build and
+the solution's tests check the result ([one run](docs/verified-migrations.md#with-ai)).
+
+Found and planned, not changed: Web Forms and WCF services hosted in IIS are left for a person with the
+mapping written out; BinaryFormatter and JavaScriptSerializer go to AI (not yet run); WCF hosting, Remoting,
+`Thread.Abort` and code-page encodings are listed for a person. Windows Forms and WPF projects are converted,
+and that has not been built here (it needs Windows).
 
 ## Extending Renova
 
@@ -453,9 +462,10 @@ Linux, Windows and macOS, the web bundle, the CLI and both IDE plugins. See [doc
    re-platforming a Gradle build, multi-module Ant builds, AI runs of the remaining legacy frameworks (EJB 2,
    JAX-RPC, Faces managed beans, iBATIS).
 6. **.NET:** .NET Framework, .NET Core and older .NET → .NET 10 or 8 is in for C# and Visual Basic class
-   libraries, console applications, test projects and ASP.NET Core applications. Next: classic ASP.NET
-   (MVC 5, Web API 2) to ASP.NET Core with AI, NUnit 2 → 3, Entity Framework 6 → EF Core, Windows Forms and
-   WPF verified on Windows, a public open-source project, behavioural verification for ASP.NET Core.
+   libraries, console applications, test projects and ASP.NET Core applications, with NUnit 2 → 3 and, with
+   AI, ASP.NET MVC 5 and Web API 2 → ASP.NET Core. Next: a larger real MVC application, Entity Framework 6 →
+   EF Core, Windows Forms and WPF verified on Windows, behavioural verification for ASP.NET Core (the original
+   needs IIS on Windows), Web Forms.
 7. **PHP:** a chosen PHP version, a chosen Laravel version.
 
 ## Contributing
