@@ -331,7 +331,7 @@ public final class JavaPlugin implements EcosystemPlugin {
                 }
                 for (PomReader.Dependency d : pom.dependencies()) {
                     boot |= d.groupId().equals("org.springframework.boot");
-                    struts |= d.groupId().equals("org.apache.struts");
+                    struts |= d.groupId().equals("org.apache.struts") && d.artifactId().startsWith("struts2");
                     javaEe |= d.groupId().startsWith("javax") || d.groupId().equals("jstl")
                             || (d.groupId().equals("org.springframework") && d.version() != null && !d.version().contains("${")
                             && io.renova.core.util.Versions.isBelow(d.version(), "6"));

@@ -53,6 +53,14 @@ class JavaTargetsTest {
                 + "<version>2.16.12.Final</version></plugin></plugins></build>");
         assertThat(REGISTRY.defaultPlaybook(micronaut).id()).isEqualTo("micronaut-4");
         assertThat(REGISTRY.defaultPlaybook(quarkus).id()).isEqualTo("quarkus-3");
+        // Struts 7 continues Struts 2. Struts 1 is another framework with the same groupId: no add-on for it.
+        String strutsWar = "<groupId>g</groupId><artifactId>desk</artifactId><version>1</version><packaging>war</packaging>"
+                + "<dependencies><dependency><groupId>org.apache.struts</groupId><artifactId>%s</artifactId><version>%s</version>"
+                + "</dependency></dependencies>";
+        Path struts2 = project(root.resolve("struts2"), strutsWar.formatted("struts2-core", "2.5.33"));
+        Path struts1 = project(root.resolve("struts1"), strutsWar.formatted("struts-core", "1.3.10"));
+        assertThat(REGISTRY.defaultPlaybook(struts2).id()).isEqualTo("java8-to-21-jakarta-ee10+struts7");
+        assertThat(REGISTRY.defaultPlaybook(struts1).id()).isEqualTo("java8-to-21-jakarta-ee10");
         // Every Java path stays available for whoever wants a different target.
         assertThat(REGISTRY.playbooksFor(plain)).extracting(Playbook::id)
                 .contains("java-to-17", "java-to-21", "java-to-25", "spring-boot-3", "spring-boot-4", "java8-to-21-jakarta-ee10",

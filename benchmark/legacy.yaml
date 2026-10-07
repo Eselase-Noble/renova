@@ -1,0 +1,40 @@
+# Renova legacy-frameworks suite: applications on frameworks that ended before Jakarta EE, where no recipe
+# carries the code across and the change is made by AI and checked by the build, the project's own tests and,
+# with behaviour on, by running the original beside the result.
+#
+# Run: cli/bin/renova benchmark --suite benchmark/legacy.yaml --out <empty dir> --ai anthropic
+#
+# Every run uses the AI provider on your own key: about 25,000 tokens per application with Claude Opus.
+
+id: java-legacy-frameworks
+appsDir: ../../renova-test-apps
+
+configurations:
+  - id: ai-rag
+    ai: true
+    rag: true
+    behaviour: true
+
+apps:
+  # Jersey 1 resources and client, and a Commons HttpClient 3 client whose tests call a local HTTP server.
+  - id: jersey-1-and-httpclient-3
+    path: couriers-jersey1
+    playbook: java8-to-21-jakarta-ee10
+    checks:
+      - { file: "**/*.java", absent: "com.sun.jersey", why: "Jersey 1 runs only on javax" }
+      - { file: "**/*.java", absent: "org.apache.commons.httpclient", why: "Commons HttpClient 3 ended in 2011" }
+      - { file: src/main/webapp/WEB-INF/web.xml, contains: "org.glassfish.jersey.servlet.ServletContainer",
+          why: "the build passes without it; the application would not deploy" }
+      - { file: pom.xml, absent: "<groupId>com.sun.jersey</groupId>", why: "the old artifacts are gone from the build" }
+
+  # Struts 1 actions, a form bean, struts-config.xml and pages with Struts tags: replaced as one change.
+  - id: struts-1-to-spring-mvc
+    path: tickets-struts1
+    playbook: java8-to-21-jakarta-ee10
+    checks:
+      - { file: "**/*.java", absent: "org.apache.struts", why: "Struts 1 has no Jakarta EE release" }
+      - { file: "**/*.jsp", absent: "struts.apache.org/tags", why: "the Struts tag libraries are gone with the framework" }
+      - { file: src/main/webapp/WEB-INF/web.xml, contains: "org.springframework.web.servlet.DispatcherServlet",
+          why: "something has to answer *.do" }
+      - { file: src/main/webapp/WEB-INF/web.xml, contains: "*.do", why: "old links and bookmarks keep working" }
+      - { file: pom.xml, absent: "<groupId>org.apache.struts</groupId>", why: "the old artifacts are gone from the build" }

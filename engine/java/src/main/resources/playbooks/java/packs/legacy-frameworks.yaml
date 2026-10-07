@@ -23,6 +23,18 @@ rules:
         ActionMessages/ActionErrors become BindingResult errors or model attributes; DispatchAction methods
         become one handler method per value of the dispatch parameter. Keep the JSP pages; replace the
         html:, bean: and logic: tags with Spring's form: tags and JSTL in the pages each controller renders.
+        In web.xml the ActionServlet becomes Spring's DispatcherServlet on the same url-pattern, configured by a
+        new @Configuration class (@EnableWebMvc, @ComponentScan of the controllers' package, a MessageSource
+        named messageSource over the same message properties). In the pom, replace the Struts artifacts with
+        org.springframework:spring-webmvc 6.2.x and, for the pages, jakarta.servlet.jsp.jstl:jakarta.servlet.jsp.jstl-api
+        with org.glassfish.web:jakarta.servlet.jsp.jstl 3.0.x. Leave classes that do not use Struts as they are.
+      # The framework is replaced as one change: the actions and forms with the pages they render and the
+      # descriptors that wire them, and the configuration class Spring needs in their place.
+      params:
+        together: true
+        with: ["**/WEB-INF/struts-config*.xml", "**/WEB-INF/web.xml", "**/*.jsp", "**/*.jspf",
+               "**/MessageResources*.properties", "**/ApplicationResources*.properties"]
+        create: ["**/src/main/java/**/*.java"]
 
   - id: struts-1-configuration
     title: struts-config.xml and Tiles definitions
@@ -117,6 +129,36 @@ rules:
         @Inject; multipart moves to org.glassfish.jersey.media.multipart. In the pom, replace com.sun.jersey
         artifacts with org.glassfish.jersey.containers:jersey-container-servlet, org.glassfish.jersey.inject:jersey-hk2
         and org.glassfish.jersey.media:jersey-media-json-jackson, version 3.1.x.
+
+  # web.xml is not a Java file, so the rule above never offers it: without these the build passes and the
+  # application fails to deploy, naming a servlet class that is no longer on the classpath.
+  - id: jersey-1-servlet
+    title: Jersey 1 servlet in web.xml
+    category: A
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/WEB-INF/web.xml"]
+      pattern: "com\\.sun\\.jersey\\.spi\\.container\\.servlet\\.ServletContainer"
+    fix:
+      strategy: replace
+      include: "**/WEB-INF/web.xml"
+      find: "com.sun.jersey.spi.container.servlet.ServletContainer"
+      replace: "org.glassfish.jersey.servlet.ServletContainer"
+
+  - id: jersey-1-packages-parameter
+    title: Jersey 1 package-scanning parameter in web.xml
+    category: A
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/WEB-INF/web.xml"]
+      pattern: "com\\.sun\\.jersey\\.config\\.property\\.packages"
+    fix:
+      strategy: replace
+      include: "**/WEB-INF/web.xml"
+      find: "com.sun.jersey.config.property.packages"
+      replace: "jersey.config.server.provider.packages"
 
   - id: faces-managed-beans
     title: Faces managed beans (removed in Faces 4)
