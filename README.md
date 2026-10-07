@@ -7,7 +7,8 @@ of the project. Deterministic rewrites handle the mechanical bulk. Context-depen
 AI model or a person, and the real build checks every change.
 
 > **Status:** early development (`0.1.0-SNAPSHOT`). The engine, command-line interface, web console and desktop
-> app, IntelliJ plugin and VS Code extension work for Java projects. See the [roadmap](#roadmap).
+> app, IntelliJ plugin and VS Code extension work for Java projects; .NET (C# and Visual Basic) has its first
+> targets. See the [roadmap](#roadmap).
 
 ---
 
@@ -44,7 +45,7 @@ most of the effort. Renova treats the two differently:
   Compiler, build-file and test failures become structured errors that feed an automatic repair loop. One repair can change a source file and its build file together. Tests are never changed to make them pass; the one exception is a test that a rewrite step left uncompilable, where only the compiler's errors may be repaired.
 - **Bring your own AI key.** Each user or organisation supplies its own provider credentials. Token
   usage is reported per migration.
-- **Any ecosystem.** The engine has no Java-specific code. Java is the first plugin.
+- **Any ecosystem.** The engine has no Java-specific code. Java is the first plugin, .NET the second.
 
 ## How it works
 
@@ -77,6 +78,7 @@ Every finding belongs to a change category, and plan steps run in the order A �
 |---|---|---|
 | [`engine/core`](engine) | Ecosystem-neutral engine: playbooks, plugin SPI, analysis, planning, migration, AI loop, reports | Working |
 | [`engine/java`](engine) | Java plugin: Maven/Gradle model, Java detectors, OpenRewrite fixer, Maven verifier, bundled playbooks | Working |
+| [`engine/dotnet`](engine) | .NET plugin: C# and Visual Basic project model, .NET detectors, project-file fixer, `dotnet` verifier, bundled playbooks | First targets working |
 | [`engine/ai-anthropic`](engine) | AI provider for Claude, using each user's own Anthropic API key | Working |
 | [`engine/ai-openai`](engine) | AI provider for OpenAI or any OpenAI-compatible server (Azure OpenAI, vLLM, Ollama), using the user's own key | Working |
 | [`cli`](cli) | `renova` command for terminals and CI pipelines | Working |
@@ -92,6 +94,9 @@ Every finding belongs to a change category, and plan steps run in the order A �
 - Maven 3.8 or later
 - Git, used to version migration workspaces
 - Network access to Maven Central, or a mirror configured in `settings.xml`
+- For .NET projects: the .NET SDK of the target (10 or 8) and network access to nuget.org or your own feed.
+  Renova looks for `dotnet` on the PATH, in `DOTNET_ROOT`, `~/.dotnet` and the usual install folders;
+  `RENOVA_DOTNET` names another one
 
 ### Build
 
@@ -278,6 +283,7 @@ rules:
 | `replace` | Text replacement driven by the playbook, for files without a parser |
 | `gradle` | Edits to Gradle build files in the file's own style: `addDependency`, `removeDependency`, `setPluginVersion`, `setWrapperVersion` |
 | `maven` | Format-preserving pom.xml edits: `setScope`, `setPluginVersion`, `setProperty`, `changeProperty`, `setParentVersion`, `addDependency`, `addAnnotationProcessor`, `setVersion`, `removeDuplicates` |
+| `dotnet` | Edits to .NET project files: `convertToSdkStyle`, `setTargetFramework`, `setPackageVersion`, `addPackage`, `replacePackage`, `removePackage`, `setProperty` |
 | `ai` | The configured AI provider. The build verifies the result. One request per file; with `params.together`, one request for everything a rule found plus the files named in `params.with`, and new files where `params.create` allows: for a change no single file holds, such as replacing a web framework |
 | `manual` | A person, guided by the rule's `hint` in the report |
 
@@ -381,6 +387,34 @@ rules:
     fix: { strategy: recipe, recipes: [org.openrewrite.java.migrate.UpgradeToJava21] }
 ```
 
+### .NET targets
+
+| Playbook | Takes | To | Suggested for |
+|---|---|---|---|
+| `dotnet-to-10` | C# and Visual Basic projects on .NET Framework, .NET Core, or .NET 5 to 9 | .NET 10 | Every .NET project |
+| `dotnet-to-8` | The same projects | .NET 8 | Chosen by hand |
+
+What these do today, with no AI, verified with `dotnet build` and `dotnet test`
+([results](docs/verified-migrations.md#net)):
+
+- **Project files.** A project in the format from before the .NET SDK becomes an SDK-style one that compiles
+  the same files: `packages.config` becomes package references, a source file on disk that the project never
+  compiled is kept out, linked files, embedded resources, copied content and Visual Basic's options and
+  project-wide `Imports` are carried over.
+- **Target framework.** `net48`, `netcoreapp3.1`, `net6.0` and the rest move to the target; a Windows Forms or
+  WPF project becomes `net10.0-windows`; .NET Standard libraries are left alone.
+- **What .NET Framework had built in.** Where the code uses `System.Configuration`, `System.Data.SqlClient`,
+  `System.Drawing`, WCF clients and others, a guard adds the NuGet package that now supplies it; the code is
+  not touched.
+- **Tests.** NUnit, xUnit and MSTest (including the MSTest that came with Visual Studio) get the packages
+  `dotnet test` needs. A build that passes without running the project's tests is reported as failed.
+- **ASP.NET Core and Entity Framework Core** packages follow the target (`10.0.*`).
+
+Found and planned, not yet changed: classic ASP.NET (Web Forms, MVC 5, Web API 2, WCF hosted in IIS) is left
+for a person with the mapping written out; BinaryFormatter and JavaScriptSerializer go to AI; WCF hosting,
+Remoting, `Thread.Abort` and code-page encodings are listed for a person. Windows Forms and WPF projects are
+converted, and that has not been built here (it needs Windows).
+
 ## Extending Renova
 
 All extension points are Java interfaces discovered with `ServiceLoader`. Adding a jar to the
@@ -417,8 +451,12 @@ Linux, Windows and macOS, the web bundle, the CLI and both IDE plugins. See [doc
    Micronaut 4, Quarkus 3, Hibernate 6 and 7, Struts 7, library add-ons, Gradle builds, Ant builds, Kotlin and
    Java EE → Spring Boot are in, with Gradle builds of Kotlin, Micronaut and Quarkus projects. Next for Java:
    re-platforming a Gradle build, multi-module Ant builds, AI runs of the remaining legacy frameworks (EJB 2,
-   JAX-RPC, Faces managed beans, iBATIS). Then .NET (C# and VB: .NET Framework → modern .NET), then
-   PHP (a chosen PHP version, a chosen Laravel version).
+   JAX-RPC, Faces managed beans, iBATIS).
+6. **.NET:** .NET Framework, .NET Core and older .NET → .NET 10 or 8 is in for C# and Visual Basic class
+   libraries, console applications, test projects and ASP.NET Core applications. Next: classic ASP.NET
+   (MVC 5, Web API 2) to ASP.NET Core with AI, NUnit 2 → 3, Entity Framework 6 → EF Core, Windows Forms and
+   WPF verified on Windows, a public open-source project, behavioural verification for ASP.NET Core.
+7. **PHP:** a chosen PHP version, a chosen Laravel version.
 
 ## Contributing
 

@@ -61,6 +61,23 @@ JAX-RS resource created and listed accounts at its old address, rejected a reque
 rolled back a transfer without funds; the Payroll WAR, started with `java -jar`, answered from its servlet and
 its JSP page under the context path the server used to give it.
 
+## .NET
+
+Run on 7 October 2026 with the .NET SDK 10.0.401 on Linux, no AI:
+`cli/bin/renova benchmark --suite benchmark/dotnet.yaml --out /tmp/dotnet --configs deterministic`.
+
+| Project | From | To | Build and tests | Checks |
+|---|---|---|---|---|
+| Billing (C# library and NUnit tests; project files in the format before the SDK, `packages.config`, an embedded resource, a stale source file on disk) | .NET Framework 4.8 | .NET 10 | Pass (7 tests) | 6/6 |
+| Ledger (Visual Basic library and tests on the MSTest that came with Visual Studio; no solution file) | .NET Framework 4.7.2 | .NET 10 | Pass (4 tests) | 5/5 |
+| Orders (ASP.NET Core web API, Entity Framework Core, xUnit tests that start the application in memory) | .NET Core 3.1 | .NET 10 | Pass (4 tests) | 3/3 |
+| Orders (same) | .NET Core 3.1 | .NET 8 | Pass (4 tests) | 2/2 |
+
+All three are synthetic and small. The two .NET Framework originals could not be built on this machine (their
+format needs Visual Studio's MSBuild on Windows), so what is shown is that the migrated projects build and their
+tests pass, not that the originals did. Not run: classic ASP.NET, Windows Forms and WPF, NUnit 2, Entity
+Framework 6, multi-targeted libraries, a project anyone else wrote, and any .NET path with AI.
+
 ## With AI
 
 Run on 7 October 2026 with Claude Opus (`claude-opus-5-5`), retrieval on, on the maintainer's own key. AI output

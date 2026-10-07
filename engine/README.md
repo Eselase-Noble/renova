@@ -26,7 +26,7 @@ The engine is a library. The products in this repository (`cli`, `web`, `desktop
 |---|---|---|
 | **Playbook** | YAML: target platform plus rules. New migration paths are data, not code | `java/src/main/resources/playbooks/` |
 | **Rule** | `detect` (what to find) + `fix` (who resolves it) + category A–E + severity | in a playbook |
-| **Detector** | A `detect.type`. Core: `fileExists`, `fileContains`. Java: `import`, `dependency`, `javaVersionBelow`, `mavenPluginBelow`, `pomProperty`, `importWithoutDependency` | `DetectorFactory` SPI |
+| **Detector** | A `detect.type`. Core: `fileExists`, `fileContains`. Java: `import`, `dependency`, `javaVersionBelow`, `mavenPluginBelow`, `pomProperty`, `importWithoutDependency`. .NET: `targetFrameworkBelow`, `legacyProjectFormat`, `projectKind`, `nugetPackage`, `namespace`, `namespaceWithoutPackage`, `assemblyReference` | `DetectorFactory` SPI |
 | **Fix strategy** | `recipe` (OpenRewrite), `replace` (text, for JSP/TLD/config), `maven` (pom.xml edits), `gradle` (build.gradle and wrapper edits), `ai`, `manual` | `Fixer` SPI |
 | **Guard** | A rule with `phase: guard`, checked on the migrated code before verification | in a playbook |
 | **Ecosystem plugin** | Project model, detectors, fixers, verifier and bundled playbooks for one stack | `EcosystemPlugin` SPI (ServiceLoader) |
@@ -44,6 +44,7 @@ This is the headline number for customers.
 - `core` (`renova-core`): ecosystem-neutral engine (model, playbooks, SPI, analyzer, planner, migrator, workspace, AI loop, reports)
 - `ai-anthropic` (`renova-ai-anthropic`): Claude provider (official Anthropic Java SDK, JSON-schema responses, streaming, refusal handling)
 - `ai-openai` (`renova-ai-openai`): OpenAI provider (official OpenAI Java SDK, strict JSON-schema responses, streaming); works with OpenAI-compatible servers through `openai.baseUrl`
+- `dotnet` (`renova-dotnet`): .NET plugin (C# and Visual Basic project model in both project formats, .NET detectors, the `dotnet` project-file fixer, `dotnet build`/`dotnet test` verifier, .NET → 10 and → 8 playbooks)
 - `java` (`renova-java`): Java plugin (Maven/Gradle model, Java detectors, OpenRewrite fixer, Maven verifier, Java 8→21/Jakarta playbook)
 
 ## Adding an ecosystem
@@ -68,5 +69,5 @@ Next:
 2. **More benchmark apps**, including more public open-source legacy projects.
 3. **RAG phase 2**: lessons from accepted fixes, per migration and per organisation.
 4. **Java**: re-platforming a Gradle build, multi-module Ant builds, AI runs of the remaining legacy frameworks.
-5. **More ecosystems**: .NET (C# and VB), then PHP and Laravel.
+5. **More ecosystems**: .NET has its first targets (see the root README); classic ASP.NET with AI is next, then PHP and Laravel.
 6. Licensing, a playbook marketplace and private playbook packs.
