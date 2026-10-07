@@ -52,15 +52,23 @@ public final class PhpVerifier implements Verifier {
     public VerifyResult verify(MigrationContext context) throws Exception {
         Path workspace = context.workspace().root();
         String target = target(context);
-        PhpRuntimes.Runtime php = (target == null ? PhpRuntimes.newest() : PhpRuntimes.forTarget(target))
+        List<String> needed = neededExtensions(workspace);
+        PhpRuntimes.Runtime php = (target == null ? PhpRuntimes.newest() : PhpRuntimes.forTarget(target, needed))
                 .orElseThrow(() -> new IOException("No PHP " + target + " or newer is installed"));
         Path composer = PhpRuntimes.composer().orElseThrow(() -> new IOException("Composer is not installed"));
         boolean skipTests = "true".equals(context.options().toolOption("verify.skipTests"));
         List<BuildError> errors = new ArrayList<>();
         StringBuilder log = new StringBuilder("Verified on PHP ").append(php.version()).append(" (").append(php.executable()).append(")\n");
+        if (!php.missing(needed).isEmpty()) {
+            log.append(VerifyResult.NOTE).append("PHP ").append(php.version()).append(" at ").append(php.executable()).append(" lacks ")
+                    .append(String.join(", ", php.missing(needed))).append(", which the project or its tests use: failures that name a ")
+                    .append("missing driver or function come from this machine, not from the migration. Install the extension, or put a ")
+                    .append("PHP that has it in RENOVA_PHP.\n");
+        }
         boolean success = true;
         int ran = 0;
         boolean expected = false;
+        List<String> warnings = new ArrayList<>();
         int number = 0;
         for (Module module : new PhpPlugin().model(workspace).modules()) {
             Path dir = workspace.resolve(module.path()).normalize();
@@ -101,7 +109,13 @@ public final class PhpVerifier implements Verifier {
             log.append("== ").append(module.path()).append(": ").append(runner.getFileName()).append(" exit ").append(test.exitCode()).append('\n');
             TestRun run = testResults(results, workspace);
             ran += run.ran();
-            if (!test.ok()) {
+            if (!test.ok() && run.failures().isEmpty() && run.ran() > 0 && test.output().contains("OK, but there were issues!")) {
+                // Every test passed; the runner has remarks about the suite itself (its configuration, how classes are named).
+                Matcher remark = Pattern.compile("(?m)^\\d+\\) (.+)$").matcher(test.output());
+                while (remark.find() && warnings.size() < 4) {
+                    warnings.add(remark.group(1).replace(workspace.toString() + "/", "").strip());
+                }
+            } else if (!test.ok()) {
                 success = false;
                 log.append(test.tail(40)).append('\n');
                 errors.addAll(run.failures().isEmpty() ? List.of(new BuildError(composerJson, 0, said(test.output()))) : run.failures());
@@ -116,7 +130,37 @@ public final class PhpVerifier implements Verifier {
                     .append(ran > 0 ? ", and " + ran + " test(s) ran and none failed." : skipTests ? "; tests were not run."
                             : ". The project has no tests to run: nothing shows that the code still does what it did.").append('\n');
         }
+        if (success && !warnings.isEmpty()) {
+            log.append(VerifyResult.NOTE).append("The test runner has remarks that failed no test: ").append(String.join(" | ", warnings)).append('\n');
+        }
         return new VerifyResult(success, errors.stream().distinct().toList(), log.toString());
+    }
+
+    /**
+     * Extensions the project says it needs (ext-* in composer.json) and the database driver its tests are
+     * configured for, to choose between several installations of the same PHP and to explain a failure.
+     */
+    static List<String> neededExtensions(Path workspace) throws IOException {
+        List<String> needed = new ArrayList<>();
+        Path composer = workspace.resolve("composer.json");
+        if (Files.isRegularFile(composer)) {
+            Matcher ext = Pattern.compile("\"ext-([a-z0-9_]+)\"\\s*:").matcher(Files.readString(composer));
+            while (ext.find()) {
+                needed.add(ext.group(1).replace("zend-opcache", "zend opcache"));
+            }
+        }
+        for (String config : List.of("phpunit.xml", "phpunit.xml.dist")) {
+            Path file = workspace.resolve(config);
+            if (Files.isRegularFile(file)) {
+                String xml = Files.readString(file).replaceAll("(?s)<!--.*?-->", "");
+                for (String[] driver : new String[][] {{"sqlite", "pdo_sqlite"}, {"mysql", "pdo_mysql"}, {"pgsql", "pdo_pgsql"}}) {
+                    if (xml.matches("(?s).*DB_CONNECTION\"\\s+value=\"" + driver[0] + "\".*") && !needed.contains(driver[1])) {
+                        needed.add(driver[1]);
+                    }
+                }
+            }
+        }
+        return needed;
     }
 
     static String target(MigrationContext context) {

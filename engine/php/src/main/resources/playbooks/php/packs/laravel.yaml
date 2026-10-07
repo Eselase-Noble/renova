@@ -177,6 +177,20 @@ rules:
         and callers change from factory(User::class)->create() to User::factory()->create() and
         factory(User::class, 3) to User::factory()->count(3).
 
+  - id: phpunit-configuration
+    title: phpunit.xml in the form PHPUnit 10 and later read
+    category: A
+    severity: WARNING
+    detect:
+      type: fileContains
+      include: ["phpunit.xml", "phpunit.xml.dist"]
+      pattern: "<whitelist|processUncoveredFiles|syntaxCheck|convert(Errors|Notices|Warnings|Deprecations)ToExceptions|backupStaticAttributes|\\bverbose="
+    fix:
+      strategy: phpunit-config
+    rationale: >
+      The PHPUnit that current Laravel supports removed settings that older skeletons' files carry and moved
+      the list of source folders. A file it cannot validate warns on every run and fails a build.
+
 knowledge:
 
   - id: laravel-upgrades

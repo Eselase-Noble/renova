@@ -123,4 +123,50 @@ class ComposerJsonTest {
                 "test OrderTest::test_total failed: TypeError: number_format(): Argument #1 ($num) must be of type float, string given"));
         assertThat(run.failures().getFirst().fromFailedTest()).isTrue();
     }
+
+    @Test
+    void anOldPhpUnitConfigurationIsRewrittenForPhpUnit10() {
+        String old = """
+                <phpunit backupGlobals="false"
+                         backupStaticAttributes="false"
+                         colors="true"
+                         convertErrorsToExceptions="true"
+                         syntaxCheck="false"
+                         bootstrap="test/bootstrap.php"
+                        >
+                    <testsuites>
+                        <testsuite name="Tests">
+                            <directory>./test/</directory>
+                        </testsuite>
+                    </testsuites>
+
+                    <filter>
+                        <whitelist processUncoveredFilesFromWhitelist="true">
+                            <directory>./src/</directory>
+                        </whitelist>
+                    </filter>
+                </phpunit>
+                """;
+        assertThat(PhpUnitConfigFixer.modernise(old)).isEqualTo("""
+                <phpunit backupGlobals="false"
+                         backupStaticProperties="false"
+                         colors="true"
+                         bootstrap="test/bootstrap.php"
+                        >
+                    <testsuites>
+                        <testsuite name="Tests">
+                            <directory>./test/</directory>
+                        </testsuite>
+                    </testsuites>
+
+                    <source>
+                        <include>
+                            <directory>./src/</directory>
+                        </include>
+                    </source>
+                </phpunit>
+                """);
+        String current = "<phpunit bootstrap=\"vendor/autoload.php\" colors=\"true\">\n    <source><include><directory>app</directory></include></source>\n</phpunit>\n";
+        assertThat(PhpUnitConfigFixer.modernise(current)).isEqualTo(current);
+    }
 }

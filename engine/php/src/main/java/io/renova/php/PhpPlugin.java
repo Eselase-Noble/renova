@@ -159,7 +159,7 @@ public final class PhpPlugin implements EcosystemPlugin {
 
     @Override
     public List<Fixer> fixers() {
-        return List.of(new RectorFixer(), new ComposerFixer());
+        return List.of(new RectorFixer(), new ComposerFixer(), new io.renova.php.fix.PhpUnitConfigFixer());
     }
 
     @Override
@@ -193,7 +193,9 @@ public final class PhpPlugin implements EcosystemPlugin {
     @Override
     public List<String> bundledPlaybooks() {
         return List.of("playbooks/php/php-to-8.4.yaml", "playbooks/php/php-to-8.5.yaml", "playbooks/php/php-to-8.3.yaml",
-                "playbooks/php/laravel-13.yaml", "playbooks/php/laravel-12.yaml", "playbooks/php/laravel-11.yaml");
+                "playbooks/php/laravel-13.yaml", "playbooks/php/laravel-12.yaml", "playbooks/php/laravel-11.yaml",
+                // Add-ons: optional, combined with a target (php-to-8.4+phpunit11).
+                "playbooks/php/addons/phpunit11.yaml");
     }
 
     /** Whether a project-relative path is inside a folder that holds no code of the project's own. */

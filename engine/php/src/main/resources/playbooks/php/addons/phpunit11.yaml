@@ -1,0 +1,52 @@
+# Add-on: PHPUnit 11, combined with a target as in php-to-8.4+phpunit11. The PHP targets stop at PHPUnit 9.6,
+# the smallest step that runs on current PHP; this goes on to the current way of writing tests.
+
+id: phpunit11
+name: "PHPUnit → 11"
+ecosystem: php
+version: 0.1.0
+description: >
+  Moves the tests to PHPUnit 11: the changes of PHPUnit 10 and 11 (data providers are static, removed
+  assertions and expectations), and attributes in place of the annotations PHPUnit 12 no longer reads
+  (@dataProvider, @depends, @covers, @group, @test).
+
+settings:
+  kind: addon
+
+rules:
+
+  - id: phpunit-11
+    title: Upgrade PHPUnit to 11
+    category: E
+    severity: WARNING
+    detect: { type: composerPackage, names: [phpunit/phpunit], constraintBelow: "11.5" }
+    fix:
+      strategy: composer
+      params: { action: setVersion, constraint: "^11.5" }
+    rationale: PHPUnit 11 needs PHP 8.2 or later, which every PHP target provides. PHPUnit 9 gets bug fixes only.
+
+  - id: phpunit-attributes
+    title: Test annotations become attributes
+    category: C
+    severity: WARNING
+    detect: { type: composerPackage, names: [phpunit/phpunit] }
+    fix:
+      strategy: rector
+      recipes: ["composer-based:phpunit", "Rector\\PHPUnit\\Set\\PHPUnitSetList::ANNOTATIONS_TO_ATTRIBUTES"]
+    rationale: >
+      PHPUnit 11 reports annotations in comments as deprecated and PHPUnit 12 ignores them, which silently
+      stops a test from getting its data or running at all.
+
+  - id: phpunit-configuration
+    title: phpunit.xml in the form PHPUnit 10 and later read
+    category: A
+    severity: WARNING
+    detect:
+      type: fileContains
+      include: ["phpunit.xml", "phpunit.xml.dist", "**/phpunit.xml", "**/phpunit.xml.dist"]
+      pattern: "<whitelist|<coverage[^>]*>\\s*$|processUncoveredFiles|syntaxCheck|convert(Errors|Notices|Warnings|Deprecations)ToExceptions|backupStaticAttributes|\\bverbose="
+    fix:
+      strategy: phpunit-config
+    rationale: >
+      PHPUnit 10 removed settings that older files carry and moved the list of source folders. A file it cannot
+      validate still runs, with a warning on every run and an exit code that fails a build.

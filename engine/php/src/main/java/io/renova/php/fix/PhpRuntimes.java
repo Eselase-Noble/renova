@@ -21,8 +21,17 @@ import java.util.stream.Stream;
  */
 public final class PhpRuntimes {
 
-    /** @param version as the interpreter reports it, e.g. "8.4.23" */
-    public record Runtime(Path executable, String version) {
+    /**
+     * @param version    as the interpreter reports it, e.g. "8.4.23"
+     * @param extensions the extensions it has loaded, lower case
+     */
+    public record Runtime(Path executable, String version, java.util.Set<String> extensions) {
+
+        /** Which of these extensions this PHP lacks. */
+        public List<String> missing(java.util.Collection<String> needed) {
+            return needed.stream().filter(e -> !extensions.contains(e.toLowerCase(java.util.Locale.ROOT))).toList();
+        }
+
         public String minor() {
             String[] parts = version.split("\\.");
             return parts.length < 2 ? version : parts[0] + "." + parts[1];
@@ -82,7 +91,7 @@ public final class PhpRuntimes {
                     }
                     String real = file.toRealPath().toString();
                     if (!byRealPath.containsKey(real)) {
-                        version(file).ifPresent(v -> byRealPath.put(real, new Runtime(file, v)));
+                        probe(file).ifPresent(r -> byRealPath.put(real, r));
                     }
                 }
             } catch (IOException | java.io.UncheckedIOException e) {
@@ -95,7 +104,20 @@ public final class PhpRuntimes {
 
     /** The PHP to verify a migration to {@code target} ("8.4") on: that release, else the oldest newer one. */
     public static Optional<Runtime> forTarget(String target) {
-        return installed().stream().filter(r -> !Versions.isBelow(r.minor(), target)).findFirst();
+        return forTarget(target, List.of());
+    }
+
+    /**
+     * As {@link #forTarget(String)}; where several installations of that release exist (the system's and a
+     * tool's), the one with the most of the extensions the project needs.
+     */
+    public static Optional<Runtime> forTarget(String target, java.util.Collection<String> needed) {
+        List<Runtime> adequate = installed().stream().filter(r -> !Versions.isBelow(r.minor(), target)).toList();
+        if (adequate.isEmpty()) {
+            return Optional.empty();
+        }
+        String minor = adequate.getFirst().minor();
+        return adequate.stream().filter(r -> r.minor().equals(minor)).min(Comparator.comparingInt(r -> r.missing(needed).size()));
     }
 
     /** The newest PHP, for running tools such as Rector, which need a current one whatever the project targets. */
@@ -141,12 +163,21 @@ public final class PhpRuntimes {
         return command;
     }
 
-    private static Optional<String> version(Path php) {
+    private static Optional<Runtime> probe(Path php) {
         try {
-            Proc.Result result = Proc.run(List.of(php.toString(), "-r", "echo PHP_VERSION;"), php.toAbsolutePath().getParent(),
-                    Duration.ofSeconds(20));
-            String out = result.output().strip();
-            return result.ok() && out.matches("\\d+\\.\\d+\\.\\d+.*") ? Optional.of(out.replaceAll("^(\\d+\\.\\d+\\.\\d+).*", "$1")) : Optional.empty();
+            Proc.Result result = Proc.run(List.of(php.toString(), "-r", "echo PHP_VERSION, \"\\n\", implode(',', get_loaded_extensions());"),
+                    php.toAbsolutePath().getParent(), Duration.ofSeconds(20));
+            List<String> lines = result.output().strip().lines().toList();
+            if (!result.ok() || lines.isEmpty() || !lines.getFirst().matches("\\d+\\.\\d+\\.\\d+.*")) {
+                return Optional.empty();
+            }
+            java.util.Set<String> extensions = new java.util.TreeSet<>();
+            if (lines.size() > 1) {
+                for (String extension : lines.getLast().split(",")) {
+                    extensions.add(extension.strip().toLowerCase(java.util.Locale.ROOT));
+                }
+            }
+            return Optional.of(new Runtime(php, lines.getFirst().replaceAll("^(\\d+\\.\\d+\\.\\d+).*", "$1"), extensions));
         } catch (IOException e) {
             return Optional.empty();
         } catch (InterruptedException e) {

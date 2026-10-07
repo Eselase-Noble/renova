@@ -3,10 +3,11 @@
 # judgement goes to the build's errors, AI repair and a person.
 
 id: laravel-11
-name: "Laravel → 11 (PHP 8.3)"
+name: "Laravel → 11 (PHP 8.3, out of support)"
 ecosystem: php
 version: 0.1.0
 description: >
+  Laravel 11 stopped getting security fixes in March 2026: choose it as a step on the way, not as where to stay.
   Moves a Laravel application to Laravel 11 on PHP 8.3: laravel/framework and the packages that are released
   with it, the code changes of every Laravel release on the way (Rector's Laravel rules), PHP 8.3 syntax, and a
   PHPUnit the framework supports. Verified on PHP 8.3 with Composer, a syntax check and the application's tests.
