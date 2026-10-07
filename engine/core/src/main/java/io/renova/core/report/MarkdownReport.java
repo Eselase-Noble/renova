@@ -51,7 +51,7 @@ public final class MarkdownReport {
         md.append("| | |\n|---|---|\n");
         md.append("| Findings | ").append(analysis.findings().size()).append(" |\n");
         md.append("| Plan steps | ").append(plan.steps().size()).append(" |\n");
-        md.append("| Automated (recipe + replace) | ").append(percent(plan.automationRate())).append(" of findings |\n");
+        md.append("| Automated (no AI, no person) | ").append(percent(plan.automationRate())).append(" of findings |\n");
         plan.occurrencesByStrategy().forEach((strategy, n) ->
                 md.append("| Strategy `").append(strategy).append("` | ").append(n).append(" finding(s) |\n"));
         long guards = plan.playbook().rules().stream().filter(io.renova.core.playbook.Rule::guard).count();
@@ -180,7 +180,7 @@ public final class MarkdownReport {
             case FixSpec.REPLACE -> "automated text replacement `" + fix.find() + "` → `" + fix.replace() + "` in `" + fix.include() + "`";
             case FixSpec.AI -> "AI-assisted edit, checked by the build";
             case FixSpec.MANUAL -> "manual";
-            default -> "strategy `" + fix.strategy() + "`";
+            default -> "automated edit (`" + fix.strategy() + "`)";
         };
     }
 

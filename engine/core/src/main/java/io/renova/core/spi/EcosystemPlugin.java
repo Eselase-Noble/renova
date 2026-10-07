@@ -24,11 +24,28 @@ public interface EcosystemPlugin {
     ProjectModel model(Path root) throws IOException;
 
     /**
-     * File names that mark the root of a project of this ecosystem, such as {@code pom.xml}. A cheap hint for
-     * folder pickers; {@link #supports} stays the real check.
+     * File names that mark the root of a project of this ecosystem, such as {@code pom.xml}, or {@code *.sln}
+     * for any file with that ending. A cheap hint for folder pickers; {@link #supports} stays the real check.
      */
     default List<String> projectMarkers() {
         return List.of();
+    }
+
+    /** Whether {@code dir} holds a file one of the markers names; only the folder itself is looked at. */
+    static boolean marked(Path dir, List<String> markers) {
+        List<String> endings = markers.stream().filter(m -> m.startsWith("*")).map(m -> m.substring(1)).toList();
+        if (markers.stream().anyMatch(m -> !m.startsWith("*") && java.nio.file.Files.isRegularFile(dir.resolve(m)))) {
+            return true;
+        }
+        if (endings.isEmpty()) {
+            return false;
+        }
+        try (java.util.stream.Stream<Path> files = java.nio.file.Files.list(dir)) {
+            return files.anyMatch(f -> endings.stream().anyMatch(e -> f.getFileName().toString().endsWith(e))
+                    && java.nio.file.Files.isRegularFile(f));
+        } catch (IOException | java.io.UncheckedIOException e) {
+            return false;
+        }
     }
 
     /**

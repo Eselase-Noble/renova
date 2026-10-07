@@ -100,7 +100,7 @@ public final class Portfolio {
     }
 
     private static void collect(Path dir, int depth, List<String> markers, List<Path> found) throws IOException {
-        if (markers.stream().anyMatch(m -> Files.isRegularFile(dir.resolve(m)))) {
+        if (io.renova.core.spi.EcosystemPlugin.marked(dir, markers)) {
             found.add(dir);
             return;
         }

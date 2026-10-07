@@ -110,8 +110,8 @@ public class SystemController {
 
     private boolean isProject(Path dir) {
         // Marker files only: supports() may read the whole tree, far too slow for every folder in a listing.
-        return registry.plugins().stream().flatMap(p -> p.projectMarkers().stream())
-                .anyMatch(marker -> Files.isRegularFile(dir.resolve(marker)));
+        return io.renova.core.spi.EcosystemPlugin.marked(dir,
+                registry.plugins().stream().flatMap(p -> p.projectMarkers().stream()).toList());
     }
 
     private static Path real(Path path) {

@@ -11,7 +11,8 @@ import java.util.Set;
 public record MigrationPlan(Playbook playbook, List<PlanStep> steps) {
 
     /** Strategies whose changes need no human or AI decision. */
-    public static final Set<String> DETERMINISTIC = Set.of(FixSpec.RECIPE, FixSpec.REPLACE);
+    /** Strategies that need a model or a person; every other one (recipes, text rules, an ecosystem's own edits) is deterministic. */
+    public static final Set<String> NOT_DETERMINISTIC = Set.of(FixSpec.AI, FixSpec.MANUAL);
 
     public MigrationPlan {
         steps = List.copyOf(steps);
@@ -34,7 +35,7 @@ public record MigrationPlan(Playbook playbook, List<PlanStep> steps) {
         if (total == 0) {
             return 1.0;
         }
-        int automated = steps.stream().filter(s -> DETERMINISTIC.contains(s.strategy()))
+        int automated = steps.stream().filter(s -> !NOT_DETERMINISTIC.contains(s.strategy()))
                 .mapToInt(PlanStep::occurrences).sum();
         return (double) automated / total;
     }
