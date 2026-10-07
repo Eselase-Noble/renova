@@ -31,7 +31,7 @@ final class VerifyBehaviourCommand implements Callable<Integer> {
     @Option(names = {"-p", "--playbook"}, paramLabel = "ID|FILE", description = "Playbook used for the migration. Default: auto-detect.")
     String playbookRef;
 
-    @Option(names = "--maven-settings", paramLabel = "FILE", description = "Maven settings.xml for building the original.")
+    @Option(names = "--maven-settings", paramLabel = "FILE", description = "Java projects: Maven settings.xml for building the original.")
     Path mavenSettings;
 
     @Option(names = "--offline", description = "Build the original offline.")

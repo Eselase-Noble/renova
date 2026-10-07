@@ -309,9 +309,12 @@ public final class ProjectView {
         advanced.add(option("Scenario file", "Requests and multi-step flows to compare, with accepted changes and database checks."), 0, ar);
         advanced.add(browseRow(scenarios, "Scenario file", "*.yaml", "*.yml"), 0, ++ar, 2, 1);
         advanced.addRow(++ar, option("Repair behaviour differences with AI", "Off: report differences without changing code for them."), repairBehaviour);
-        advanced.add(option("Maven settings.xml", "For a private repository such as Nexus or Artifactory."), 0, ++ar);
-        advanced.add(browseRow(settings, "Maven settings", "*.xml"), 0, ++ar, 2, 1);
-        advanced.addRow(++ar, option("Offline builds", "Use only the local Maven repository (mvn -o)."), offline);
+        // Maven's options are for Maven: a .NET or PHP project is not shown settings that do nothing for it.
+        if (engine.registry().playbooksFor(path).stream().anyMatch(p -> p.ecosystem().equals("java"))) {
+            advanced.add(option("Maven settings.xml", "For a private repository such as Nexus or Artifactory."), 0, ++ar);
+            advanced.add(browseRow(settings, "Maven settings", "*.xml"), 0, ++ar, 2, 1);
+            advanced.addRow(++ar, option("Offline builds", "Use only the local Maven repository (mvn -o)."), offline);
+        }
         TitledPane more = new TitledPane("Advanced", advanced);
         more.setExpanded(false);
         more.setAnimated(false);

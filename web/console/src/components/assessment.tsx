@@ -49,6 +49,11 @@ export function AssessmentView({ assessment }: { assessment: Assessment }) {
     ["Build", list(facts.buildTools)],
     ["Java", list(facts.javaVersions)],
     ["Runs on", list(facts.containers)],
+    ["Languages", list(facts.languages)],
+    ["Target frameworks", list(facts.targetFrameworks)],
+    ["Project kinds", list(facts.kinds)],
+    ["PHP", list(facts.phpVersions)],
+    ["Framework", list(facts.frameworks).replace(/^none$/, "")],
     ["Modules", project.modules.length ? String(project.modules.length) : ""],
   ].filter(([, value]) => value);
 

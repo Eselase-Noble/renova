@@ -1,7 +1,7 @@
 {
   "name": "renova",
   "displayName": "Renova",
-  "description": "Assess and migrate legacy Java projects (Java 8 → 21, Java EE → Jakarta EE 10, Spring 6) from VS Code.",
+  "description": "Assess and migrate legacy Java, .NET and PHP projects (Java 8 → 21, Jakarta EE, Spring; .NET Framework → .NET 10; PHP 8, Laravel, Symfony) from VS Code.",
   "version": "0.1.0",
   "publisher": "renova",
   "license": "SEE LICENSE IN LICENSE.txt",
@@ -22,12 +22,22 @@
     "legacy",
     "java",
     "jakarta",
-    "spring"
+    "spring",
+    "dotnet",
+    "csharp",
+    "php",
+    "laravel",
+    "symfony"
   ],
   "main": "./out/src/extension.js",
   "activationEvents": [
     "workspaceContains:**/pom.xml",
-    "workspaceContains:**/build.gradle"
+    "workspaceContains:**/build.gradle",
+    "workspaceContains:**/build.gradle.kts",
+    "workspaceContains:**/*.sln",
+    "workspaceContains:**/*.csproj",
+    "workspaceContains:**/*.vbproj",
+    "workspaceContains:**/composer.json"
   ],
   "contributes": {
     "commands": [

@@ -257,6 +257,19 @@ export interface AuditEvent {
   detail: string | null;
 }
 
+/** The licence installed on the server: what it covers and until when. */
+export interface LicenceInfo {
+  valid: boolean;
+  /** False in a development build, which migrates without a licence. */
+  required: boolean;
+  description: string;
+  licensee: string | null;
+  edition: string | null;
+  ecosystems: string[];
+  seats: number;
+  expires: string | null;
+}
+
 export interface SystemInfo {
   version: string;
   java: string;
@@ -385,6 +398,7 @@ export const api = {
 
   audit: (area?: string) => request<AuditEvent[]>(`/org/audit?limit=500${area ? `&area=${encodeURIComponent(area)}` : ""}`),
   system: () => request<SystemInfo>("/system"),
+  licence: () => request<LicenceInfo>("/system/licence"),
   directories: (path?: string | null) =>
     request<DirectoryListing>(`/system/directories${path ? `?path=${encodeURIComponent(path)}` : ""}`),
 

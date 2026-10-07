@@ -1,7 +1,11 @@
 # Renova for VS Code
 
-Assess and migrate legacy Java projects (Java 8 → 21, Java EE → Jakarta EE 10, Spring 6) from VS Code. The extension
-runs the Renova CLI on your machine (Java 21+ needed); only AI requests leave it, on your own key.
+Assess and migrate legacy Java, .NET and PHP projects from VS Code: Java 8 → 21, Java EE → Jakarta EE, Spring and
+Spring Boot; .NET Framework and .NET Core → .NET 10 (C# and Visual Basic); PHP 5 and 7 → PHP 8, Laravel and Symfony.
+The extension runs the Renova CLI on your machine (Java 21+ needed to run Renova itself, whatever the project is
+written in); only AI requests leave it, on your own key. It starts in a workspace that has a `pom.xml`, a
+`build.gradle`, a `.sln`, `.csproj` or `.vbproj`, or a `composer.json`. Verifying a migration needs the project's own
+tools: Maven or Gradle and a JDK, the .NET SDK, or PHP and Composer.
 
 - **Renova: Assess Workspace** (or the Renova view in the activity bar, or the status bar item): findings appear as
   diagnostics in the editor and the Problems panel, with who resolves them (an automatic recipe or rule, AI checked by

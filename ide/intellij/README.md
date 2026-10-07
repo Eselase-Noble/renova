@@ -1,7 +1,9 @@
-# Renova for IntelliJ IDEA
+# Renova for IntelliJ IDEA, PhpStorm and Rider
 
-Assess and migrate legacy Java projects from IntelliJ IDEA 2025.2 or later. The Renova engine runs inside the IDE;
-only AI requests leave the machine, on your own key.
+Assess and migrate legacy Java, .NET and PHP projects from IntelliJ IDEA, PhpStorm, Rider or another IDE of the
+IntelliJ platform, 2025.2 or later. The plugin needs nothing of the Java plugin, so it installs in the IDEs that do
+not have it. The Renova engine runs inside the IDE; only AI requests leave the machine, on your own key. Verifying
+a migration needs the project's own tools on the machine: Maven or Gradle and a JDK, the .NET SDK, or PHP and Composer.
 
 - **Tools › Renova › Assess with Renova** (or the Renova tool window): findings by category, the automation rate,
   and the plan as a tree of steps and the places they apply to. Double-click a place to open it.

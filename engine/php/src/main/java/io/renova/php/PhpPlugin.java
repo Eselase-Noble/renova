@@ -49,7 +49,8 @@ public final class PhpPlugin implements EcosystemPlugin {
 
     @Override
     public List<String> projectMarkers() {
-        return List.of("composer.json");
+        // index.php: a site from before Composer, which is a project too.
+        return List.of("composer.json", "index.php");
     }
 
     @Override

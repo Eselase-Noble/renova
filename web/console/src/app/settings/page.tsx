@@ -111,6 +111,7 @@ function Appearance() {
 
 function Server() {
   const system = useQuery({ queryKey: ["system"], queryFn: api.system, staleTime: Infinity });
+  const licence = useQuery({ queryKey: ["licence"], queryFn: api.licence, staleTime: 60_000 });
   if (system.error) return <ErrorState error={system.error} />;
   if (!system.data) return <LoadingRows rows={3} />;
   const info = system.data;
@@ -121,6 +122,14 @@ function Server() {
           <Field label="Version"><span className="font-mono text-[13px]">{info.version}</span></Field>
           <Field label="Java"><span className="font-mono text-[13px]">{info.java}</span></Field>
           <Field label="Ecosystems">{info.ecosystems.map((e) => e.name).join(", ") || "None installed"}</Field>
+          <Field label="Licence">
+            {licence.data ? licence.data.description : licence.error ? "Could not be read" : "…"}
+            <p className="mt-1 text-xs text-muted-foreground">
+              {licence.data && !licence.data.required
+                ? "This is a development build: it migrates without a licence."
+                : "Assessing projects is free; migrating needs a licence that covers the project's ecosystem. It is installed on the server with \"renova licence install\"."}
+            </p>
+          </Field>
           <Field label="Playbooks">{plural(info.playbooks, "playbook")} installed</Field>
           <Field label="AI providers"><span className="capitalize">{info.aiProviders.join(", ") || "None installed"}</span></Field>
           <Field label="Concurrency">{plural(info.parallelMigrations, "migration")} at a time; others wait in the queue</Field>

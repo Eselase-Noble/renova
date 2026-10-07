@@ -56,10 +56,10 @@ final class BenchmarkCommand implements Callable<Integer> {
     @Option(names = "--max-ai-iterations", defaultValue = "3", description = "Build-repair rounds (default: ${DEFAULT-VALUE}).")
     int maxAiIterations;
 
-    @Option(names = "--maven-settings", paramLabel = "FILE", description = "Maven settings.xml (e.g. for a private Nexus).")
+    @Option(names = "--maven-settings", paramLabel = "FILE", description = "Java projects: Maven settings.xml (e.g. for a private Nexus).")
     Path mavenSettings;
 
-    @Option(names = "--offline", description = "Run Maven offline.")
+    @Option(names = "--offline", description = "Java projects: run Maven offline.")
     boolean offline;
 
     @Mixin

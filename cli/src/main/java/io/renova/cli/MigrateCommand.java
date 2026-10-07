@@ -60,10 +60,10 @@ final class MigrateCommand implements Callable<Integer> {
                     + "Needs no extra key. Default: the rag.enabled setting, else on.")
     Boolean rag;
 
-    @Option(names = "--maven-settings", paramLabel = "FILE", description = "Maven settings.xml (e.g. for a private Nexus).")
+    @Option(names = "--maven-settings", paramLabel = "FILE", description = "Java projects: Maven settings.xml (e.g. for a private Nexus).")
     Path mavenSettings;
 
-    @Option(names = "--offline", description = "Run Maven offline.")
+    @Option(names = "--offline", description = "Java projects: run Maven offline.")
     boolean offline;
 
     @Override

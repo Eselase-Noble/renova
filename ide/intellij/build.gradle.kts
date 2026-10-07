@@ -28,6 +28,8 @@ val renova = providers.gradleProperty("renovaVersion").get()
 dependencies {
     implementation("io.renova:renova-core:$renova")
     implementation("io.renova:renova-java:$renova")
+    implementation("io.renova:renova-dotnet:$renova")
+    implementation("io.renova:renova-php:$renova")
     implementation("io.renova:renova-ai-anthropic:$renova")
     implementation("io.renova:renova-ai-openai:$renova")
 

@@ -1,6 +1,8 @@
 # Renova Web
 
-The web console and REST API for the [Renova engine](../engine), for a team's own server.
+The web console and REST API for the [Renova engine](../engine), for a team's own server: Java, .NET and PHP projects,
+each offered the targets of its own ecosystem. The server needs the tools that verify a migration (Maven or Gradle
+and JDKs, the .NET SDK, PHP and Composer) for the ecosystems it is used for.
 
 | Part | Path | Stack |
 |---|---|---|

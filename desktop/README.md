@@ -1,7 +1,7 @@
 # Renova Desktop
 
-A **JavaFX** app for assessing and migrating legacy projects on your own machine, for code that must not
-leave it. The [Renova engine](../engine) runs inside the app: no server, no account. Only AI requests leave the
+A **JavaFX** app for assessing and migrating legacy Java, .NET and PHP projects on your own machine, for code that
+must not leave it. A project is offered the targets and add-ons of its own ecosystem. The [Renova engine](../engine) runs inside the app: no server, no account. Only AI requests leave the
 machine, on your own key.
 
 | Screen | |
