@@ -292,7 +292,7 @@ public final class PhpPlugin implements EcosystemPlugin {
                 "playbooks/php/laravel-13.yaml", "playbooks/php/laravel-12.yaml", "playbooks/php/laravel-11.yaml",
                 "playbooks/php/symfony-7.4.yaml", "playbooks/php/symfony-6.4.yaml", "playbooks/php/symfony-8.1.yaml",
                 // Add-ons: optional, combined with a target (php-to-8.4+phpunit11).
-                "playbooks/php/addons/phpunit11.yaml");
+                "playbooks/php/addons/phpunit11.yaml", "playbooks/php/addons/conservative.yaml");
     }
 
     /** Whether a project-relative path is inside a folder that holds no code of the project's own. */

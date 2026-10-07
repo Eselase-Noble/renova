@@ -101,9 +101,13 @@ public final class RectorFixer implements Fixer {
             // A file Rector cannot read (a fixture in another language, a template) stops the whole run: it is
             // left as it is and the run repeated, a few times at most.
             List<String> unreadable = new ArrayList<>();
+            List<String> skippedRules = skippedRules(context, rector);
+            if (!skippedRules.isEmpty()) {
+                details.add(module.path() + ": " + skippedRules.size() + " rule(s) that only restyle code are left out (settings.rector.skip)");
+            }
             Proc.Result run;
             for (int attempt = 0; ; attempt++) {
-                Files.writeString(config, config(dir, used, unreadable), StandardCharsets.UTF_8);
+                Files.writeString(config, config(dir, used, unreadable, skippedRules), StandardCharsets.UTF_8);
                 run = Proc.run(List.of(php.executable().toString(), "-d", "memory_limit=-1", rector.toString(), "process",
                         "--config", config.toString(), "--no-progress-bar", "--no-diffs", "--clear-cache"), dir, TIMEOUT, PhpRuntimes.environment());
                 List<String> more = new ArrayList<>();
@@ -150,8 +154,14 @@ public final class RectorFixer implements Fixer {
     }
 
     static String config(Path dir, Set<String> recipes, List<String> skipped) {
+        return config(dir, recipes, skipped, List.of());
+    }
+
+    /** @param skippedRules rule classes that are not to run, whatever set names them */
+    static String config(Path dir, Set<String> recipes, List<String> skipped, List<String> skippedRules) {
         String skip = skipped.stream().map(f -> ", '" + dir.resolve(f).toString().replace("\\", "\\\\").replace("'", "\\'") + "'")
-                .collect(java.util.stream.Collectors.joining());
+                .collect(java.util.stream.Collectors.joining())
+                + skippedRules.stream().map(r -> ", \\" + r.replaceFirst("^\\\\", "") + "::class").collect(java.util.stream.Collectors.joining());
         String composerBased = recipes.stream().filter(r -> r.startsWith("composer-based:")).map(r -> r.substring("composer-based:".length()) + ": true")
                 .collect(java.util.stream.Collectors.joining(", "));
         String attributes = recipes.stream().filter(r -> r.startsWith("attributes:")).map(r -> r.substring("attributes:".length()) + ": true")
@@ -210,6 +220,46 @@ public final class RectorFixer implements Fixer {
         }
         details.add("Rector installed into " + tools);
         return rector;
+    }
+
+    /**
+     * The rule classes the playbook (usually an add-on) says not to run. A name with {@code *} is matched
+     * against the rule files Rector and its extensions were installed with.
+     */
+    static List<String> skippedRules(MigrationContext context, Path rector) throws java.io.IOException {
+        if (!(context.playbook().setting("rector.skip") instanceof List<?> named) || named.isEmpty()) {
+            return List.of();
+        }
+        List<String> rules = new ArrayList<>();
+        Path vendor = rector.getParent().getParent();
+        for (Object entry : named) {
+            String name = entry.toString();
+            if (!name.contains("*")) {
+                rules.add(name);
+                continue;
+            }
+            int last = name.lastIndexOf('\\');
+            String namespace = name.substring(0, last + 1);
+            java.util.regex.Pattern file = java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(name.substring(last + 1)).replace("*", "\\E.*\\Q") + "\\.php");
+            String folder = namespace.substring(namespace.indexOf('\\') + 1).replace('\\', '/');
+            try (java.util.stream.Stream<Path> files = Files.walk(vendor)) {
+                files.filter(f -> file.matcher(f.getFileName().toString()).matches() && f.getParent().toString().replace('\\', '/').endsWith("/" + folder.replaceAll("/$", ""))
+                                && concreteRule(f, namespace))
+                        .map(f -> namespace + f.getFileName().toString().replaceFirst("\\.php$", "")).sorted().distinct().forEach(rules::add);
+            }
+        }
+        return rules;
+    }
+
+    /** A rule of this namespace that Rector can run: a base class several rules share is not one, and naming it is an error. */
+    private static boolean concreteRule(Path file, String namespace) {
+        try {
+            String code = Files.readString(file, StandardCharsets.ISO_8859_1);
+            return code.contains("namespace " + namespace.replaceAll("\\\\$", "") + ";") && !code.contains("abstract class ")
+                    && code.contains("class ");
+        } catch (java.io.IOException e) {
+            return false;
+        }
     }
 
     static Path cacheDir() {

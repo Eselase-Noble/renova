@@ -158,3 +158,21 @@ apps:
       - { file: src/Controller/NoteController.php, contains: "#[Route(path: '/notes', name: 'note_add', methods: ['POST'])]", why: "routes are attributes, which is all Symfony 8 reads" }
       - { file: config/routes/framework.yaml, contains: "routing/errors.php", why: "the framework's routes are no longer shipped as XML" }
       - { file: composer.json, absent: "composer.renova", why: "nothing of Renova's own is left in the project" }
+
+  # The conservative add-on: what the target needs and no restyling.
+  - id: php74-library-to-84-conservative
+    path: ledger-php74
+    playbook: php-to-8.4+conservative
+    checks:
+      - { file: "src/*.php", absent: "each(", why: "what PHP 8 removed is still rewritten" }
+      - { file: src/Account.php, contains: "private $postings = array();", why: "an array written the long way stays that way" }
+      - { file: src/Account.php, contains: "$this->number = $number;", why: "the constructor is not rewritten to promoted properties" }
+      - { file: src/Account.php, contains: "usort($sorted, function ($a, $b) {", why: "a closure is not rewritten as an arrow function" }
+
+  - id: laravel-10-to-13-conservative
+    path: orders-laravel10
+    playbook: laravel-13+conservative
+    checks:
+      - { file: composer.lock, matches: '"name": "laravel/framework",\s+"version": "v13\.', why: "Laravel 13 is what was installed and tested" }
+      - { file: app/Models/Order.php, contains: "protected $fillable = ['customer', 'quantity', 'unit_price', 'placed_on'];", why: "model properties are not rewritten as attributes" }
+      - { file: app/Models/Order.php, contains: "public function getTotalAttribute()", why: "an accessor that works is left as it is" }

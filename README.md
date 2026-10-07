@@ -464,7 +464,8 @@ What these do today, with no AI ([results](docs/verified-migrations.md#php)):
 
 Rector's rule sets also move code to newer idioms (constructor promotion, arrow functions, and in Laravel 13
 attributes in place of `$fillable`): more is changed than the target strictly needs, and the tests are what
-shows that nothing else did. Closure factories from Laravel 7 and older become factory classes without AI.
+shows that nothing else did. `--with conservative` leaves those rewrites out: on the Laravel 10 sample the
+migration to Laravel 13 then changes 4 lines of code in 2 files where it otherwise changes 96 in 8. Closure factories from Laravel 7 and older become factory classes without AI.
 What PHP 8 runs differently from PHP 7 (arithmetic on text, loose comparisons) no rule can decide: the tests
 show it and the AI repair loop fixes it ([one run](docs/verified-migrations.md#with-ai)). A site without
 Composer (PHP files in a folder, as they were uploaded) gets a `composer.json` in the migrated copy and is
@@ -533,8 +534,8 @@ source migrates without one. See [docs/licensing.md](docs/licensing.md).
    EF Core, Windows Forms and WPF verified on Windows, Web Forms. Behavioural verification runs ASP.NET Core
    applications; classic ASP.NET originals need IIS on Windows.
 7. **PHP:** a chosen PHP version (8.3, 8.4, 8.5), Laravel version (11, 12, 13) and Symfony version (6.4, 7.4, 8.1)
-   are in, with sites without Composer, a PHPUnit add-on and behavioural verification. Next: an option to
-   change only what the target requires, a real Laravel or Symfony application with a database and security
+   are in, with sites without Composer, add-ons for PHPUnit 11 and for keeping the code's style, and
+   behavioural verification. Next: a real Laravel or Symfony application with a database and security
    configuration, `mysql_*` with AI.
 
 ## Contributing

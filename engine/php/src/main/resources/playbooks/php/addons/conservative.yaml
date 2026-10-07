@@ -1,0 +1,45 @@
+# Add-on: change only what the target needs, combined with a target as in php-to-8.4+conservative. Rector's rule
+# sets also move code to newer ways of writing the same thing; this leaves those rules out, so that the diff a
+# team reviews is the migration and nothing else.
+
+id: conservative
+name: "Keep the code's style"
+ecosystem: php
+version: 0.1.0
+description: >
+  Leaves out the rewrites that change how code is written without changing what a newer PHP or framework
+  requires: constructor promotion, arrow functions, readonly, match, short arrays, str_contains, attributes in
+  place of Laravel model properties, accessors as Attribute objects. Removed functions and syntax, renamed
+  classes and changed signatures are still rewritten.
+
+settings:
+  kind: addon
+  rector:
+    # Rule classes Rector does not run. A name with * stands for every rule of that name pattern.
+    skip:
+      - Rector\Php80\Rector\Class_\ClassPropertyAssignToConstructorPromotionRector
+      - Rector\Php74\Rector\Closure\ClosureToArrowFunctionRector
+      - Rector\Php81\Rector\Property\ReadOnlyPropertyRector
+      - Rector\Php82\Rector\Class_\ReadOnlyClassRector
+      - Rector\Php80\Rector\Switch_\ChangeSwitchToMatchRector
+      - Rector\Php80\Rector\NotIdentical\StrContainsRector
+      - Rector\Php80\Rector\Identical\StrStartsWithRector
+      - Rector\Php80\Rector\Identical\StrEndsWithRector
+      - Rector\Php74\Rector\Assign\NullCoalescingOperatorRector
+      - Rector\Php70\Rector\Ternary\TernaryToNullCoalescingRector
+      - Rector\Php54\Rector\Array_\LongArrayToShortArrayRector
+      - Rector\Php83\Rector\ClassMethod\AddOverrideAttributeToOverriddenMethodsRector
+      - Rector\Php83\Rector\ClassConst\AddTypeToConstRector
+      - Rector\Php84\Rector\MethodCall\NewMethodCallWithoutParenthesesRector
+      - Rector\Php80\Rector\Class_\StringableForToStringRector
+      - Rector\Php55\Rector\String_\StringClassNameToClassConstantRector
+      - Rector\Php80\Rector\FuncCall\ClassOnObjectRector
+      - Rector\Php71\Rector\List_\ListToArrayDestructRector
+      - RectorLaravel\Rector\Class_\*PropertyTo*AttributeRector
+      - RectorLaravel\Rector\Class_\ModelCastsPropertyToCastsMethodRector
+      - RectorLaravel\Rector\Class_\RouteKeyMethodToRouteKeyAttributeRector
+      - RectorLaravel\Rector\ClassMethod\MigrateToSimplifiedAttributeRector
+      - RectorLaravel\Rector\ClassMethod\ScopeNamedClassMethodToScopeAttributedClassMethodRector
+      - RectorLaravel\Rector\ClassMethod\MakeModelAttributesAndScopesProtectedRector
+
+rules: []

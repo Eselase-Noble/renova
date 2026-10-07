@@ -80,6 +80,11 @@ class ComposerJsonTest {
         assertThat(config).contains("->withPaths(['/work/app'])", "'*/vendor/*'", ", '/work/app/test/fixtures/hack.php'])",
                 "        \\Rector\\Set\\ValueObject\\LevelSetList::UP_TO_PHP_84,", "        \\Acme\\Rector\\OwnRector::class,",
                 "->withComposerBased(phpunit: true);");
+        // Rules an add-on leaves out go where Rector looks for what not to run; annotations and imports are their own calls.
+        String styled = RectorFixer.config(Path.of("/work/app"), new LinkedHashSet<>(List.of("attributes:symfony", "attributes:doctrine", "import-names")),
+                List.of(), List.of("Rector\\Php74\\Rector\\Closure\\ClosureToArrowFunctionRector"));
+        assertThat(styled).contains("'*.blade.php', \\Rector\\Php74\\Rector\\Closure\\ClosureToArrowFunctionRector::class])",
+                "->withAttributesSets(symfony: true, doctrine: true)", "->withImportNames(importShortClasses: false, removeUnusedImports: true);");
     }
 
     @Test
