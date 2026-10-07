@@ -137,6 +137,20 @@ apps:
       - { file: src/test/java/com/acme/payroll/PayslipTest.java, contains: "class PayslipTest", why: "tests are in the standard place, and run" }
       - { file: src/main/resources/com/acme/payroll/labels.properties, contains: "net=", why: "resources beside the sources still reach the classpath" }
 
+  # A build of several Ant projects: a library and the web application that names its jar, with libraries
+  # shared from a folder above both. They become modules of one Maven parent, the second depending on the first.
+  - id: ant-modules-to-maven-jakarta
+    path: depot-ant-modules
+    playbook: java8-to-21-jakarta-ee10
+    checks:
+      - { file: pom.xml, contains: "<module>stock</module>", why: "each Ant project is a module" }
+      - { file: pom.xml, contains: "<packaging>pom</packaging>", why: "under one parent" }
+      - { file: web/pom.xml, contains: "<artifactId>depot-stock</artifactId>", why: "the web application's build named the library's jar" }
+      - { file: stock/pom.xml, contains: "<artifactId>acme-rates</artifactId>", why: "a library nobody published is kept, as a file" }
+      - { file: web/src/main/java/com/acme/depot/web/StockServlet.java, contains: "import jakarta.servlet", why: "Jakarta EE" }
+      - { file: stock/src/test/java/com/acme/depot/stock/ShelfTest.java, contains: "class ShelfTest", why: "tests are in the standard place, and run" }
+      - { file: stock/src/main/resources/com/acme/depot/stock/units.properties, contains: "unit=", why: "resources beside the sources still reach the classpath" }
+
   # A change of platform: off the application server (JBoss descriptors, EJB, CDI, JAX-RS, JPA) and onto
   # Spring Boot. The generated test starts the whole application on an in-memory database.
   - id: jakarta-ee-to-spring-boot
@@ -151,6 +165,18 @@ apps:
       - { file: src/main/java/com/acme/ledger/api/LedgerApplication.java, contains: "register(com.acme.ledger.api.AccountResource.class)", why: "a resource Jersey does not know is not served" }
       - { file: src/main/resources/application.properties, contains: "server.servlet.context-path=/ledger", why: "the application answers at the address the server gave it" }
       - { file: "**/*.java", absent: "import jakarta.ejb", why: "no EJB container" }
+
+  # The same change of platform for a Gradle build: Spring Boot's plugin and starters in build.gradle.
+  - id: jakarta-ee-to-spring-boot-gradle
+    path: ledger-javaee-gradle
+    playbook: jakarta-ee-to-spring-boot
+    checks:
+      - { file: build.gradle, contains: "id 'org.springframework.boot' version", why: "Spring Boot builds and packages it" }
+      - { file: build.gradle, contains: "spring-boot-starter-jersey", why: "REST resources keep JAX-RS and run on Jersey" }
+      - { file: build.gradle, absent: "javaee-api", why: "no server supplies the platform API any more" }
+      - { file: build.gradle, absent: "id 'war'", why: "it runs on its own" }
+      - { file: src/main/java/com/acme/ledger/service/AccountService.java, matches: '@Service\s+@Transactional', why: "a session bean's methods ran in a transaction" }
+      - { file: src/main/resources/application.properties, contains: "server.servlet.context-path=/ledger", why: "the application answers at the address the server gave it" }
 
   # Both at once: an Ant web application ends as a Spring Boot WAR, with its JUnit 4 tests still running.
   - id: ant-to-spring-boot

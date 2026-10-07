@@ -55,7 +55,8 @@ public final class SpringBootReplatformer implements Fixer {
         int converted = 0;
         for (io.renova.core.model.Module module : context.project().modules()) {
             Path dir = root.resolve(module.path()).normalize();
-            if (!"maven".equals(module.fact("buildTool")) || !Files.isDirectory(dir.resolve("src/main/java"))) {
+            boolean built = "maven".equals(module.fact("buildTool")) || "gradle".equals(module.fact("buildTool"));
+            if (!built || !Files.isDirectory(dir.resolve("src/main/java"))) {
                 continue;
             }
             String label = module.path().equals(".") ? "" : module.path() + ": ";
@@ -66,7 +67,7 @@ public final class SpringBootReplatformer implements Fixer {
             notes.forEach(n -> details.add(label + n));
         }
         if (converted == 0) {
-            return new StageResult(STRATEGY, StageResult.Status.SKIPPED, "no Maven module with Jakarta EE components found", details);
+            return new StageResult(STRATEGY, StageResult.Status.SKIPPED, "no Maven or Gradle module with Jakarta EE components found", details);
         }
         return new StageResult(STRATEGY, StageResult.Status.APPLIED, converted + " module(s) moved to Spring Boot " + boot, details);
     }
@@ -155,13 +156,20 @@ public final class SpringBootReplatformer implements Fixer {
         // The descriptors the server read.
         boolean war = Files.isDirectory(module.resolve("src/main/webapp"));
         Properties properties = new Properties();
-        String pom = Files.readString(module.resolve("pom.xml"), StandardCharsets.UTF_8);
-        String artifact = xml(pom.replaceAll("(?s)<parent>.*?</parent>", ""), "artifactId");
+        // The build: a pom.xml, or a Gradle build script in either language.
+        Path buildFile = Stream.of("pom.xml", "build.gradle", "build.gradle.kts").map(module::resolve).filter(Files::isRegularFile)
+                .findFirst().orElseThrow(() -> new IOException("no build file in " + module));
+        boolean maven = buildFile.getFileName().toString().equals("pom.xml");
+        String pom = Files.readString(buildFile, StandardCharsets.UTF_8);
         String contextRoot = descriptors(module, properties, notes);
-        if (contextRoot == null && Pattern.compile("<packaging>\\s*war\\s*</packaging>").matcher(pom).find()) {
+        if (contextRoot == null && maven && Pattern.compile("<packaging>\\s*war\\s*</packaging>").matcher(pom).find()) {
             // The server published a WAR under its file name.
+            String artifact = xml(pom.replaceAll("(?s)<parent>.*?</parent>", ""), "artifactId");
             String finalName = xml(pom, "finalName");
             contextRoot = "/" + (finalName != null && !finalName.contains("${") ? finalName : artifact);
+        }
+        if (contextRoot == null && !maven && GRADLE_WAR.matcher(pom).find()) {
+            contextRoot = "/" + gradleArchiveName(module, pom);
         }
         if (contextRoot != null && !contextRoot.equals("/")) {
             properties.put("server.servlet.context-path", contextRoot, "The address the application server published it under.");
@@ -252,7 +260,8 @@ public final class SpringBootReplatformer implements Fixer {
                 jsp = walk.anyMatch(p -> p.toString().endsWith(".jsp") || p.toString().endsWith(".jspx"));
             }
         }
-        Files.writeString(module.resolve("pom.xml"), pom(pom, boot, uses, webContent, jsp, notes), StandardCharsets.UTF_8);
+        Files.writeString(buildFile, maven ? pom(pom, boot, uses, webContent, jsp, notes)
+                : gradle(pom, boot, uses, webContent, jsp, buildFile.getFileName().toString().endsWith(".kts"), notes), StandardCharsets.UTF_8);
         return true;
     }
 
@@ -627,6 +636,153 @@ public final class SpringBootReplatformer implements Fixer {
                 + (removed.changes() > 0 ? " in place of " + removed.changes() + " server API dependenc" + (removed.changes() == 1 ? "y" : "ies") : "")
                 + "; packaged as " + (webContent ? "a WAR that also runs on its own" : "an executable jar"));
         return pom;
+    }
+
+    // ---- Gradle ----------------------------------------------------------------------------------------------
+
+    static final String DEPENDENCY_MANAGEMENT = "1.1.7";
+    private static final Pattern GRADLE_WAR = Pattern.compile("(?m)^\\s*(id\\s*\\(?\\s*['\"]war['\"]\\s*\\)?|apply\\s+plugin:\\s*['\"]war['\"]|`?war`?)\\s*$");
+    private static final Pattern GRADLE_DEPENDENCY = Pattern.compile(
+            "(?m)^[ \\t]*\\w+[ \\t]*\\(?[ \\t]*['\"]([^:'\"\\s]+):([^:'\"\\s]+)(?::[^'\"]*)?['\"][ \\t]*\\)?[ \\t]*\\R");
+    private static final Pattern GRADLE_MANAGED = Pattern.compile(
+            "(['\"])((?:org\\.glassfish\\.jaxb|org\\.hibernate[\\w.]*|com\\.fasterxml\\.jackson[\\w.]*):[^:'\"\\s]+|jakarta\\.[\\w.]+:[^:'\"\\s]+-api):[^'\"]+\\1");
+
+    /** The name Gradle gives the WAR, which is the address a server published it under: the archive's or the project's. */
+    private static String gradleArchiveName(Path module, String build) throws IOException {
+        Matcher named = Pattern.compile("archive(?:Base|File)Name(?:\\.set\\(|\\s*=\\s*)['\"]([^'\"]+?)(?:\\.war)?['\"]").matcher(build);
+        if (named.find()) {
+            return named.group(1);
+        }
+        for (String settings : new String[] {"settings.gradle", "settings.gradle.kts"}) {
+            if (Files.isRegularFile(module.resolve(settings))) {
+                Matcher root = Pattern.compile("rootProject\\.name\\s*=\\s*['\"]([^'\"]+)['\"]").matcher(Files.readString(module.resolve(settings)));
+                if (root.find()) {
+                    return root.group(1);
+                }
+            }
+        }
+        return module.toAbsolutePath().normalize().getFileName().toString();
+    }
+
+    /**
+     * The Gradle build of the re-platformed module: Spring Boot's plugin and its dependency management in
+     * place of the versions the build wrote, starters in place of the platform API, and JUnit 5 for the
+     * generated test beside whatever the project's own tests use.
+     */
+    static String gradle(String original, String boot, Uses uses, boolean webContent, boolean jsp, boolean kotlin, List<String> notes) {
+        String build = original;
+        // The platform API the server supplied.
+        int removed = 0;
+        Matcher declared = GRADLE_DEPENDENCY.matcher(build);
+        StringBuilder kept = new StringBuilder();
+        while (declared.find()) {
+            boolean server = serverApi(declared.group(1), declared.group(2));
+            removed += server ? 1 : 0;
+            declared.appendReplacement(kept, server ? "" : Matcher.quoteReplacement(declared.group()));
+        }
+        build = declared.appendTail(kept).toString();
+        // Versions the application set for what Spring Boot now manages would fight the versions it chose.
+        build = GRADLE_MANAGED.matcher(build).replaceAll("$1$2$1");
+
+        String q = kotlin ? "\"" : "'";
+        List<String> plugins = new ArrayList<>();
+        if (!Pattern.compile("(?m)^\\s*(id\\s*\\(?\\s*['\"](java|java-library|war)['\"]|apply\\s+plugin:\\s*['\"](java|java-library|war)['\"]|`?(java|war|`java-library`)`?\\s*$)")
+                .matcher(build).find()) {
+            plugins.add(kotlin ? "java" : "id 'java'");
+        }
+        plugins.add(kotlin ? "id(\"org.springframework.boot\") version \"" + boot + "\"" : "id 'org.springframework.boot' version '" + boot + "'");
+        plugins.add(kotlin ? "id(\"io.spring.dependency-management\") version \"" + DEPENDENCY_MANAGEMENT + "\""
+                : "id 'io.spring.dependency-management' version '" + DEPENDENCY_MANAGEMENT + "'");
+        build = addGradlePlugins(build, plugins);
+        if (!webContent) {
+            // Nothing is left to deploy to a server: an executable jar.
+            build = build.replaceAll("(?m)^[ \\t]*(id\\s*\\(?\\s*['\"]war['\"]\\s*\\)?|apply\\s+plugin:\\s*['\"]war['\"]|`?war`?)[ \\t]*\\R", "");
+            if (!Pattern.compile("(?m)^\\s*(id\\s*\\(?\\s*['\"]java(-library)?['\"]|apply\\s+plugin:\\s*['\"]java(-library)?['\"]|`?java`?\\s*$|`java-library`)").matcher(build).find()) {
+                build = addGradlePlugins(build, List.of(kotlin ? "java" : "id 'java'"));
+            }
+            // Configurations only the war plugin has.
+            build = build.replaceAll("(?m)^([ \\t]*)providedCompile\\b", "$1compileOnly").replaceAll("(?m)^([ \\t]*)providedRuntime\\b", "$1runtimeOnly");
+        }
+
+        List<String> starters = new ArrayList<>();
+        starters.add(uses.rest() ? "spring-boot-starter-jersey" : "spring-boot-starter-web");
+        if (uses.jpa()) {
+            starters.add("spring-boot-starter-data-jpa");
+        }
+        if (uses.validation()) {
+            starters.add("spring-boot-starter-validation");
+        }
+        for (String starter : starters) {
+            build = GradleBuildFixer.addDependency(build, "implementation", "org.springframework.boot:" + starter, kotlin);
+        }
+        if (uses.jaxb()) {
+            build = GradleBuildFixer.addDependency(build, "implementation", "jakarta.xml.bind:jakarta.xml.bind-api", kotlin);
+            build = GradleBuildFixer.addDependency(build, "runtimeOnly", "org.glassfish.jaxb:jaxb-runtime", kotlin);
+        }
+        if (uses.ejb() && !uses.jpa()) {
+            build = GradleBuildFixer.addDependency(build, "implementation", "org.springframework:spring-tx", kotlin);
+        }
+        if (uses.inject() && !uses.rest()) {
+            build = GradleBuildFixer.addDependency(build, "implementation", "jakarta.inject:jakarta.inject-api", kotlin);
+        }
+        if (webContent) {
+            build = GradleBuildFixer.addDependency(build, "providedRuntime", "org.springframework.boot:spring-boot-starter-tomcat", kotlin);
+            if (jsp) {
+                build = GradleBuildFixer.addDependency(build, "providedRuntime", "org.apache.tomcat.embed:tomcat-embed-jasper", kotlin);
+            }
+        }
+        if (Pattern.compile("['\"]junit:junit[:'\"]").matcher(build).find()) {
+            // The application's JUnit 4 tests keep running beside the JUnit 5 test added here.
+            build = GradleBuildFixer.addDependency(build, "testRuntimeOnly", "org.junit.vintage:junit-vintage-engine", kotlin);
+        }
+        build = GradleBuildFixer.addDependency(build, "testImplementation", "org.springframework.boot:spring-boot-starter-test", kotlin);
+        build = GradleBuildFixer.addDependency(build, "testRuntimeOnly", "org.junit.platform:junit-platform-launcher", kotlin);
+        if (uses.jpa()) {
+            build = GradleBuildFixer.addDependency(build, "testRuntimeOnly", "com.h2database:h2", kotlin);
+        }
+        if (!build.contains("mavenCentral()")) {
+            build += (build.endsWith("\n") ? "" : "\n") + "\nrepositories {\n    mavenCentral()\n}\n";
+        }
+        if (!build.contains("useJUnitPlatform")) {
+            // The generated test is JUnit 5, which Gradle runs only when told to.
+            build += (build.endsWith("\n") ? "" : "\n") + "\n" + (kotlin ? "tasks.withType<Test> {\n    useJUnitPlatform()\n}\n"
+                    : "tasks.withType(Test).configureEach {\n    useJUnitPlatform()\n}\n");
+        }
+        // Lines taken out leave their blank lines behind.
+        build = build.replaceAll("\\n{3,}", "\n\n");
+        notes.add("the Gradle build: Spring Boot " + boot + " manages the versions; " + String.join(", ", starters)
+                + (removed > 0 ? " in place of " + removed + " server API dependenc" + (removed == 1 ? "y" : "ies") : "")
+                + "; packaged as " + (webContent ? "a WAR that also runs on its own (bootWar)" : "an executable jar (bootJar)"));
+        return build;
+    }
+
+    /** Adds plugin lines to the build's {@code plugins} block, which it gets, where Gradle wants it, if it has none. */
+    static String addGradlePlugins(String build, List<String> lines) {
+        Matcher block = Pattern.compile("(?m)^plugins\\s*\\{").matcher(build);
+        if (block.find()) {
+            int close = build.indexOf("\n}", block.end());
+            if (close >= 0) {
+                String body = build.substring(block.end(), close);
+                Matcher first = Pattern.compile("(?m)^([ \\t]+)\\S").matcher(body);
+                String indent = first.find() ? first.group(1) : "    ";
+                StringBuilder added = new StringBuilder();
+                lines.forEach(l -> added.append("\n").append(indent).append(l));
+                return build.substring(0, close) + added + build.substring(close);
+            }
+        }
+        // Before everything but a buildscript block, as Gradle requires.
+        StringBuilder plugins = new StringBuilder("plugins {\n");
+        lines.forEach(l -> plugins.append("    ").append(l).append("\n"));
+        plugins.append("}\n\n");
+        Matcher buildscript = Pattern.compile("(?m)^buildscript\\s*\\{").matcher(build);
+        if (buildscript.find()) {
+            int close = build.indexOf("\n}", buildscript.end());
+            if (close >= 0) {
+                int after = Math.min(build.length(), close + 3);
+                return build.substring(0, after) + "\n" + plugins + build.substring(after).replaceFirst("^\\R+", "");
+            }
+        }
+        return plugins + build.replaceFirst("^\\R+", "");
     }
 
     private static String xml(String text, String tag) {

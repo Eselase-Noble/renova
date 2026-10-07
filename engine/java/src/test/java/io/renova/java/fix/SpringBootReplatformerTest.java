@@ -185,4 +185,95 @@ class SpringBootReplatformerTest {
                 "spring-boot-starter-test");
         assertThat(read("src/main/resources/application.properties")).contains("server.servlet.context-path=/shop");
     }
+
+    @Test
+    void aGradleBuildGetsSpringBootInPlaceOfThePlatformApi() throws Exception {
+        file("settings.gradle", "rootProject.name = 'pay'\n");
+        file("build.gradle", """
+                plugins {
+                    id 'war'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    providedCompile 'jakarta.platform:jakarta.jakartaee-api:10.0.0'
+                    implementation 'org.apache.commons:commons-lang3:3.14.0'
+                    implementation 'org.hibernate.orm:hibernate-core:6.2.0.Final'
+                    testImplementation 'junit:junit:4.13.2'
+                }
+                """);
+        file("src/main/java/com/acme/pay/PayService.java", """
+                package com.acme.pay;
+
+                import jakarta.ejb.Stateless;
+                import jakarta.persistence.EntityManager;
+                import jakarta.persistence.PersistenceContext;
+
+                @Stateless
+                public class PayService {
+                    @PersistenceContext
+                    EntityManager em;
+                }
+                """);
+        List<String> notes = new ArrayList<>();
+
+        assertThat(SpringBootReplatformer.convert(module, "3.5.7", notes)).isTrue();
+
+        String build = read("build.gradle");
+        assertThat(build).contains("id 'java'", "id 'org.springframework.boot' version '3.5.7'",
+                        "id 'io.spring.dependency-management' version '" + SpringBootReplatformer.DEPENDENCY_MANAGEMENT + "'",
+                        "implementation 'org.springframework.boot:spring-boot-starter-web'",
+                        "implementation 'org.springframework.boot:spring-boot-starter-data-jpa'",
+                        "implementation 'org.apache.commons:commons-lang3:3.14.0'",
+                        // Spring Boot chooses Hibernate's version now.
+                        "implementation 'org.hibernate.orm:hibernate-core'\n",
+                        "testRuntimeOnly 'org.junit.vintage:junit-vintage-engine'",
+                        "testImplementation 'org.springframework.boot:spring-boot-starter-test'", "testRuntimeOnly 'com.h2database:h2'",
+                        "useJUnitPlatform()")
+                // No pages: nothing to deploy to a server, so no WAR and no platform API.
+                .doesNotContain("id 'war'", "jakartaee-api", "providedCompile");
+        // The server published the WAR under the project's name.
+        assertThat(read("src/main/resources/application.properties")).contains("server.servlet.context-path=/pay");
+        assertThat(read("src/main/java/com/acme/pay/PayService.java")).contains("@Service");
+        assertThat(module.resolve("src/main/java/com/acme/pay/Application.java")).exists();
+        assertThat(String.join("\n", notes)).contains("the Gradle build: Spring Boot 3.5.7", "in place of 1 server API dependency",
+                "an executable jar (bootJar)");
+    }
+
+    @Test
+    void aKotlinBuildScriptAndABuildWithoutAPluginsBlockAreWrittenTheirOwnWay() {
+        SpringBootReplatformer.Uses rest = new SpringBootReplatformer.Uses(true, false, false, false, true, false, false, false, false);
+        String kotlin = SpringBootReplatformer.gradle("""
+                plugins {
+                    war
+                }
+
+                dependencies {
+                    compileOnly("javax:javaee-api:8.0")
+                }
+                """, "3.5.7", rest, true, true, true, new ArrayList<>());
+        assertThat(kotlin).contains("    war\n", "id(\"org.springframework.boot\") version \"3.5.7\"",
+                        "implementation(\"org.springframework.boot:spring-boot-starter-jersey\")",
+                        // Pages: still a WAR, with the embedded server and its JSP engine not packaged twice.
+                        "providedRuntime(\"org.springframework.boot:spring-boot-starter-tomcat\")",
+                        "providedRuntime(\"org.apache.tomcat.embed:tomcat-embed-jasper\")", "tasks.withType<Test> {", "mavenCentral()")
+                .doesNotContain("javaee-api");
+
+        String legacy = SpringBootReplatformer.gradle("""
+                buildscript {
+                    repositories { mavenCentral() }
+                }
+                apply plugin: 'war'
+
+                dependencies {
+                    compile 'commons-io:commons-io:2.11.0'
+                }
+                """, "3.5.7", rest, false, false, false, new ArrayList<>());
+        // The plugins block comes right after buildscript, where Gradle accepts it.
+        assertThat(legacy).containsSubsequence("buildscript {", "}\n", "plugins {", "id 'org.springframework.boot'", "id 'java'", "}\n\ndependencies {")
+                .doesNotContain("apply plugin: 'war'");
+    }
 }
