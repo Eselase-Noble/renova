@@ -199,6 +199,23 @@ rules:
       Spring Boot 2 brought javax.xml.bind in with its starters; Spring Boot 3 does not bring jakarta.xml.bind.
       Code that uses JAXB annotations needs the API declared. Spring Boot manages its version.
 
+  - id: guard-gradle-stray-javax-jaxb
+    phase: guard
+    title: The javax JAXB API the Java upgrade adds to a Gradle build is not for Spring Boot 3
+    category: E
+    severity: WARNING
+    detect:
+      type: fileContains
+      include: ["**/build.gradle", "**/build.gradle.kts"]
+      pattern: "runtimeOnly[ (]+['\"]javax\\.xml\\.bind:jaxb-api"
+    fix:
+      strategy: gradle
+      params: { action: removeDependency, remove: ["javax.xml.bind:jaxb-api"] }
+    rationale: >
+      The Java upgrade recipe adds javax.xml.bind:jaxb-api at runtime to any Gradle build, for code written
+      for Java 8. On Spring Boot 3 nothing uses the javax package: code that binds XML imports jakarta.xml.bind,
+      which the guard above declares.
+
 knowledge:
 
   - id: spring-boot-3-baseline

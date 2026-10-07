@@ -84,6 +84,23 @@ rules:
       recipes: [io.renova.java.QuarkusUpdate]
     rationale: Quarkus 3 ships the Jakarta EE 10 APIs only; the Quarkus 3.0 recipes rename the imports.
 
+  - id: guard-quarkus-gradle-wrapper
+    phase: guard
+    title: The Quarkus 3 Gradle plugin needs Gradle 9
+    category: A
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/gradle/wrapper/gradle-wrapper.properties"]
+      pattern: "^distributionUrl=.*/gradle-[0-8]\\."
+    fix:
+      strategy: gradle
+      params: { action: setWrapperVersion, version: "9.1.0" }
+    rationale: >
+      On Gradle 8.5, which is enough for Java 21, the Quarkus 3.33 plugin stops the build while it is being
+      configured ("NamedImpl cannot be cast to class org.gradle.api.Task"). The build and its tests pass on
+      Gradle 9.1.
+
 knowledge:
 
   - id: quarkus-3-baseline

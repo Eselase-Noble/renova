@@ -46,10 +46,19 @@ public final class GradlePluginDetector implements DetectorFactory {
         };
     }
 
-    /** The plugin applied with a version: group 1 is the version as written. */
+    /**
+     * The plugin applied with a version: group 1 is the version as written. A Kotlin plugin may also be
+     * written {@code kotlin("jvm")}, the Kotlin DSL's short form of {@code id("org.jetbrains.kotlin.jvm")}.
+     */
     public static Pattern declaration(String id) {
-        return Pattern.compile("id\\s*\\(?\\s*['\"]" + Pattern.quote(id) + "['\"]\\s*\\)?\\s*version\\s*\\(?\\s*['\"]?([^'\"\\s)]+)");
+        String applied = "id\\s*\\(?\\s*['\"]" + Pattern.quote(id) + "['\"]\\s*\\)?";
+        if (id.startsWith(KOTLIN)) {
+            applied = "(?:" + applied + "|kotlin\\s*\\(\\s*['\"]" + Pattern.quote(id.substring(KOTLIN.length())) + "['\"]\\s*\\))";
+        }
+        return Pattern.compile(applied + "\\s*version\\s*\\(?\\s*['\"]?([^'\"\\s)]+)");
     }
+
+    private static final String KOTLIN = "org.jetbrains.kotlin.";
 
     private static boolean below(String version, String bound) {
         return !version.matches("\\d.*") || Versions.isBelow(version, bound);

@@ -23,12 +23,21 @@ import java.util.regex.Pattern;
  *   <li>{@code action: addDependency} adds the dependency each finding carries (from
  *       {@code gradleImportWithoutDependency}) to the build file's {@code dependencies} block;
  *       {@code remove: ["javax.xml.bind:jaxb-api"]} also deletes the lines that declare those artifacts.</li>
+ *       With {@code dependency: "g:a[:v]"} (and {@code configuration}, default implementation) it adds that one
+ *       instead, to every build file the rule found.</li>
  *   <li>{@code action: removeDependency, remove: [...]} only deletes.</li>
+ *   <li>{@code action: setPluginVersion, plugins: ["org.jetbrains.kotlin."], version: "1.9.25"} sets the version
+ *       of every plugin in a {@code plugins} block whose id starts with one of the prefixes.</li>
+ *   <li>{@code action: setWrapperVersion, version: "9.1.0"} points gradle-wrapper.properties at that Gradle.</li>
  * </ul>
  */
 public final class GradleBuildFixer implements Fixer {
 
     public static final String STRATEGY = "gradle";
+    private static final List<String> ACTIONS = List.of("addDependency", "removeDependency", "setPluginVersion", "setWrapperVersion");
+    /** A plugin with a literal version: group 1 is everything before the version, 2 the id, 3 a kotlin("…") name. */
+    private static final Pattern PLUGIN = Pattern.compile(
+            "((?:\\bid\\s*\\(?\\s*['\"]([\\w.-]+)['\"]\\s*\\)?|\\bkotlin\\s*\\(\\s*['\"]([\\w.-]+)['\"]\\s*\\))\\s*version\\s*\\(?\\s*['\"])[^'\"]+");
 
     @Override
     public String strategy() {
@@ -44,11 +53,24 @@ public final class GradleBuildFixer implements Fixer {
             String ruleId = step.rule().id();
             Params params = step.rule().fix().params(ruleId);
             String action = params.string("action");
-            if (!action.equals("addDependency") && !action.equals("removeDependency")) {
+            if (!ACTIONS.contains(action)) {
                 throw new IllegalArgumentException("Rule '" + ruleId + "': unknown gradle action '" + action
-                        + "'; use addDependency or removeDependency");
+                        + "'; use one of " + ACTIONS);
             }
             for (String file : step.files()) {
+                if (action.equals("setWrapperVersion")) {
+                    if (file.endsWith("gradle-wrapper.properties")) {
+                        Path properties = root.resolve(file);
+                        String before = Files.readString(properties, StandardCharsets.UTF_8);
+                        String content = setWrapperVersion(before, params.string("version"));
+                        if (!content.equals(before)) {
+                            Files.writeString(properties, content, StandardCharsets.UTF_8);
+                            changed++;
+                        }
+                        details.add(ruleId + ": " + file + ": " + (content.equals(before) ? "already correct" : action));
+                    }
+                    continue;
+                }
                 if (!file.endsWith(".gradle") && !file.endsWith(".gradle.kts")) {
                     continue;
                 }
@@ -58,7 +80,13 @@ public final class GradleBuildFixer implements Fixer {
                 for (String artifact : params.strings("remove")) {
                     content = removeDependency(content, artifact);
                 }
-                if (action.equals("addDependency")) {
+                if (action.equals("setPluginVersion")) {
+                    content = setPluginVersion(content, params.requiredStrings("plugins"), params.string("version"));
+                }
+                if (action.equals("addDependency") && params.optString("dependency").isPresent()) {
+                    content = addDependency(content, params.optString("configuration").orElse("implementation"),
+                            params.string("dependency"), file.endsWith(".kts"));
+                } else if (action.equals("addDependency")) {
                     for (Finding f : step.findings()) {
                         if (f.file().equals(file) && f.data().containsKey("dependency")) {
                             content = addDependency(content, f.data().getOrDefault("configuration", "implementation"),
@@ -108,6 +136,27 @@ public final class GradleBuildFixer implements Fixer {
         String quote = kotlin ? "\"" : "'";
         return build + (build.endsWith("\n") ? "" : "\n") + "\ndependencies {\n    " + configuration
                 + (kotlin ? "(" + quote + dependency + quote + ")" : " " + quote + dependency + quote) + "\n}\n";
+    }
+
+    /**
+     * Sets the version of the plugins whose id starts with one of the prefixes, where a version is written:
+     * {@code id 'x' version '1'}, {@code id("x") version "1"}, and Kotlin's {@code kotlin("jvm") version "1"}.
+     */
+    static String setPluginVersion(String build, List<String> prefixes, String version) {
+        Matcher m = PLUGIN.matcher(build);
+        StringBuilder out = new StringBuilder();
+        while (m.find()) {
+            String id = m.group(2) != null ? m.group(2) : "org.jetbrains.kotlin." + m.group(3);
+            boolean wanted = prefixes.stream().anyMatch(id::startsWith);
+            m.appendReplacement(out, Matcher.quoteReplacement(wanted ? m.group(1) + version : m.group()));
+        }
+        return m.appendTail(out).toString();
+    }
+
+    /** Points the wrapper at another Gradle; the old distribution's checksum goes with it. */
+    static String setWrapperVersion(String properties, String version) {
+        return properties.replaceAll("(?m)^(distributionUrl=.*/gradle-)[^-/]+(-(?:bin|all)\\.zip)\\s*$", "$1" + version + "$2")
+                .replaceAll("(?m)^distributionSha256Sum=.*\\R?", "");
     }
 
     /** Deletes the lines that declare {@code groupId:artifactId}, with any version. */

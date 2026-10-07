@@ -182,3 +182,32 @@ apps:
       - { file: pom.xml, contains: "<kotlin.version>1.9.25</kotlin.version>", why: "a Kotlin compiler that knows Java 21" }
       - { file: src/main/kotlin/com/acme/tasks/Task.kt, contains: "import jakarta.persistence.Entity", why: "Kotlin sources are migrated like Java ones" }
       - { file: "**/*.kt", absent: "import javax.", why: "Jakarta EE" }
+
+  # The same three stacks built with Gradle. Each needs a guard its Maven build does not: the Kotlin plugins'
+  # version, Micronaut's validation module, its processor and SnakeYAML, and a Gradle the Quarkus 3 plugin runs on.
+  - id: kotlin-spring-boot-2-to-3-gradle
+    path: tasks-kotlin-boot2-gradle
+    playbook: spring-boot-3
+    checks:
+      - { file: build.gradle, matches: "id 'org.springframework.boot' version '3\\.5\\.", why: "on the target release" }
+      - { file: build.gradle, contains: "id 'org.jetbrains.kotlin.plugin.jpa' version '1.9.25'", why: "every Kotlin plugin moves with the compiler" }
+      - { file: build.gradle, absent: "javax.xml.bind", why: "nothing on Spring Boot 3 uses the javax JAXB API" }
+      - { file: "**/*.kt", absent: "import javax.", why: "Jakarta EE" }
+
+  - id: micronaut-3-to-4-gradle
+    path: greeter-micronaut3-gradle
+    playbook: micronaut-4
+    checks:
+      - { file: build.gradle, matches: "id 'io.micronaut.application' version '4\\.", why: "the Micronaut 4 plugin" }
+      - { file: build.gradle, contains: "implementation 'io.micronaut.validation:micronaut-validation'", why: "validation is its own module" }
+      - { file: build.gradle, contains: "annotationProcessor 'io.micronaut.validation:micronaut-validation-processor'", why: "without it constraints are not enforced" }
+      - { file: build.gradle, contains: "runtimeOnly 'org.yaml:snakeyaml'", why: "application.yml is read only with SnakeYAML" }
+
+  - id: quarkus-2-to-3-gradle
+    path: catalog-quarkus2-gradle
+    playbook: quarkus-3
+    checks:
+      - { file: gradle.properties, matches: "quarkusPlatformVersion=3\\.", why: "on Quarkus 3" }
+      - { file: gradle/wrapper/gradle-wrapper.properties, contains: "gradle-9.1.0-bin.zip", why: "a Gradle the Quarkus 3 plugin runs on" }
+      - { file: gradle/wrapper/gradle-wrapper.properties, absent: "distributionSha256Sum", why: "the old distribution's checksum would reject the new one" }
+      - { file: "**/*.java", absent: "import javax.ws.rs", why: "Jakarta REST" }

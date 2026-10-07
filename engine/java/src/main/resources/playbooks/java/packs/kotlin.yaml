@@ -1,5 +1,5 @@
-# Kotlin sources in a Maven build. The recipes rewrite Kotlin as they do Java; what needs care is the Kotlin
-# compiler itself, which has to know the Java release it compiles for.
+# Kotlin sources in a Maven or Gradle build. The recipes rewrite Kotlin as they do Java; what needs care is the
+# Kotlin compiler itself, which has to know the Java release it compiles for.
 
 rules:
 
@@ -16,6 +16,19 @@ rules:
       Kotlin compilers before 1.9.20 stop with "Unknown JVM target version: 21". 1.9.25 is the last 1.9 release:
       it compiles for Java 21 and is the version Spring Boot 3.5 manages. Kotlin 2 changes the compiler front
       end and is a step of its own.
+
+  - id: guard-kotlin-gradle-compiles-for-java-21
+    phase: guard
+    title: The Kotlin Gradle plugins must know Java 21
+    category: A
+    severity: BLOCKER
+    detect: { type: gradlePlugin, id: org.jetbrains.kotlin.jvm, versionBelow: "1.9.20" }
+    fix:
+      strategy: gradle
+      params: { action: setPluginVersion, plugins: ["org.jetbrains.kotlin."], version: "1.9.25" }
+    rationale: >
+      The same compiler, applied as a Gradle plugin: before 1.9.20 compileKotlin fails on Java 21. The
+      compiler plugins (spring, jpa, allopen, noarg, kapt) carry the compiler's version and move with it.
 
 knowledge:
 

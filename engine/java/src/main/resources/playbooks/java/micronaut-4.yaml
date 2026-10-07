@@ -115,6 +115,59 @@ rules:
       Constraints on method parameters are woven in at compile time. Without the processor the code builds and
       runs, and invalid requests are accepted without complaint.
 
+  - id: guard-micronaut-gradle-validation-module
+    phase: guard
+    title: Micronaut 4 keeps validation in its own module (Gradle)
+    category: E
+    severity: BLOCKER
+    detect:
+      type: gradleImportWithoutDependency
+      imports: [io.micronaut.validation]
+      dependency: "io.micronaut.validation:micronaut-validation"
+    fix:
+      strategy: gradle
+      params: { action: addDependency }
+    rationale: >
+      The same module in a Gradle build, where the upgrade recipe replaces io.micronaut:micronaut-validation
+      with the jakarta.validation API alone and @Validated is no longer found. The Micronaut plugin's platform
+      gives the version.
+
+  - id: guard-micronaut-gradle-validation-processor
+    phase: guard
+    title: Validation needs its annotation processor in Micronaut 4 (Gradle)
+    category: E
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/build.gradle", "**/build.gradle.kts"]
+      pattern: "io\\.micronaut\\.validation:micronaut-validation\\b"
+      unless: "micronaut-validation-processor"
+    fix:
+      strategy: gradle
+      params: { action: addDependency, configuration: annotationProcessor,
+                dependency: "io.micronaut.validation:micronaut-validation-processor" }
+    rationale: >
+      Constraints on method parameters are woven in at compile time. Without the processor the code builds and
+      runs, and invalid requests are accepted without complaint.
+
+  - id: guard-micronaut-gradle-snakeyaml
+    phase: guard
+    title: Micronaut 4 reads application.yml only with SnakeYAML on the classpath (Gradle)
+    category: E
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/build.gradle", "**/build.gradle.kts"]
+      pattern: "io\\.micronaut\\.(application|library)['\"]"
+      unless: "snakeyaml"
+    fix:
+      strategy: gradle
+      params: { action: addDependency, configuration: runtimeOnly, dependency: "org.yaml:snakeyaml" }
+    rationale: >
+      Micronaut 4 made SnakeYAML optional, and its Gradle plugin stops the build when it finds a YAML
+      configuration file without it ("YAML configuration file detected but snakeyaml is not on classpath").
+      At runtime only, it changes nothing for a project configured with properties files.
+
 knowledge:
 
   - id: micronaut-4-baseline
