@@ -52,6 +52,9 @@ public final class PhpBehaviourRunner implements BehaviourRunner {
     /** {@code @Route("/x", name="y", methods={"GET"})} or {@code #[Route(path: '/x', methods: ['GET'])]}: the path, then the rest. */
     private static final Pattern SYMFONY_ROUTE = Pattern.compile("(?:@|#\\[)(?:[\\w\\\\]*\\\\)?Route\\(\\s*(?:path\\s*[:=]\\s*)?['\"]([^'\"]*)['\"]([^)]*)\\)");
     private static final Pattern CONTROLLER = Pattern.compile("([A-Za-z_][\\w\\\\]*)(?:::class|@\\w+)");
+    private static final Pattern ROUTE_MATCH = Pattern.compile(
+            "Route::match\\(\\s*\\[[^\\]]*]\\s*,\\s*['\"]([^'\"]*)['\"]\\s*,\\s*([^;]*?)\\)\\s*(?:->|;)");
+    private static final Pattern INCLUDE = Pattern.compile("\\b(?:include|require)(?:_once)?\\b[^;'\"]*['\"]([^'\"]+\\.\\w+)['\"]\\s*\\)?\\s*;");
     private static final Pattern VARIABLE = Pattern.compile("\\{(\\w+)\\??}");
     /** A key for the sandbox only: sessions and encrypted cookies need one, and both sides get the same. */
     private static final String SANDBOX_KEY = "base64:cmVub3ZhLXNhbmRib3gta2V5LTMyLWJ5dGVzLWxvbmc=";
@@ -94,7 +97,14 @@ public final class PhpBehaviourRunner implements BehaviourRunner {
                 if (!Files.isRegularFile(path)) {
                     continue;
                 }
-                Matcher m = ROUTE.matcher(read(path).replaceAll("(?m)^\\s*(//|#).*$", ""));
+                String code = read(path).replaceAll("(?m)^\\s*(//|#).*$", "");
+                // Route::match(['get', 'post'], '/x', ...): one address for several methods.
+                Matcher several = ROUTE_MATCH.matcher(code);
+                while (several.find()) {
+                    routes.add(new Route(null, (file[1] + "/" + several.group(1)).replaceAll("/+", "/").replaceAll("(?<=.)/$", ""),
+                            handler(root, several.group(2), file[0])));
+                }
+                Matcher m = ROUTE.matcher(code);
                 while (m.find()) {
                     String template = (file[1] + "/" + m.group(2)).replaceAll("/+", "/").replaceAll("(?<=.)/$", "");
                     String handler = handler(root, m.group(3), file[0]);
@@ -106,6 +116,27 @@ public final class PhpBehaviourRunner implements BehaviourRunner {
                         }
                         case "any", "view" -> routes.add(new Route(m.group(1).equals("view") ? "GET" : null, template, handler));
                         default -> routes.add(new Route(m.group(1).toUpperCase(java.util.Locale.ROOT), template, handler));
+                    }
+                }
+            }
+            // A site that was moved into Laravel: the pages still in its legacy folder answer at their old addresses.
+            Path legacy = root.resolve("config/legacy.php");
+            if (Files.isRegularFile(legacy)) {
+                Matcher configured = Pattern.compile("'root'\\s*=>\\s*'([^']+)'").matcher(read(legacy));
+                Path site = root.resolve(configured.find() ? configured.group(1) : "legacy");
+                if (Files.isDirectory(site)) {
+                    List<String> included = included(site);
+                    try (Stream<Path> files = Files.walk(site, 2)) {
+                        for (Path page : files.filter(f -> f.toString().endsWith(".php") && !isIncluded(site, f, included)).sorted().toList()) {
+                            String path = "/" + site.relativize(page).toString().replace('\\', '/');
+                            String file = root.relativize(page).toString().replace('\\', '/');
+                            routes.add(new Route(null, path, file));
+                            if (path.equals("/index.php")) {
+                                routes.add(new Route(null, "/", file));
+                            }
+                        }
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
                     }
                 }
             }
@@ -147,8 +178,10 @@ public final class PhpBehaviourRunner implements BehaviourRunner {
         String docRoot = documentRoot(root);
         if (docRoot != null) {
             Path dir = docRoot.isEmpty() ? root : root.resolve(docRoot);
+            List<String> included = included(dir);
             try (Stream<Path> files = Files.walk(dir, 2)) {
-                for (Path page : files.filter(f -> f.toString().endsWith(".php") && !PhpPlugin.produced(root.relativize(f))).sorted().toList()) {
+                for (Path page : files.filter(f -> f.toString().endsWith(".php") && !PhpPlugin.produced(root.relativize(f))
+                        && !isIncluded(dir, f, included)).sorted().toList()) {
                     String path = "/" + dir.relativize(page).toString().replace('\\', '/');
                     if (!path.equals("/index.php")) {
                         routes.add(new Route("GET", path, root.relativize(page).toString().replace('\\', '/')));
@@ -159,6 +192,31 @@ public final class PhpBehaviourRunner implements BehaviourRunner {
             }
         }
         return routes;
+    }
+
+    /**
+     * The files a site's pages include or require, as the statements write them ("includes/db.php"). A browser
+     * can ask for such a file where the web server allows it, but it is not a page: asked for alone it prints
+     * nothing, and it has no address once its code is a class.
+     */
+    static List<String> included(Path site) {
+        List<String> names = new ArrayList<>();
+        try (Stream<Path> files = Files.walk(site, 6)) {
+            for (Path file : files.filter(f -> f.toString().endsWith(".php") && !PhpPlugin.produced(site.relativize(f))).toList()) {
+                Matcher m = INCLUDE.matcher(read(file));
+                while (m.find()) {
+                    names.add(m.group(1).replace('\\', '/').replaceAll("^(\\.{1,2}/)+", "").replaceAll("^/+", ""));
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return names;
+    }
+
+    private static boolean isIncluded(Path site, Path file, List<String> included) {
+        String path = "/" + site.relativize(file).toString().replace('\\', '/');
+        return included.stream().anyMatch(name -> !name.isEmpty() && path.endsWith("/" + name));
     }
 
     @Override

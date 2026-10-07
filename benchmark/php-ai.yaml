@@ -28,3 +28,17 @@ apps:
       - { file: tests/QuoteTest.php, contains: "$this->assertEquals(1215.0, $this->sheet()->subtotal());", why: "the test is the one the project had" }
       - { file: tests/QuoteTest.php, contains: "array('Sand', '12 bags', '30')", why: "with the data it had" }
       - { file: "src/*.php", absent: "@$row", why: "errors are not silenced" }
+
+  # A site without a framework: with AI its pages become routes, a controller and Blade views in Laravel 13.
+  # Without AI (the deterministic configuration) the pages stay in the legacy folder and the first two checks
+  # fail by design. Run with behaviour on to compare every page and the form with the original:
+  # cli/bin/renova migrate ../renova-test-apps/clinic-php-plain -p php-to-laravel-13 --out <dir> --ai anthropic --verify-behaviour
+  - id: plain-site-pages-as-laravel
+    path: clinic-php-plain
+    playbook: php-to-laravel-13
+    checks:
+      - { file: routes/web.php, contains: "/view.php", why: "the pages keep their addresses" }
+      - { file: "resources/views/**/*.blade.php", contains: "<h1>", why: "the markup is in Blade views" }
+      - { file: "app/**/*.php", absent: "session_start(", why: "Laravel's session, not PHP's own" }
+      - { file: composer.json, contains: '"laravel/framework": "^13', why: "it is a Laravel application" }
+

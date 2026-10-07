@@ -450,6 +450,7 @@ Windows machine, and how, is in [docs/windows-test-plan.md](docs/windows-test-pl
 | `php-to-8.3`, `php-to-8.4`, `php-to-8.5` | Any Composer project, from PHP 5.4 on, or a site without Composer | That PHP version, and nothing else: frameworks stay | Projects without Laravel (`php-to-8.4`) |
 | `laravel-11`, `laravel-12`, `laravel-13` | A Laravel application on any older Laravel | That Laravel, on PHP 8.3 (Laravel 11) or 8.4 | Laravel applications (`laravel-13`) |
 | `symfony-6.4`, `symfony-7.4`, `symfony-8.1` | A Symfony application on an older Symfony | That Symfony (6.4 and 7.4 are long-term-support releases), on PHP 8.3 or 8.4 | Symfony applications (`symfony-7.4`) |
+| `php-to-laravel-13` | A site written in plain PHP, without a framework | A Laravel 13 application on PHP 8.4 that serves the site's pages at the addresses they had; with AI, the pages as routes, controllers and Blade views | Chosen by hand |
 
 What these do today, with no AI ([results](docs/verified-migrations.md#php)):
 
@@ -463,6 +464,18 @@ What these do today, with no AI ([results](docs/verified-migrations.md#php)):
 - **Verification on the target PHP.** `composer update` resolves and installs what `composer.json` now asks
   for, every file of the project is checked to parse, and the project's tests run with PHPUnit or Pest. PHP
   has no compiler to catch the rest, so a project without tests is reported as unproven.
+
+**Plain PHP into Laravel** (`php-to-laravel-13`) is done in two steps, and the first needs no AI. The site's
+files move to a `legacy` folder inside a new Laravel 13 application, stylesheets, scripts and images move to
+`public`, and one controller, matched after every route of the application, runs the page the site had at an
+address: `/view.php?id=3` still runs `view.php`, in its own folder, with PHP's own `$_GET`, `$_POST` and
+session. Variables the site's functions take with `global` are found and kept global. The site then works as
+it did, which the side-by-side run checks request by request, and it is a Laravel application: new features
+are written as routes and controllers beside the old pages. In the second step, with an AI provider, the
+pages themselves become routes at the same addresses, controllers and Blade views, shared includes become
+classes, and rewritten pages are deleted from `legacy`; a page that cannot be rewritten with confidence stays
+and keeps working. Forms keep accepting the requests they accepted (no CSRF token is demanded, as before);
+turning that check on is a listed follow-up.
 
 Rector's rule sets also move code to newer idioms (constructor promotion, arrow functions, and in Laravel 13
 attributes in place of `$fillable`): more is changed than the target strictly needs, and the tests are what
@@ -522,7 +535,8 @@ source migrates without one. See [docs/licensing.md](docs/licensing.md).
    ([design](docs/behavioural-verification-design.md)).
 3. **Benchmark harness:** `renova benchmark` scores migrations of synthetic legacy apps (see
    [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.
-4. **Web console:** single sign-on (the audit log and local mode are in). **Licensing** is in: signed licence
+4. **Web console:** single sign-on over OpenID Connect is in ([setting it up](docs/deployment.md#single-sign-on-for-the-web-console)),
+   with the audit log and local mode; SAML and roles from the provider's groups are not. **Licensing** is in: signed licence
    files checked offline. **Desktop:** signed installers need certificates that are not bought yet
    ([what and how](docs/deployment.md#signing-the-installers)).
 5. **More targets and ecosystems:** Java 17/21/25, Spring Boot 3 and 4.1, Spring Framework 7 with Jakarta EE 11,
@@ -536,8 +550,8 @@ source migrates without one. See [docs/licensing.md](docs/licensing.md).
    EF Core, Windows Forms and WPF verified on Windows, Web Forms. Behavioural verification runs ASP.NET Core
    applications; classic ASP.NET originals need IIS on Windows.
 7. **PHP:** a chosen PHP version (8.3, 8.4, 8.5), Laravel version (11, 12, 13) and Symfony version (6.4, 7.4, 8.1)
-   are in, with sites without Composer, add-ons for PHPUnit 11 and for keeping the code's style, and
-   behavioural verification. Next: a real Laravel or Symfony application with a database and security
+   are in, with sites without Composer, plain PHP sites into Laravel 13, add-ons for PHPUnit 11 and for
+   keeping the code's style, and behavioural verification. Next: a real Laravel or Symfony application with a database and security
    configuration, `mysql_*` with AI.
 
 ## Contributing

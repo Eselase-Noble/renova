@@ -116,7 +116,8 @@ Run on 7 October 2026, no AI, verified on PHP 8.4.23 with Composer 2.9:
 | Notes (same) | Symfony 5.4 | Symfony 6.4, PHP 8.3 | Pass (6 tests) | 2/2 |
 | Notes (same) | Symfony 5.4 | Symfony 8.1, PHP 8.4 | Pass (6 tests); side by side, the same answer to 6 of 6 requests | 4/4 |
 | Ledger and Orders (same), with the `conservative` add-on | PHP 7.4; Laravel 10 | PHP 8.4; Laravel 13 | Pass (7 tests each). Code changed outside `composer.json`: 30 lines in place of 66, and 8 lines in place of 96 | 4/4, 3/3 |
-| Brochure (a site without Composer or tests: three pages and an include using `each()`, `create_function()`, curly-brace offsets, reversed `implode()`) | PHP 5.3 to 7.4 | PHP 8.4, with a `composer.json` | Pass (no tests); side by side on PHP 7.4 and 8.4, the same answer to 6 of 6 requests | 5/5 |
+| Brochure (a site without Composer or tests: three pages and an include using `each()`, `create_function()`, curly-brace offsets, reversed `implode()`) | PHP 5.3 to 7.4 | PHP 8.4, with a `composer.json` | Pass (no tests); side by side on PHP 7.4 and 8.4, the same answer to 5 of 5 requests | 5/5 |
+| Clinic (a site without Composer, framework or tests: three pages and three includes; SQLite through PDO, a form that posts and redirects, a message kept in the session for the next page, functions that take settings with `global`, a stylesheet) | Plain PHP on PHP 7.4 | A Laravel 13 application on PHP 8.4 that serves the same pages from its `legacy` folder (`php-to-laravel-13`, no page rewritten) | Pass (3 tests, written with the application); side by side on PHP 7.4 and 8.4, the same answer to 13 of 13 requests, the posted form, its redirect and the message after it among them | 7/7 |
 
 Each original was first run as it was, on the PHP it was written for, in Docker (PHP 7.4, 7.1, 8.2 and 8.0):
 all tests passed there, one of FastRoute's 204 skipped. The two Laravel applications are Laravel's real
@@ -148,6 +149,15 @@ varies between runs; these are single runs, not averages. Repeat them with
 | Spring PetClinic Microservices (seven modules, see below) | Spring Boot 2.6, Spring Cloud 2021 | Spring Boot 3.5, Spring Cloud 2025, Java 21 | Pass, in four repair rounds | Not run: several applications | 29,714 / 22,184 |
 | Quotes (PHP: a library that multiplies cells of a hand-filled sheet, `""`, `"n/a"`, `"12 bags"`, and calls an instance method statically; all of it runs on PHP 7.4) | PHP 7.2 to 7.4, PHPUnit 8.5 | PHP 8.4, PHPUnit 9.6 | Pass, in one repair round (6 tests). Without AI: 5 of 6 tests fail with `TypeError: Unsupported operand types: string * string` | Not run: a library | 2,588 / 2,248 |
 | Shop (.NET: ASP.NET MVC 5 with a Web API 2 controller, three Razor views and a layout, a style bundle, `Global.asax`, `Web.config`; beside a class library with NUnit tests) | ASP.NET MVC 5.2 on .NET Framework 4.8 | ASP.NET Core on .NET 10 | Pass, in one repair round (3 tests, of the library) | Not compared: the original needs IIS on Windows. The migrated application was started and called: 11 addresses answer as the code says (pages, the `category/{category}` route, 404 and 400, JSON from the API, the stylesheet), the form saves, rejects invalid input with the same messages, and refuses a post without its anti-forgery token | 13,656 / 11,764 |
+
+One more AI path has been run once and is not in the table, because its comparison with the original has not
+been repeated since the rule changed: the Clinic site above with AI on (`php-to-laravel-13`). In one request
+(6,424 tokens in, 17,132 out) its three pages became four routes, one controller, two support classes, a
+layout and four Blade views, and the `legacy` folder was left empty; the build passed. Compared with the
+original, the pages that only read answered the same, and the form did not: the rewrite had added Laravel's
+CSRF token, which the old site never asked for, so a post without it was refused. The rule now tells the
+model to keep forms as they were and puts rewritten routes in a group without that check; that version has
+not been run, because the key used for these runs ran out of credit.
 
 What these runs changed in Renova:
 

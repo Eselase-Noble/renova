@@ -99,6 +99,10 @@ public final class BehaviourVerifier {
                     run.candidateLog());
         }
         List<Route> routes = runner.get().routes(originalModel, original);
+        // Where the migration moved or replaced the files that answer (pages that became controllers), the
+        // file a fix belongs in is the one that answers now.
+        Path workspace = context.workspace().root();
+        List<Route> routesNow = null;
         List<Pattern> accept = file == null ? List.of() : file.accept().stream().map(Pattern::compile).toList();
         List<String> accepted = new ArrayList<>();
         List<ScenarioResult> results = new ArrayList<>();
@@ -109,7 +113,13 @@ public final class BehaviourVerifier {
                         ? new ScenarioResult(scenario, i, Exchange.failed("not sent"), Exchange.failed("not sent"), List.of(),
                                 List.of("no answers recorded"))
                         : ResponseComparator.compare(scenario, i, answers.baseline(), answers.baselineAgain(), answers.candidate());
-                result = result.withHandler(handler(scenario, i, routes));
+                String handler = handler(scenario, i, routes);
+                if (handler != null && !Files.isRegularFile(workspace.resolve(handler))) {
+                    routesNow = routesNow != null ? routesNow : runner.get().routes(context.plugin().model(workspace), workspace);
+                    String now = routeHandler(scenario.steps().get(i), routesNow);
+                    handler = now != null && Files.isRegularFile(workspace.resolve(now)) ? now : handler;
+                }
+                result = result.withHandler(handler);
                 ScenarioResult r = result;
                 List<String> intended = result.differences().stream()
                         .filter(d -> accept.stream().anyMatch(p -> p.matcher(r.label() + ": " + d).find())).toList();
@@ -147,7 +157,11 @@ public final class BehaviourVerifier {
         if (scenario.handlerFile() != null && scenario.steps().size() == 1) {
             return scenario.handlerFile();
         }
-        Step s = scenario.steps().get(step);
+        return routeHandler(scenario.steps().get(step), routes);
+    }
+
+    /** The file of the most specific route that matches the request; null when none does. */
+    static String routeHandler(Step s, List<Route> routes) {
         Route best = null;
         int bestScore = -1;
         for (Route route : routes) {

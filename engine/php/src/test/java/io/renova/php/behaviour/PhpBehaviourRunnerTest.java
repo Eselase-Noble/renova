@@ -127,4 +127,30 @@ class PhpBehaviourRunnerTest {
         assertThat(runner.discover(model, root)).extracting(s -> s.steps().getFirst().path())
                 .containsExactly("/", "/notes", "/notes/1", "/notes/search");
     }
+
+    @Test
+    void aFileOtherPagesIncludeIsNotAPageAndAMovedSitesPagesAreFoundInItsLegacyFolder(@TempDir Path tmp) throws Exception {
+        Path site = Files.createDirectories(tmp.resolve("site"));
+        write(site, "index.php", "<?php require 'includes/db.php'; include_once(dirname(__FILE__) . '/includes/layout.php');\n");
+        write(site, "view.php", "<?php require 'includes/db.php';\n");
+        write(site, "includes/db.php", "<?php function db() {}\n");
+        write(site, "includes/layout.php", "<?php function top() {}\n");
+        PhpBehaviourRunner runner = new PhpBehaviourRunner();
+
+        assertThat(runner.routes(new io.renova.php.PhpPlugin().model(site), site)).extracting(Route::template)
+                .containsExactly("/view.php");
+
+        Path app = Files.createDirectories(tmp.resolve("app"));
+        write(app, "artisan", "#!/usr/bin/env php\n");
+        write(app, "composer.json", "{ \"require\": { \"laravel/framework\": \"^13.0\" } }");
+        write(app, "config/legacy.php", "<?php return ['root' => 'legacy'];\n");
+        write(app, "routes/web.php", "<?php\nRoute::match(['get', 'post'], '/new.php', [AppointmentController::class, 'create']);\n");
+        write(app, "app/Http/Controllers/AppointmentController.php", "<?php\n");
+        write(app, "legacy/view.php", "<?php require 'includes/db.php';\n");
+        write(app, "legacy/includes/db.php", "<?php function db() {}\n");
+
+        assertThat(runner.routes(new io.renova.php.PhpPlugin().model(app), app)).extracting(Route::template, Route::handlerFile)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("/new.php", "app/Http/Controllers/AppointmentController.php"),
+                        org.assertj.core.groups.Tuple.tuple("/view.php", "legacy/view.php"));
+    }
 }

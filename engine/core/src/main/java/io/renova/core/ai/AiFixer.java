@@ -47,7 +47,8 @@ import java.util.regex.Pattern;
  * <p>A rule whose fix has {@code params.together} replaces something no single file holds, such as a web
  * framework: all its files go in one request, with the files named by {@code params.with} (pages,
  * descriptors) editable beside them, and new files allowed where {@code params.create} says. Where the
- * other files cannot be told by name, {@code params.withContaining} keeps those that match a pattern.
+ * other files cannot be told by name, {@code params.withContaining} keeps those that match a pattern. Where
+ * an earlier stage moves the files the rule found, {@code params.files} names them as they are when AI runs.
  */
 public final class AiFixer implements Fixer {
 
@@ -75,15 +76,25 @@ public final class AiFixer implements Fixer {
             if (!params.optString("together").map(Boolean::parseBoolean).orElse(false)) {
                 continue;
             }
+            // A rule whose files an earlier stage moved or made names them as they are now (params.files).
+            List<String> now = params.strings("files");
+            if (!now.isEmpty()) {
+                scan = ScanContext.of(context.plugin().model(context.workspace().root()));
+            }
             scan = scan == null ? ScanContext.of(context.project()) : scan;
+            List<String> targets = now.isEmpty() ? step.files() : scan.files(now).stream().map(ScanContext::toProjectPath)
+                    .filter(f -> !context.plugin().isTestFile(f)).toList();
+            if (targets.isEmpty()) {
+                continue;
+            }
             // Of the files the globs name, optionally only those that hold the thing being replaced.
             Optional<Pattern> holding = params.optString("withContaining").map(Pattern::compile);
             ScanContext scanned = scan;
             List<String> companions = scan.files(params.strings("with")).stream()
                     .filter(f -> holding.isEmpty() || holding.get().matcher(String.join("\n", scanned.lines(f))).find())
                     .map(ScanContext::toProjectPath).filter(f -> !context.plugin().isTestFile(f)).toList();
-            step.files().forEach(f -> hintsByFile.put(f, new ArrayList<>()));
-            send(context, step.files(), List.of(hint(step)), List.of(), tally,
+            targets.forEach(f -> hintsByFile.put(f, new ArrayList<>()));
+            send(context, targets, List.of(hint(step)), List.of(), tally,
                     new Layer(companions, step.rule().title(), params.strings("create")));
         }
         for (PlanStep step : steps) {

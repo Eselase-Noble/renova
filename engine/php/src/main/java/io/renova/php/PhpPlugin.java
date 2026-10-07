@@ -28,8 +28,8 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * The PHP ecosystem: Composer projects, from an older PHP to a chosen one, and Laravel applications from an
- * older Laravel to a chosen one.
+ * The PHP ecosystem: Composer projects, from an older PHP to a chosen one, Laravel and Symfony applications from
+ * an older release to a chosen one, and sites without a framework into Laravel.
  */
 public final class PhpPlugin implements EcosystemPlugin {
 
@@ -239,12 +239,13 @@ public final class PhpPlugin implements EcosystemPlugin {
 
     @Override
     public List<DetectorFactory> detectors() {
-        return List.of(new PhpVersionDetector(), new ComposerPackageDetector());
+        return List.of(new PhpVersionDetector(), new ComposerPackageDetector(), new io.renova.php.detect.PhpFrameworkDetector());
     }
 
     @Override
     public List<Fixer> fixers() {
-        return List.of(new RectorFixer(), new ComposerFixer(), new io.renova.php.fix.PhpUnitConfigFixer());
+        return List.of(new RectorFixer(), new ComposerFixer(), new io.renova.php.fix.PhpUnitConfigFixer(),
+                new io.renova.php.fix.LaravelPlatformFixer());
     }
 
     @Override
@@ -291,6 +292,7 @@ public final class PhpPlugin implements EcosystemPlugin {
         return List.of("playbooks/php/php-to-8.4.yaml", "playbooks/php/php-to-8.5.yaml", "playbooks/php/php-to-8.3.yaml",
                 "playbooks/php/laravel-13.yaml", "playbooks/php/laravel-12.yaml", "playbooks/php/laravel-11.yaml",
                 "playbooks/php/symfony-7.4.yaml", "playbooks/php/symfony-6.4.yaml", "playbooks/php/symfony-8.1.yaml",
+                "playbooks/php/php-to-laravel-13.yaml",
                 // Add-ons: optional, combined with a target (php-to-8.4+phpunit11).
                 "playbooks/php/addons/phpunit11.yaml", "playbooks/php/addons/conservative.yaml");
     }

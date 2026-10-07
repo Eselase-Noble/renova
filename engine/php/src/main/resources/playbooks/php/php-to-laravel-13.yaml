@@ -1,0 +1,139 @@
+# A PHP site without a framework → a Laravel 13 application on PHP 8.4. First without rewriting a page: the
+# site is put inside a Laravel application and served by it at the addresses it had, which a side-by-side run
+# can check. Then, with AI, its pages become routes, controllers and Blade views; what is not rewritten keeps
+# running as it was.
+
+id: php-to-laravel-13
+name: "PHP without a framework → Laravel 13 (PHP 8.4)"
+ecosystem: php
+version: 0.1.0
+description: >
+  Makes a site written in plain PHP a Laravel 13 application on PHP 8.4. The code PHP 7 and 8 removed is
+  rewritten by Rector; the site's pages move to a legacy folder inside a new Laravel application and are served
+  at the addresses they had; with AI the pages become routes, controllers and Blade views, and what is left
+  keeps running from the legacy folder. Verified on PHP 8.4 with Composer, a syntax check, and by running the
+  original site beside the result.
+targets:
+  php: "8.4"
+  laravel: "13"
+
+settings:
+  rector:
+    packages: ["rector/rector:2.7.0", "driftingly/rector-laravel:2.6.2"]
+
+include:
+  - packs/php-language.yaml
+
+rules:
+
+  - id: php-version
+    title: Require PHP 8.4
+    category: A
+    severity: BLOCKER
+    detect: { type: phpVersionBelow, version: "8.4" }
+    fix:
+      strategy: composer
+      params: { action: setPhp, constraint: "^8.4" }
+    rationale: Laravel 13 needs PHP 8.3 or later; 8.4 is a release every package of the framework supports.
+
+  - id: php-language
+    title: Code that PHP 8.4 no longer accepts, or has a better form for
+    category: C
+    severity: BLOCKER
+    detect: { type: phpVersionBelow, version: "8.4" }
+    fix:
+      strategy: rector
+      recipes: ["Rector\\Set\\ValueObject\\LevelSetList::UP_TO_PHP_84"]
+    rationale: >
+      The pages have to run on the PHP Laravel 13 runs on, whether they are rewritten or not: removed functions
+      and syntax are replaced first, while the site still has the shape it came in.
+
+  - id: laravel-platform
+    title: Put the site inside a Laravel 13 application
+    category: D
+    severity: BLOCKER
+    detect: { type: phpFramework, is: [none] }
+    fix:
+      strategy: laravel-platform
+      params: { skeleton: "laravel/laravel:^13.0" }
+    rationale: >
+      The whole site becomes a Laravel application in one step that changes none of its pages: they move to a
+      legacy folder and one controller runs them at the addresses they had, after every route of the
+      application. From there a page can be rewritten for Laravel on its own, and the site works at every
+      point in between.
+
+  - id: laravel-pages
+    title: Pages as Laravel routes, controllers and Blade views
+    category: D
+    severity: WARNING
+    detect: { type: phpFramework, is: [none] }
+    fix:
+      strategy: ai
+      hint: >
+        This site was plain PHP and now runs inside a Laravel 13 application: its files are in the legacy
+        folder, and App\Http\Controllers\LegacySiteController runs any page there whose address has no route.
+        Rewrite the pages for Laravel. For each page a browser asks for (not the files other pages include):
+        a route in routes/web.php at the address the page has now, with its file name (/view.php stays
+        /view.php; the index page is also /), so that links, bookmarks and forms keep working; a controller in
+        app/Http/Controllers; and a Blade view in resources/views with the page's markup. The response must be
+        what the page sent: the same status, the same redirect target (written as the page wrote it, e.g.
+        "view.php?id=4"), and the same HTML, text for text, including what was escaped ({{ }} where the page
+        used htmlspecialchars, {!! !!} where it printed a value as it was). Read input from the Request
+        ($request->query(), $request->input()) with the defaults the page used. header('HTTP/1.0 404 ...')
+        followed by output and exit becomes a response with status 404 and the same body.
+        Functions and data that pages shared through include files become classes under app/ (for example
+        app/Support or app/Services) or config files; a layout the pages print through functions becomes a
+        Blade layout with the same markup. Database access keeps the same SQL and the same database: move the
+        connection to config/database.php or keep PDO behind one class, do not redesign tables and do not
+        replace queries with Eloquent models unless the result is certain to be the same. If the old code
+        makes its database or tables on first use, the new code still does. Paths to data files of the site
+        are written with base_path('legacy/...') so the data stays where it is.
+        $_SESSION becomes Laravel's session (session(), $request->session()); a message stored for the next
+        page becomes a flashed value. Pages that share a session are rewritten in the same change or not at
+        all, because a page left in the legacy folder cannot read Laravel's session. Write the routes inside
+        the group routes/web.php already has (Route::withoutMiddleware(...)->group), and do not add @csrf or
+        any other field to a form: the pages must accept exactly the requests they accepted, and the group
+        says how to turn the check on later.
+        Delete from the legacy folder every page you rewrote and every include file nothing there uses any
+        more (list them in deletes). A page you cannot rewrite with confidence stays in the legacy folder
+        untouched, with the include files it needs; it keeps working. Do not change LegacySiteController,
+        routes/legacy.php, config/legacy.php or bootstrap/app.php.
+      # The pages are where the stage before put them; the routes file and what may be added change with them.
+      params:
+        together: true
+        files: ["legacy/*.php", "legacy/**/*.php", "legacy/**/*.inc", "legacy/**/*.phtml"]
+        with: ["routes/web.php"]
+        create: ["app/**/*.php", "resources/views/**/*.blade.php", "config/*.php", "database/migrations/*.php"]
+    rationale: >
+      Rewriting a page is judgement: what is a controller, what is a view, what the page's includes become.
+      It is checked by what the page answers, before and after. Without an AI provider this step is left for
+      a person, and the site runs from the legacy folder.
+
+  - id: laravel-web-server
+    title: Point the web server at the application's public folder
+    category: D
+    severity: WARNING
+    detect: { type: phpFramework, is: [none] }
+    fix:
+      strategy: manual
+      hint: >
+        The site's folder used to be the web server's document root. It is now public/ of the Laravel
+        application, and every address that is not a file there has to reach public/index.php, addresses
+        ending in .php too: Apache does that with public/.htaccess; nginx needs
+        "try_files $uri /index.php?$query_string" in every location, the one for .php files included. Rules
+        the site had in its own .htaccess (rewrites, denied folders, passwords) are no longer read and need a
+        route, a middleware or a web-server setting. Run "php artisan migrate" once: sessions and the cache of
+        Laravel pages are kept in its database. Set APP_ENV, APP_DEBUG=false and APP_URL in .env for production.
+
+  - id: laravel-csrf
+    title: Protect the rewritten forms against request forgery
+    category: D
+    severity: WARNING
+    detect: { type: phpFramework, is: [none] }
+    fix:
+      strategy: manual
+      hint: >
+        The site's forms were never checked for a CSRF token, and the rewritten pages accept the same requests:
+        their routes are in a group in routes/web.php that leaves Laravel's check out. For each form, add @csrf
+        to the view and move its route out of the group. Scripts and other systems that post to the site
+        without loading the form first will then be refused (status 419), which is the point; check who posts.

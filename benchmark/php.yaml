@@ -126,6 +126,21 @@ apps:
       - { file: index.php, contains: "implode(', ', array_keys($CATALOGUE))", why: "implode() takes the separator first" }
       - { file: index.php, contains: "<?php require 'includes/catalogue.php'; ?>", why: "the pages are still plain PHP pages" }
 
+  # A site without a framework into Laravel 13, no page rewritten: SQLite through PDO, a form that posts and
+  # redirects, a message kept in the session for the next page, functions that take settings with "global".
+  # The side-by-side run sends the form and reads the pages on the original and inside Laravel.
+  - id: plain-site-into-laravel-13
+    path: clinic-php-plain
+    playbook: php-to-laravel-13
+    checks:
+      - { file: composer.json, contains: '"laravel/framework": "^13', why: "it is a Laravel application" }
+      - { file: legacy/index.php, contains: "page_top('Appointments')", why: "the pages are the site's own, moved and not rewritten" }
+      - { file: legacy/index.php, absent: "each(", why: "and they run on PHP 8.4" }
+      - { file: public/css/site.css, contains: "border-collapse", why: "what the browser fetches is in public/" }
+      - { file: config/legacy.php, contains: "'DB_FILE', 'DOCTORS', 'SITE_NAME'", why: "variables the site's functions take as global still are" }
+      - { file: bootstrap/app.php, contains: "routes/legacy.php", why: "the old pages answer after the application's routes" }
+      - { file: tests/Feature/LegacySiteTest.php, contains: "assertStatus(404)", why: "an address nothing answers is not found" }
+
   # Symfony 5.4 as applications were written then: routes as annotations, @Method from
   # SensioFrameworkExtraBundle, doctrine/annotations, functional tests with WebTestCase.
   - id: symfony-54-to-74

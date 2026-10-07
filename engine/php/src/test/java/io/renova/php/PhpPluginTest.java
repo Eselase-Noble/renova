@@ -76,7 +76,7 @@ class PhpPluginTest {
         assertThat(registry.defaultPlaybook(app).id()).isEqualTo("laravel-13");
         assertThat(registry.defaultPlaybook(library).id()).isEqualTo("php-to-8.4");
         assertThat(registry.playbooksFor(library)).extracting(Playbook::id)
-                .contains("php-to-8.3", "php-to-8.4", "php-to-8.5", "laravel-11", "laravel-12", "laravel-13");
+                .contains("php-to-8.3", "php-to-8.4", "php-to-8.5", "laravel-11", "laravel-12", "laravel-13", "php-to-laravel-13");
 
         List<Finding> findings = new Analyzer(registry).analyze(app, registry.defaultPlaybook(app)).findings();
         assertThat(findings).extracting(Finding::ruleId).contains("php-version", "laravel-framework", "laravel-code", "cors-package",
