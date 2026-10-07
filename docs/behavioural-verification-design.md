@@ -129,7 +129,7 @@ behaviour report.
 | 1 | Docker sandboxes for WAR apps (Tomcat), endpoint discovery for Spring MVC and `web.xml`, GET scenarios, status / header / body comparison with normalisers, behaviour report, `--verify-behaviour` |
 | 2 | Scenario files (POST, uploads, logins, carried values) and database effects on a seeded database |
 | 3 | Differences fed to AI repair; behaviour metrics in the benchmark |
-| 4 | JBoss/WildFly and Spring Boot runners; recorded-traffic replay (HAR, access logs) |
+| 4 | Spring Boot runner (built: `java -jar` on the original's and the target's Java release, one application per Maven project); JBoss/WildFly runner; recorded-traffic replay (HAR, access logs) |
 
 Phase 1 needs no customer input and catches the most expensive surprises: an app that no longer
 starts, routes that disappeared, and pages that render differently.

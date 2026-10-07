@@ -27,7 +27,7 @@ The engine is a library. The products in this repository (`cli`, `web`, `desktop
 | **Playbook** | YAML: target platform plus rules. New migration paths are data, not code | `java/src/main/resources/playbooks/` |
 | **Rule** | `detect` (what to find) + `fix` (who resolves it) + category A–E + severity | in a playbook |
 | **Detector** | A `detect.type`. Core: `fileExists`, `fileContains`. Java: `import`, `dependency`, `javaVersionBelow`, `mavenPluginBelow`, `pomProperty`, `importWithoutDependency` | `DetectorFactory` SPI |
-| **Fix strategy** | `recipe` (OpenRewrite), `replace` (text, for JSP/TLD/config), `maven` (pom.xml edits), `ai`, `manual` | `Fixer` SPI |
+| **Fix strategy** | `recipe` (OpenRewrite), `replace` (text, for JSP/TLD/config), `maven` (pom.xml edits), `gradle` (build.gradle and wrapper edits), `ai`, `manual` | `Fixer` SPI |
 | **Guard** | A rule with `phase: guard`, checked on the migrated code before verification | in a playbook |
 | **Ecosystem plugin** | Project model, detectors, fixers, verifier and bundled playbooks for one stack | `EcosystemPlugin` SPI (ServiceLoader) |
 | **AI provider** | Any model (hosted or on-prem) that proposes whole-file edits, created from the caller's own settings | `AiProviderFactory` SPI (ServiceLoader) |
@@ -54,16 +54,19 @@ Implement `EcosystemPlugin`, register it in
 
 ## Status and roadmap
 
-Working now: analysis, planning, a safe workspace with per-stage commits, OpenRewrite recipes,
-text replacement, format-preserving pom.xml edits, guard rules (checked after the fix stages and after
-each AI repair round), Maven build and test verification with structured errors, the AI fix and repair
-loop with Claude and OpenAI-compatible providers (including on-premises servers), retrieval (RAG phase 1,
-`--rag`), an AI audit log, Markdown/JSON reports, and the benchmark harness.
+Working now: analysis, planning, a safe workspace with per-stage commits, OpenRewrite recipes for Maven and
+Gradle builds, text replacement, format-preserving pom.xml and build.gradle edits, guard rules (checked after
+the fix stages and after each AI repair round), Maven and Gradle build and test verification with structured
+errors, the AI fix and repair loop with Claude and OpenAI-compatible providers (including on-premises
+servers), whole-layer AI requests for framework replacements, retrieval (RAG phase 1, `--rag`), behavioural
+verification of servlet-container WARs and Spring Boot applications, an AI audit log, Markdown/JSON reports,
+and the benchmark harness. The targets and what has been verified are in the
+[root README](../README.md#targets) and [docs/verified-migrations.md](../docs/verified-migrations.md).
 
 Next:
-1. **Behavioural verification**: run the old and new apps side by side and diff HTTP responses and DB effects.
-2. **More benchmark apps**, including public open-source legacy projects.
+1. **Behavioural verification**: a JBoss/WildFly runner, Gradle builds, recorded-traffic replay.
+2. **More benchmark apps**, including more public open-source legacy projects.
 3. **RAG phase 2**: lessons from accepted fixes, per migration and per organisation.
-4. **Transitive-only classes**: classes used in code but available only through transitive dependencies.
-5. Gradle recipe runner, `pom.*.xml` variant handling, more playbooks (Spring Boot 2→3, Java EE→Quarkus, then .NET/Python).
+4. **Java**: re-platforming a Gradle build, multi-module Ant builds, AI runs of the remaining legacy frameworks.
+5. **More ecosystems**: .NET (C# and VB), then PHP and Laravel.
 6. Licensing, a playbook marketplace and private playbook packs.

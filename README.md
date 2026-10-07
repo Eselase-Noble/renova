@@ -41,7 +41,7 @@ most of the effort. Renova treats the two differently:
 - **Safe by construction.** The source project is never modified. Each stage of a migration is a
   separate git commit in an isolated workspace, so every change can be reviewed, audited or reverted.
 - **Verified.** The migrated project is built and its tests are run (`--skip-tests` to only compile).
-  Compiler, build-file and test failures become structured errors that feed an automatic repair loop. One repair can change a source file and its build file together.
+  Compiler, build-file and test failures become structured errors that feed an automatic repair loop. One repair can change a source file and its build file together. Tests are never changed to make them pass; the one exception is a test that a rewrite step left uncompilable, where only the compiler's errors may be repaired.
 - **Bring your own AI key.** Each user or organisation supplies its own provider credentials. Token
   usage is reported per migration.
 - **Any ecosystem.** The engine has no Java-specific code. Java is the first plugin.
@@ -187,8 +187,10 @@ accept:
   - 'GET /items/: status 200 became 404'
 ```
 
-It needs Docker and currently runs single-WAR Maven applications on servlet containers. Applications that need
-a full Jakarta EE server are reported as skipped. See
+It needs Docker and runs Maven projects with one application: a Spring Boot application, started with
+`java -jar` (the original on the Java release it was written for, the migrated one on the target's), or a WAR
+on a servlet container. Applications that need a full Jakarta EE server, Gradle builds and projects with
+several applications are reported as skipped. See
 [docs/behavioural-verification-design.md](docs/behavioural-verification-design.md).
 
 To measure Renova itself across several apps and configurations (with and without AI or retrieval), use
@@ -274,9 +276,9 @@ rules:
 |---|---|
 | `recipe` | An ecosystem rewrite tool (OpenRewrite for Java), deterministic and type-aware |
 | `replace` | Text replacement driven by the playbook, for files without a parser |
-| `gradle` | Edits to Gradle build files in the file's own style: `addDependency`, `removeDependency` |
+| `gradle` | Edits to Gradle build files in the file's own style: `addDependency`, `removeDependency`, `setPluginVersion`, `setWrapperVersion` |
 | `maven` | Format-preserving pom.xml edits: `setScope`, `setPluginVersion`, `setProperty`, `changeProperty`, `setParentVersion`, `addDependency`, `addAnnotationProcessor`, `setVersion`, `removeDuplicates` |
-| `ai` | The configured AI provider. The build verifies the result |
+| `ai` | The configured AI provider. The build verifies the result. One request per file; with `params.together`, one request for everything a rule found plus the files named in `params.with`, and new files where `params.create` allows: for a change no single file holds, such as replacing a web framework |
 | `manual` | A person, guided by the rule's `hint` in the report |
 
 ### Targets
@@ -315,14 +317,17 @@ when the jar names its coordinates or Maven Central has a file with the same che
 change its version, and otherwise the same file in a repository folder inside the project (`renova-libs`).
 Then the project is migrated like any other. The original is never changed.
 
-**Kotlin.** Kotlin sources in a Maven build are rewritten by the same recipes, and the Kotlin compiler is moved
-to one that knows the target Java release. Groovy and Scala sources are read when a project is assessed.
+**Kotlin.** Kotlin sources in a Maven or Gradle build are rewritten by the same recipes, and the Kotlin compiler
+(in Gradle, every Kotlin plugin) is moved to one that knows the target Java release. Groovy and Scala sources are read when a project is assessed.
 
 **Frameworks that ended before Jakarta EE** (Struts 1, EJB 2.x home interfaces and entity beans, JAX-RPC and
 Axis 1, Jersey 1, Faces managed beans, RichFaces, Seam 2, iBATIS 2, Hibernate's legacy Criteria, Commons
 HttpClient 3, Quartz 1, CORBA, applets, and code tied to one server's own classes) have no recipe that carries
 code across. Renova finds them, plans them, and gives AI, or a person where a build cannot check the result,
-the mapping to their successor.
+the mapping to their successor. Two of these paths have been run end to end with AI and compared with the
+original over HTTP: Jersey 1 with Commons HttpClient 3, and Struts 1 to Spring MVC, where the actions, the form
+bean, the pages and `web.xml` change in one request
+([results](docs/verified-migrations.md#with-ai)).
 
 The Jakarta targets also move Hibernate (to 6.6 with Jakarta EE 10, to 7.1 with Jakarta EE 11) and the
 namespaces of Faces pages. Every target replaces Mockito 1 to 4 with Mockito 5, because the older ones do not
@@ -347,8 +352,9 @@ has not been verified.
 
 Maven and Gradle builds are both supported: recipes run through the project's own wrapper (`mvnw`, `gradlew`)
 when it has one, and Gradle builds are changed without adding anything to their build files. Build-file
-guards fix what recipes leave behind: most are for Maven (`maven` fixes); the first for Gradle (`gradle` fixes:
-`addDependency`, `removeDependency`) declares an API the migrated code imports.
+guards fix what recipes leave behind: most are for Maven (`maven` fixes). The Gradle ones (`gradle` fixes)
+declare an API the migrated code imports, move the Kotlin plugins, give a Micronaut 4 build its validation
+module, processor and SnakeYAML, and move the wrapper to a Gradle the Quarkus 3 plugin runs on.
 
 **JDKs.** Renova finds the JDKs installed on the machine (`JAVA_HOME`, `~/.jdks`, `~/.sdkman`, `/usr/lib/jvm`,
 the usual folders on macOS and Windows, and any folder listed in `RENOVA_JDKS`) and uses the right one for each
@@ -402,15 +408,16 @@ Linux, Windows and macOS, the web bundle, the CLI and both IDE plugins. See [doc
 1. **RAG:** phase 1 (structural code retrieval and curated knowledge, no key needed) is in and on by default.
    Next: lessons from accepted fixes, then optional embeddings on the customer's own key.
 2. **Behavioural verification:** phases 1–3 (`--verify-behaviour`: HTTP answers, scenario files, database changes,
-   AI repair of differences) are in. Next: JBoss/WildFly and Spring Boot runners, recorded-traffic replay
+   AI repair of differences) and the Spring Boot runner are in. Next: a JBoss/WildFly runner, Gradle builds, recorded-traffic replay
    ([design](docs/behavioural-verification-design.md)).
 3. **Benchmark harness:** `renova benchmark` scores migrations of synthetic legacy apps (see
    [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.
 4. **Web console:** single sign-on and licensing (the audit log and local mode are in). **Desktop:** signed installers.
 5. **More targets and ecosystems:** Java 17/21/25, Spring Boot 3 and 4.1, Spring Framework 7 with Jakarta EE 11,
    Micronaut 4, Quarkus 3, Hibernate 6 and 7, Struts 7, library add-ons, Gradle builds, Ant builds, Kotlin and
-   Java EE → Spring Boot are in. Next for Java: Gradle builds of Kotlin, Micronaut and Quarkus projects,
-   re-platforming a Gradle build, multi-module Ant builds. Then .NET (C# and VB: .NET Framework → modern .NET), then
+   Java EE → Spring Boot are in, with Gradle builds of Kotlin, Micronaut and Quarkus projects. Next for Java:
+   re-platforming a Gradle build, multi-module Ant builds, AI runs of the remaining legacy frameworks (EJB 2,
+   JAX-RPC, Faces managed beans, iBATIS). Then .NET (C# and VB: .NET Framework → modern .NET), then
    PHP (a chosen PHP version, a chosen Laravel version).
 
 ## Contributing

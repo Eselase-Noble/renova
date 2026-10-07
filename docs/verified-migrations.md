@@ -1,6 +1,7 @@
 # Verified migrations
 
-What Renova has been shown to do, end to end, with **no AI**: recipes, text rules and guards only. Each row is a
+What Renova has been shown to do, end to end. First with **no AI**: recipes, text rules and guards only; then
+the [paths that need AI](#with-ai). Each row is a
 project migrated to a target, built on the target JDK, with its own tests run. Anyone can repeat it:
 
 ```sh
@@ -8,7 +9,8 @@ benchmark/fetch-public.sh
 cli/bin/renova benchmark --suite benchmark/targets.yaml --out /tmp/targets --configs deterministic
 ```
 
-Last run: 6 October 2026, on Java 21 and Maven 3.8, Renova at the commit that added this file.
+Last run: 6 October 2026, on Java 21 and Maven 3.8; the three Gradle rows at the end and the AI runs on
+7 October 2026.
 
 | Project | Build | From | To | Build and tests | Checks |
 |---|---|---|---|---|---|
@@ -32,6 +34,9 @@ Last run: 6 October 2026, on Java 21 and Maven 3.8, Renova at the commit that ad
 | Ledger (EJB, CDI, JAX-RS, JPA, JBoss descriptors) | Maven | Java EE 7 on JBoss, Java 8 | Spring Boot 3.5 executable jar, Java 21 | Pass | 8/8 |
 | Helpdesk (Struts actions, with a test that sets one up by hand) | Maven | Struts 2.5, Java 8 | Struts 7.4, Jakarta EE 10, Java 21 | Pass | 3/3 |
 | Tasks service in Kotlin (web, JPA, validation) | Maven | Spring Boot 2.7, Kotlin 1.6, Java 11 | Spring Boot 3.5, Kotlin 1.9, Java 21 | Pass | 4/4 |
+| Tasks service in Kotlin (same) | Gradle 7.5 | Spring Boot 2.7, Kotlin 1.6, Java 11 | Spring Boot 3.5, Kotlin 1.9, Java 21, Gradle 8.5 | Pass | 4/4 |
+| Greeter service (same) | Gradle 7.5 | Micronaut 3.10, Java 11 | Micronaut 4.10, Java 21, Gradle 8.5 | Pass | 4/4 |
+| Catalog service (same) | Gradle 7.5 | Quarkus 2.16, Java 11 | Quarkus 3.33, Java 21, Gradle 9.1 | Pass | 4/4 |
 
 The suite's runs take about twenty minutes in total, with dependencies already downloaded.
 
@@ -56,6 +61,38 @@ JAX-RS resource created and listed accounts at its old address, rejected a reque
 rolled back a transfer without funds; the Payroll WAR, started with `java -jar`, answered from its servlet and
 its JSP page under the context path the server used to give it.
 
+## With AI
+
+Run on 7 October 2026 with Claude Opus (`claude-opus-5-5`), retrieval on, on the maintainer's own key. AI output
+varies between runs; these are single runs, not averages. Repeat them with
+`cli/bin/renova benchmark --suite benchmark/legacy.yaml --out /tmp/legacy --ai anthropic`.
+
+| Project | From | To | Build and tests | Behaviour against the original | Tokens in / out |
+|---|---|---|---|---|---|
+| Couriers (Jersey 1 resource and client, Commons HttpClient 3 client, 9 tests, two of the classes tested against a local HTTP server) | Jersey 1.19, HttpClient 3.1, Java 8 | Jersey 3.1, the JAX-RS client API, HttpClient 5, Jakarta EE 10, Java 21 | Pass | Same: 6 of 6 requests (Tomcat 9 beside Tomcat 10.1) | 18,536 / 10,551 |
+| Tickets (Struts 1 actions, form bean with validation, `struts-config.xml`, three pages with Struts tags) | Struts 1.3, Java 8 | Spring MVC 6.2 controllers on the same `*.do` addresses, Jakarta EE 10, Java 21 | Pass | 6 of 9 requests the same; 3 differ in the form's markup only (`name=` became `id=`, error text inside a `<span>`), with the same statuses and messages | 6,885 / 11,221 |
+| Spring PetClinic Microservices (seven modules, see below) | Spring Boot 2.6, Spring Cloud 2021 | Spring Boot 3.5, Spring Cloud 2025, Java 21 | Pass, in four repair rounds | Not run: several applications | 29,714 / 22,184 |
+
+What these runs changed in Renova:
+
+- **A framework is replaced in one request.** Asked for one Struts action at a time, the model declined, rightly:
+  an action cannot become a controller without its form, its pages and `web.xml`. A rule can now say that what it
+  finds changes together (`params.together`), name the other files of the change (`params.with`) and where new
+  files may be added (`params.create`). The Struts 1 rule does; the request above added a configuration class,
+  a validator and a controller for the form page.
+- **A test a recipe left uncompilable can be repaired.** Tests are still never changed to make them pass. But
+  the PetClinic gateway's test was half-converted by a recipe and no longer compiled, so it described nothing;
+  the compiler's errors in a test that an earlier stage rewrote may now be fixed, and nothing else in it.
+- **A failed test reports its last cause.** "Failed to load ApplicationContext", cut at 400 characters, sent
+  repairs guessing; the report now carries the end of the chain ("No qualifying bean of type BulkheadRegistry").
+  A build error without words is no longer passed on empty.
+- **`web.xml` follows Jersey.** A text rule renames the Jersey 1 servlet there; the build passed without it and
+  the application would not have deployed.
+- **Struts 1 projects are no longer offered the Struts 2 → 7 add-on.**
+
+The default of three repair rounds stops the seven-module project one round short; it passed with
+`--max-ai-iterations 6`.
+
 ## A larger project that does not finish by itself
 
 Spring PetClinic Microservices at its Spring Boot 2.6 release (public, Apache-2.0): seven Maven modules on
@@ -69,20 +106,23 @@ Spring Cloud 2021, built by a Maven wrapper from 2018. Target: Spring Boot 3.5, 
 - **Six of the seven modules build, and the five that have tests pass them.** The seventh, the API gateway
   (Spring Cloud Gateway with Resilience4j), does not: one test is left half-converted by the OkHttp
   MockWebServer recipe, and behind it the circuit-breaker configuration needs changes for Spring Cloud 2025.
-  Renova reports the migration as failed and names the file. That module is work for the AI repair loop or a
-  person; it has not been run with AI here.
+  Renova reports the migration as failed and names the file. With AI the module is repaired and all seven
+  build: see [With AI](#with-ai).
 
 It is not in the suite, because the suite holds what passes without AI. `benchmark/fetch-public.sh` fetches it.
 
 ## What is not covered here
 
-- **Frameworks that ended before Jakarta EE.** Struts 1, EJB 2.x, JAX-RPC, Jersey 1, Faces managed beans,
-  RichFaces and the others in the legacy-frameworks pack are found and planned, and the change goes to AI or a
-  person with the mapping written out. None of those AI paths has been run here: they cost tokens on a key.
+- **Most frameworks that ended before Jakarta EE.** Jersey 1, Commons HttpClient 3 and Struts 1 have been run
+  with AI (above), each on one small application. EJB 2.x, JAX-RPC, Faces managed beans, RichFaces, iBATIS,
+  Hibernate's legacy Criteria and the others in the legacy-frameworks pack are found and planned, with the
+  mapping written out, and have not been run. A Struts 1 application too large for one request is sent in
+  halves, each with the pages and descriptors; that has not been tried on a real one.
 - **Re-platforming is verified by a start-up test and the project's own tests,** not by comparing behaviour.
   The data source, security domain and anything the server's console configured are listed for a person.
-- **Gradle builds of Kotlin, Micronaut and Quarkus applications** have not been run; the Maven ones have.
-  Re-platforming to Spring Boot and the generated build for Ant projects are Maven only.
+- **Gradle.** Re-platforming to Spring Boot and the generated build for Ant projects are Maven only, and so is
+  behavioural verification. Kotlin build scripts (`build.gradle.kts`) are handled by the same guards and are
+  covered by unit tests, not by a migrated project.
 - **Ant builds with several modules** (one build.xml calling others) get one Maven module from the root build.
 - **Identifying jars needs the network.** Offline, an Ant project's libraries stay files and are not upgraded.
 - **Changes that need judgement.** The original suite ([`benchmark/suite.yaml`](../benchmark/suite.yaml)) has
@@ -90,7 +130,10 @@ It is not in the suite, because the suite holds what passes without AI. `benchma
   depends on other code, upload limits that must not change, runtime-only failures. Without AI those builds fail,
   by design, and the report names the steps that were left; with a provider configured they go to the AI
   repair loop. Running that suite with AI costs tokens on your own key.
-- **Behaviour.** These runs compare builds and tests, not the running application. `--verify-behaviour` runs
-  the original and the migrated application side by side in Docker; it supports servlet-container WARs today.
+- **Behaviour.** The runs without AI compare builds and tests, not the running application.
+  `--verify-behaviour` runs the original and the migrated application side by side in Docker: servlet-container
+  WARs and, since 7 October 2026, Spring Boot applications. Run on the Orders service (Spring Boot 2.7 on
+  Java 8 beside 3.5 on Java 21), it reported the one change Spring Boot 3 is known for: `/orders/` with a
+  trailing slash no longer matches.
 - **Large codebases.** The biggest project that passes by itself is PetClinic; the seven-module project above
   gets most of the way. Applications of hundreds of modules have not been tried.

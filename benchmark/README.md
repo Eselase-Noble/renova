@@ -35,6 +35,7 @@ A run *passes* when the build passes and every check holds. Results go to `resul
 |---|---|---|
 | [`suite.yaml`](suite.yaml) (default) | How well does Renova do on applications whose last changes need judgement? | With and without |
 | [`targets.yaml`](targets.yaml) | Does every target Renova offers work end to end? One app per path, including the public Spring PetClinic sample | Without |
+| [`legacy.yaml`](legacy.yaml) | Can AI carry code off a framework that ended before Jakarta EE (Jersey 1, Commons HttpClient 3, Struts 1), with the result built, tested and compared with the original over HTTP? | With (about 25,000 tokens per app) |
 
 ```sh
 benchmark/fetch-public.sh       # once: fetches PetClinic at its last Spring Boot 2.7 commit
