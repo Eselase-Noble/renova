@@ -106,6 +106,7 @@ final class MigrateCommand implements Callable<Integer> {
         if (outcome.verification() != null) {
             System.err.println("  build      " + (outcome.verification().success() ? "PASSES" : "FAILS ("
                     + outcome.verification().errors().size() + " build errors)"));
+            outcome.verification().notes().forEach(n -> System.err.println("             " + n));
         }
         if (!outcome.manualSteps().isEmpty()) {
             System.err.println("  manual     " + outcome.manualSteps().size() + " step(s) listed in the report");

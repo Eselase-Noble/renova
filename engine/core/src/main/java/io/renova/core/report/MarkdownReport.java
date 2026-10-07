@@ -145,6 +145,10 @@ public final class MarkdownReport {
         if (outcome.verification() != null) {
             var v = outcome.verification();
             md.append("### Verification: ").append(v.success() ? "build passes" : "build fails").append("\n\n");
+            v.notes().forEach(n -> md.append("- ").append(n).append('\n'));
+            if (!v.notes().isEmpty()) {
+                md.append('\n');
+            }
             if (!v.errors().isEmpty()) {
                 md.append("| File | Line | Error |\n|---|---|---|\n");
                 for (BuildError e : v.errors().stream().limit(50).toList()) {
