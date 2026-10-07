@@ -16,6 +16,7 @@
         <module>engine/core</module>
         <module>engine/java</module>
         <module>engine/dotnet</module>
+        <module>engine/php</module>
         <module>engine/ai-anthropic</module>
         <module>engine/ai-openai</module>
         <module>cli</module>
@@ -54,6 +55,11 @@
             <dependency>
                 <groupId>io.renova</groupId>
                 <artifactId>renova-dotnet</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.renova</groupId>
+                <artifactId>renova-php</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

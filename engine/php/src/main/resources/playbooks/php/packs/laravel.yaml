@@ -1,0 +1,198 @@
+# What Laravel upgrades share whatever the target: the packages released alongside the framework, and the
+# packages Laravel took into the framework itself.
+
+rules:
+
+  - id: laravel-first-party
+    title: Packages released with Laravel follow the framework
+    category: E
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [laravel/tinker], constraintBelow: "2.10.1" }
+    fix:
+      strategy: composer
+      params: { action: setVersion, constraint: "^2.10.1|^3.0" }
+
+  - id: laravel-sanctum
+    title: Sanctum follows the framework
+    category: E
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [laravel/sanctum], constraintBelow: "4.0" }
+    fix:
+      strategy: composer
+      params: { action: setVersion, constraint: "^4.0" }
+
+  - id: laravel-collision
+    title: Collision follows the framework
+    category: E
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [nunomaduro/collision], constraintBelow: "8.1" }
+    fix:
+      strategy: composer
+      params: { action: setVersion, constraint: "^8.1" }
+
+  - id: laravel-ignition
+    title: The error page is spatie/laravel-ignition
+    category: E
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [facade/ignition] }
+    fix:
+      strategy: composer
+      params: { action: replace, packages: ["spatie/laravel-ignition:^2.4"], dev: true }
+    rationale: facade/ignition ended with Laravel 8; its successor needs no change in the application.
+
+  - id: laravel-ignition-version
+    title: Ignition follows the framework
+    category: E
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [spatie/laravel-ignition], constraintBelow: "2.4" }
+    fix:
+      strategy: composer
+      params: { action: setVersion, constraint: "^2.4" }
+
+  - id: laravel-dev-tools
+    title: Sail, Pint and Mockery in releases that support the framework
+    category: E
+    severity: WARNING
+    detect: { type: composerPackage, names: [mockery/mockery], constraintBelow: "1.6" }
+    fix:
+      strategy: composer
+      params: { action: setVersion, constraint: "^1.6" }
+
+  - id: laravel-sail
+    title: Sail follows the framework
+    category: E
+    severity: WARNING
+    detect: { type: composerPackage, names: [laravel/sail], constraintBelow: "1.26" }
+    fix:
+      strategy: composer
+      params: { action: setVersion, constraint: "^1.26" }
+
+  - id: laravel-ui
+    title: laravel/ui follows the framework
+    category: E
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [laravel/ui], constraintBelow: "4.5" }
+    fix:
+      strategy: composer
+      params: { action: setVersion, constraint: "^4.5" }
+
+  - id: guzzle-7
+    title: Laravel's HTTP client needs Guzzle 7
+    category: E
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [guzzlehttp/guzzle], constraintBelow: "7.0" }
+    fix:
+      strategy: composer
+      params: { action: setVersion, constraint: "^7.8" }
+
+  - id: trusted-proxy-package
+    title: Trusted proxies are part of the framework since Laravel 9
+    category: E
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [fideloper/proxy] }
+    fix:
+      strategy: composer
+      params: { action: remove }
+
+  - id: trusted-proxy-middleware
+    title: The TrustProxies middleware extends the framework's own class
+    category: B
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.php"]
+      pattern: "Fideloper\\\\Proxy\\\\TrustProxies"
+    fix:
+      strategy: replace
+      include: "**/*.php"
+      find: "Fideloper\\Proxy\\TrustProxies"
+      replace: "Illuminate\\Http\\Middleware\\TrustProxies"
+
+  - id: trusted-proxy-headers
+    title: The constant for all forwarded headers was removed
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/Middleware/TrustProxies.php"]
+      pattern: "Request::HEADER_X_FORWARDED_ALL"
+    fix:
+      strategy: replace
+      include: "**/Middleware/TrustProxies.php"
+      find: "Request::HEADER_X_FORWARDED_ALL"
+      replace: "Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_HOST | Request::HEADER_X_FORWARDED_PORT | Request::HEADER_X_FORWARDED_PROTO | Request::HEADER_X_FORWARDED_AWS_ELB"
+    rationale: Symfony 6 removed the constant; these are the headers it stood for, so the same proxies are trusted.
+
+  - id: cors-package
+    title: CORS handling is part of the framework since Laravel 9
+    category: E
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [fruitcake/laravel-cors] }
+    fix:
+      strategy: composer
+      params: { action: remove }
+
+  - id: cors-middleware
+    title: The CORS middleware is the framework's own
+    category: B
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.php"]
+      pattern: "Fruitcake\\\\Cors\\\\HandleCors"
+    fix:
+      strategy: replace
+      include: "**/*.php"
+      find: "Fruitcake\\Cors\\HandleCors"
+      replace: "Illuminate\\Http\\Middleware\\HandleCors"
+
+  - id: dbal-not-needed
+    title: Schema changes no longer need doctrine/dbal
+    category: E
+    severity: WARNING
+    detect: { type: composerPackage, names: [doctrine/dbal], versionBelow: "4.0" }
+    fix:
+      strategy: manual
+      hint: >
+        Laravel 11 changes columns without doctrine/dbal, and its schema builder no longer works with DBAL 3.
+        Remove the package from composer.json if the application required it only for migrations
+        ($table->change(), renameColumn); keep it, at ^4.0, if the application's own code uses Doctrine.
+
+  - id: legacy-factories
+    title: Model factories written as closures
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["database/factories/*.php"]
+      pattern: "\\$factory->define\\("
+    fix:
+      strategy: ai
+      hint: >
+        Laravel 8 replaced closure factories ($factory->define(User::class, function (Faker $faker) {...})) with
+        factory classes. Turn each into a class in Database\Factories extending
+        Illuminate\Database\Eloquent\Factories\Factory, with the model in protected $model and the same
+        attributes returned by definition(), using $this->faker in place of $faker; states defined with
+        $factory->state become methods that return $this->state([...]). The model needs the HasFactory trait,
+        and callers change from factory(User::class)->create() to User::factory()->create() and
+        factory(User::class, 3) to User::factory()->count(3).
+
+knowledge:
+
+  - id: laravel-upgrades
+    title: What Laravel's releases changed
+    triggers: ["laravel/framework", "Illuminate\\", "artisan", "RouteServiceProvider", "Kernel.php", "could not be resolved"]
+    body: |
+      Laravel 8: models live in app/Models by convention (not required), factories are classes, the route
+      namespace prefix is gone from RouteServiceProvider (routes name controllers by class:
+      [UserController::class, 'index']). Laravel 9: PHP 8.0, Flysystem 3 (Storage methods throw or return
+      false differently; the S3 and SFTP adapters are league/flysystem-aws-s3-v3 ^3.0 and
+      league/flysystem-sftp-v3), Symfony Mailer in place of SwiftMailer (withSwiftMessage is
+      withSymfonyMessage), trusted proxies and CORS in the framework, the lang folder at the root. Laravel 10:
+      PHP 8.1, native return types on the framework's methods (classes that override them must match), the
+      $dates property is gone (use $casts). Laravel 11: PHP 8.2, a slimmer application skeleton that existing
+      applications need not adopt, casts may be a casts() method, doctrine/dbal is no longer used for schema
+      changes, migrations that modify a column must restate every attribute they keep. Laravel 12 and 13 are
+      maintenance releases for most applications: dependency updates and removed deprecations. When Composer
+      cannot resolve, a third-party package has no release for the new framework at its constraint: raise that
+      package's constraint to its first release that supports it.

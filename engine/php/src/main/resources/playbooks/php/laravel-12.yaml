@@ -1,0 +1,66 @@
+# A Laravel application → Laravel 12 on PHP 8.4, from any older Laravel. The framework, PHP, the first-party
+# packages and the code Laravel's releases changed, as far as rules can; what an upgrade guide leaves to
+# judgement goes to the build's errors, AI repair and a person.
+
+id: laravel-12
+name: "Laravel → 12 (PHP 8.4)"
+ecosystem: php
+version: 0.1.0
+description: >
+  Moves a Laravel application to Laravel 12 on PHP 8.4: laravel/framework and the packages that are released
+  with it, the code changes of every Laravel release on the way (Rector's Laravel rules), PHP 8.4 syntax, and a
+  PHPUnit the framework supports. Verified on PHP 8.4 with Composer, a syntax check and the application's tests.
+targets:
+  php: "8.4"
+  laravel: "12"
+
+settings:
+  rector:
+    packages: ["rector/rector:2.7.0", "driftingly/rector-laravel:2.6.2"]
+
+include:
+  - packs/laravel.yaml
+  - packs/php-language.yaml
+
+rules:
+
+  - id: php-version
+    title: Require PHP 8.4
+    category: A
+    severity: BLOCKER
+    detect: { type: phpVersionBelow, version: "8.4" }
+    fix:
+      strategy: composer
+      params: { action: setPhp, constraint: "^8.4" }
+    rationale: Laravel 12 needs PHP 8.2 or later; 8.4 is a release every package of the suite supports.
+
+  - id: laravel-framework
+    title: Upgrade Laravel to 12
+    category: A
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [laravel/framework], versionBelow: "12.0" }
+    fix:
+      strategy: composer
+      params: { action: setVersion, constraint: "^12.0" }
+
+  - id: phpunit-9
+    title: A PHPUnit that Laravel 12 supports
+    category: E
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [phpunit/phpunit], constraintBelow: "11.5" }
+    fix:
+      strategy: composer
+      params: { action: setVersion, constraint: "^11.5" }
+    rationale: Laravel 12's testing helpers are built for PHPUnit 11 and later.
+
+  - id: laravel-code
+    title: Code changes of every Laravel release up to 12
+    category: C
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [laravel/framework], versionBelow: "12.0" }
+    fix:
+      strategy: rector
+      recipes: ["RectorLaravel\\Set\\LaravelLevelSetList::UP_TO_LARAVEL_120", "Rector\\Set\\ValueObject\\LevelSetList::UP_TO_PHP_84"]
+    rationale: >
+      The mechanical part of Laravel's upgrade guides: renamed classes, methods and properties, changed
+      signatures, helpers that became facades or the reverse.

@@ -54,3 +54,16 @@ if [ ! -d "$apps/public/stateless-2016" ]; then
 else
   echo "Already there: $apps/public/stateless-2016"
 fi
+
+# FastRoute (BSD-3-Clause), the PHP request router used by Slim and Lumen, at its 1.3.0 release of 2018: written
+# for PHP 5.4 and later, tested with PHPUnit 4.8 and 5.7.
+if [ ! -d "$apps/public/fastroute-1.3" ]; then
+  clone="$(mktemp -d)"
+  git clone -q https://github.com/nikic/FastRoute.git "$clone"
+  mkdir -p "$apps/public/fastroute-1.3"
+  git -C "$clone" archive v1.3.0 | tar -x -C "$apps/public/fastroute-1.3"
+  rm -rf "$clone"
+  echo "Fetched $apps/public/fastroute-1.3"
+else
+  echo "Already there: $apps/public/fastroute-1.3"
+fi

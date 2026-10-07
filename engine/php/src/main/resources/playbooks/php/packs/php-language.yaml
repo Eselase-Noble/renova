@@ -1,0 +1,103 @@
+# What every PHP target shares: test tooling that runs on a current PHP, libraries that were replaced, and the
+# removed parts of the language that need judgement.
+
+rules:
+
+  - id: phpunit-9
+    title: PHPUnit must be a release that runs on current PHP
+    category: E
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [phpunit/phpunit], versionBelow: "9.6" }
+    fix:
+      strategy: composer
+      params: { action: setVersion, constraint: "^9.6" }
+    rationale: >
+      PHPUnit 7 and older do not install on PHP 8. 9.6 is the oldest line that runs on every current PHP, and
+      the smallest step for tests written for 5 to 8: newer PHPUnit changes more of how tests are written.
+
+  - id: phpunit-tests
+    title: Tests follow the PHPUnit the project now has
+    category: C
+    severity: WARNING
+    detect: { type: composerPackage, names: [phpunit/phpunit] }
+    fix:
+      strategy: rector
+      recipes: ["composer-based:phpunit"]
+    rationale: >
+      Rector applies the changes each PHPUnit release needs up to the one installed: setUp(): void, the
+      @expectedException annotation as expectException(), renamed assertions. What a test checks stays.
+
+  - id: faker-abandoned
+    title: fzaninotto/faker was abandoned for fakerphp/faker
+    category: E
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [fzaninotto/faker] }
+    fix:
+      strategy: composer
+      params: { action: replace, packages: ["fakerphp/faker:^1.23"], dev: true }
+    rationale: The same library under a new name, with the same namespace; the old one does not install on PHP 8.
+
+  - id: mysql-extension
+    title: The mysql_* functions were removed in PHP 7
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.php"]
+      pattern: "\\bmysql_(connect|pconnect|query|fetch_assoc|fetch_array|fetch_row|fetch_object|num_rows|real_escape_string|select_db|error|close|insert_id|affected_rows|result)\\s*\\("
+    fix:
+      strategy: ai
+      hint: >
+        The mysql extension does not exist in PHP 7 or later. Use mysqli with the same connection the code
+        already opens: mysql_connect(h, u, p) with mysql_select_db(d) becomes mysqli_connect(h, u, p, d), and the
+        connection it returns is passed as the first argument where the old functions took it last or not at
+        all (mysql_query($sql) is mysqli_query($link, $sql); mysql_real_escape_string($s) is
+        mysqli_real_escape_string($link, $s); mysql_error() is mysqli_error($link); mysql_insert_id() is
+        mysqli_insert_id($link)). mysql_fetch_assoc, _array, _row, _object and mysql_num_rows keep their one
+        argument under the mysqli_ name. mysql_result($r, $i, $f) has no counterpart: seek with
+        mysqli_data_seek and fetch the row. Keep the SQL and the escaping exactly as they are; do not rewrite
+        queries as prepared statements here.
+
+  - id: each-and-create-function
+    title: Constructs removed in PHP 8 that Rector cannot always rewrite
+    category: C
+    severity: WARNING
+    detect:
+      type: fileContains
+      include: ["**/*.php"]
+      pattern: "\\b(create_function|money_format|ereg|eregi|ereg_replace|split|spliti|mcrypt_\\w+|get_magic_quotes_gpc)\\s*\\("
+    fix:
+      strategy: manual
+      hint: >
+        These were removed between PHP 7.0 and 8.0. Rector rewrites the simple cases in the language step:
+        create_function with literal code becomes a closure, ereg and split become preg_match and preg_split.
+        Check what is left after the migration: code built from strings at run time, money_format (use
+        NumberFormatter, which formats by locale differently), and mcrypt (use openssl_encrypt or sodium; data
+        encrypted with mcrypt needs a plan to be read again).
+
+knowledge:
+
+  - id: php-8-dependencies
+    title: Dependencies on PHP 8
+    triggers: ["composer.json", "could not be resolved", "requires php", "Problem 1", "your php version"]
+    body: |
+      When Composer cannot resolve after the PHP version is raised, a library the project requires has no
+      release for that PHP at the constraint written. Raise that library's constraint in composer.json to its
+      first major release that supports the PHP version, and no further; do not remove the library and do not
+      add "ignore-platform-reqs" or config.platform overrides, which hide the problem until run time. Abandoned
+      packages have successors with the same API: fzaninotto/faker is fakerphp/faker, swiftmailer/swiftmailer
+      is symfony/mailer (a different API), phpunit/php-token-stream is no longer needed, zendframework/* is
+      laminas/*, and guzzlehttp/guzzle 6 becomes ^7.0 with few changes for ordinary use.
+
+  - id: php-8-behaviour
+    title: What PHP 8 does differently at run time
+    triggers: ["TypeError", "ValueError", "Deprecated", "must be of type", "Undefined", "passing null", "dynamic property"]
+    body: |
+      PHP 8 throws where PHP 7 warned: internal functions throw TypeError for a wrong argument type and
+      ValueError for an impossible value; arithmetic on arrays throws; calling a non-static method statically
+      throws. Comparing a number with a non-numeric string compares as strings (0 == "a" is false). Reading an
+      undefined variable or array key is a warning, an undefined property too. Since 8.1 passing null to a
+      non-nullable parameter of an internal function is deprecated (strlen(null)); since 8.2 creating a
+      property that the class does not declare is deprecated; since 8.4 a parameter with a null default and a
+      non-nullable type must be written ?Type. Fix these in the code that passes the value, keeping the value
+      the old code effectively used ("" for a null string, 0 for a null number).

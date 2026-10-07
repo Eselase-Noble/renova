@@ -1,0 +1,66 @@
+# Renova PHP suite: one app per path, each expected to pass with composer.json edits, Rector and text rules
+# alone, without an AI key. Needs PHP 8.4 (found on the PATH, in RENOVA_PHP or ~/.local/share/renova/php) and Composer.
+#
+# Run: benchmark/fetch-public.sh                       (once: fetches the public project below)
+#      cli/bin/renova benchmark --suite benchmark/php.yaml --out <empty dir> --configs deterministic
+
+id: php-targets
+appsDir: ../../renova-test-apps
+
+configurations:
+  - id: deterministic
+    behaviour: false
+
+apps:
+  # A library written for PHP 7.4 with PHPUnit 7 tests: each(), curly-brace string offsets, implode() with its
+  # arguments reversed, the (real) cast, "${var}" in strings, @expectedException, setUp() without a return type.
+  - id: php74-library-to-84
+    path: ledger-php74
+    playbook: php-to-8.4
+    checks:
+      - { file: composer.json, contains: '"php": "^8.4"', why: "the project says which PHP it runs on" }
+      - { file: composer.json, contains: '"phpunit/phpunit": "^9.6"', why: "a PHPUnit that installs on PHP 8" }
+      - { file: composer.json, contains: "fakerphp/faker", why: "the abandoned faker package has a successor" }
+      - { file: "src/*.php", absent: "each(", why: "removed in PHP 8" }
+      - { file: tests/AccountTest.php, contains: "expectException(\\RuntimeException::class)", why: "the test still checks for the exception" }
+      - { file: tests/AccountTest.php, contains: "Withdrawing 100.01 would pass the overdraft limit.", why: "and for its message" }
+
+  # A project nobody wrote for Renova: FastRoute 1.3.0, the router under Slim and Lumen, written for PHP 5.4
+  # with PHPUnit 4.8. 204 tests.
+  - id: fastroute-13-to-84
+    path: public/fastroute-1.3
+    playbook: php-to-8.4
+    checks:
+      - { file: composer.json, contains: '"php": "^8.4"', why: "on the target" }
+      - { file: composer.json, contains: '"phpunit/phpunit": "^9.6"', why: "a PHPUnit that installs on PHP 8" }
+      - { file: test/HackTypechecker/fixtures/all_options.php, contains: "<?hh", why: "a fixture in another language is left exactly as it was" }
+      - { file: "test/**/*Test.php", absent: "setExpectedException", why: "PHPUnit 4's way of expecting an exception is gone" }
+
+  # Laravel 10, a real application skeleton with an orders API and its feature tests.
+  - id: laravel-10-to-13
+    path: orders-laravel10
+    playbook: laravel-13
+    checks:
+      - { file: composer.json, contains: '"laravel/framework": "^13.0"', why: "on the target" }
+      - { file: composer.json, contains: '"laravel/tinker": "^2.10.1|^3.0"', why: "a constraint that can reach the release Laravel 13 needs" }
+      - { file: composer.json, contains: '"phpunit/phpunit": "^11.5"', why: "a PHPUnit the framework supports" }
+      - { file: composer.lock, matches: '"name": "laravel/framework",\s+"version": "v13\.', why: "Laravel 13 is what was installed and tested" }
+      - { file: tests/Feature/OrdersTest.php, contains: "assertJsonPath('total', '58.50')", why: "the tests are the application's own, unchanged in what they check" }
+
+  # Laravel 8: five major releases in one migration.
+  - id: laravel-8-to-13
+    path: shop-laravel8
+    playbook: laravel-13
+    checks:
+      - { file: composer.lock, matches: '"name": "laravel/framework",\s+"version": "v13\.', why: "Laravel 13 is what was installed and tested" }
+      - { file: composer.json, absent: "fruitcake/laravel-cors", why: "CORS handling is in the framework since Laravel 9" }
+      - { file: composer.json, absent: "facade/ignition", why: "replaced by spatie/laravel-ignition" }
+      - { file: app/Http/Kernel.php, contains: "Illuminate\\Http\\Middleware\\HandleCors", why: "the middleware is the framework's own" }
+      - { file: app/Models/Order.php, absent: "$dates", why: "the property Laravel 10 removed is a cast now" }
+
+  - id: laravel-10-to-12
+    path: orders-laravel10
+    playbook: laravel-12
+    checks:
+      - { file: composer.json, contains: '"laravel/framework": "^12.0"', why: "on the chosen target, not the newest" }
+      - { file: composer.lock, matches: '"name": "laravel/framework",\s+"version": "v12\.', why: "Laravel 12 is what was installed and tested" }

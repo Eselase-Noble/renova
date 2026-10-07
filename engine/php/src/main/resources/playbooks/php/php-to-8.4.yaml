@@ -1,0 +1,46 @@
+# Any Composer project → PHP 8.4, and nothing else: frameworks stay on the release they are on, as far as that
+# release runs on PHP 8.4. For a Laravel application use a laravel-* target, which moves the framework too.
+
+id: php-to-8.4
+name: "PHP → 8.4"
+ecosystem: php
+version: 0.1.0
+description: >
+  Raises a project to PHP 8.4: the version composer.json requires, the code that PHP 7 and 8 removed or changed
+  (rewritten by Rector), and a PHPUnit that runs there. Verified on PHP 8.4 with Composer, a syntax check of every
+  file, and the project's own tests.
+targets:
+  php: "8.4"
+
+settings:
+  rector:
+    packages: ["rector/rector:2.7.0", "driftingly/rector-laravel:2.6.2"]
+
+include:
+  - packs/php-language.yaml
+
+rules:
+
+  - id: php-version
+    title: Require PHP 8.4
+    category: A
+    severity: BLOCKER
+    detect: { type: phpVersionBelow, version: "8.4" }
+    fix:
+      strategy: composer
+      params: { action: setPhp, constraint: "^8.4" }
+    rationale: >
+      composer.json says which PHP the project runs on, and Composer resolves its libraries for that version.
+      PHP 8.1 and older no longer get security fixes.
+
+  - id: php-language
+    title: Code that PHP 8.4 no longer accepts, or has a better form for
+    category: C
+    severity: BLOCKER
+    detect: { type: phpVersionBelow, version: "8.4" }
+    fix:
+      strategy: rector
+      recipes: ["Rector\\Set\\ValueObject\\LevelSetList::UP_TO_PHP_84"]
+    rationale: >
+      Rector's rules for every PHP release up to 8.4: removed functions and syntax are replaced, deprecated forms
+      are rewritten, and code is moved to what newer PHP offers where that changes nothing it does.
