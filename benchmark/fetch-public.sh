@@ -26,3 +26,17 @@ if [ ! -d "$apps/public/petclinic-boot27-gradle" ]; then
          "$apps/public/petclinic-boot27-gradle/mvnw.cmd" "$apps/public/petclinic-boot27-gradle/.mvn"
   echo "Made $apps/public/petclinic-boot27-gradle"
 fi
+
+# Spring PetClinic Microservices (Apache-2.0) at its Spring Boot 2.6 release: seven Maven modules on Spring
+# Cloud 2021, with a Maven wrapper from 2018. Not part of the targets suite: its API gateway does not finish
+# without AI (see docs/verified-migrations.md).
+if [ ! -d "$apps/public/petclinic-microservices-boot26" ]; then
+  clone="$(mktemp -d)"
+  git clone -q https://github.com/spring-petclinic/spring-petclinic-microservices.git "$clone"
+  mkdir -p "$apps/public/petclinic-microservices-boot26"
+  git -C "$clone" archive v2.6.7 | tar -x -C "$apps/public/petclinic-microservices-boot26"
+  rm -rf "$clone"
+  echo "Fetched $apps/public/petclinic-microservices-boot26"
+else
+  echo "Already there: $apps/public/petclinic-microservices-boot26"
+fi

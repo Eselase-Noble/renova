@@ -33,7 +33,7 @@ Last run: 6 October 2026, on Java 21 and Maven 3.8, Renova at the commit that ad
 | Helpdesk (Struts actions, with a test that sets one up by hand) | Maven | Struts 2.5, Java 8 | Struts 7.4, Jakarta EE 10, Java 21 | Pass | 3/3 |
 | Tasks service in Kotlin (web, JPA, validation) | Maven | Spring Boot 2.7, Kotlin 1.6, Java 11 | Spring Boot 3.5, Kotlin 1.9, Java 21 | Pass | 4/4 |
 
-The suite's thirteen runs take about twelve minutes in total, with dependencies already downloaded.
+The suite's runs take about twenty minutes in total, with dependencies already downloaded.
 
 PetClinic is the public sample at github.com/spring-projects/spring-petclinic (Apache-2.0), taken at the commit
 before its maintainers migrated it to Spring Boot 3 by hand. The other projects are synthetic and were written
@@ -56,6 +56,24 @@ JAX-RS resource created and listed accounts at its old address, rejected a reque
 rolled back a transfer without funds; the Payroll WAR, started with `java -jar`, answered from its servlet and
 its JSP page under the context path the server used to give it.
 
+## A larger project that does not finish by itself
+
+Spring PetClinic Microservices at its Spring Boot 2.6 release (public, Apache-2.0): seven Maven modules on
+Spring Cloud 2021, built by a Maven wrapper from 2018. Target: Spring Boot 3.5, Java 21, no AI.
+
+- The recipes moved every module to Spring Boot 3.5.16 and Spring Cloud 2025.0, and the sources to jakarta.
+- Five guards then made eight build-file edits that the first attempts at this project showed were needed:
+  a version property pinned for Spring Boot 2 (`assertj.version`), `javax.validation` dependencies Spring Boot 3
+  no longer manages, the JAXB API one module imports, a JUnit provider from 2018 that the upgrade recipe adds
+  to Surefire, and the Maven wrapper itself (3.5.4, too old for Spring Boot 3's plugins).
+- **Six of the seven modules build, and the five that have tests pass them.** The seventh, the API gateway
+  (Spring Cloud Gateway with Resilience4j), does not: one test is left half-converted by the OkHttp
+  MockWebServer recipe, and behind it the circuit-breaker configuration needs changes for Spring Cloud 2025.
+  Renova reports the migration as failed and names the file. That module is work for the AI repair loop or a
+  person; it has not been run with AI here.
+
+It is not in the suite, because the suite holds what passes without AI. `benchmark/fetch-public.sh` fetches it.
+
 ## What is not covered here
 
 - **Frameworks that ended before Jakarta EE.** Struts 1, EJB 2.x, JAX-RPC, Jersey 1, Faces managed beans,
@@ -74,5 +92,5 @@ its JSP page under the context path the server used to give it.
   repair loop. Running that suite with AI costs tokens on your own key.
 - **Behaviour.** These runs compare builds and tests, not the running application. `--verify-behaviour` runs
   the original and the migrated application side by side in Docker; it supports servlet-container WARs today.
-- **Large codebases.** The biggest project here is PetClinic. Multi-module enterprise applications are the
-  next thing to prove.
+- **Large codebases.** The biggest project that passes by itself is PetClinic; the seven-module project above
+  gets most of the way. Applications of hundreds of modules have not been tried.
