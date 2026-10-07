@@ -59,7 +59,8 @@ public final class ProjectView {
 
     private static final Map<String, String> STRATEGIES = Map.of(
             "recipe", "Recipe", "replace", "Text rule", "maven", "Build file edit", "gradle", "Build file edit",
-            "dotnet", "Project file edit", "dotnet-source", "Source rewrite", "ai", "AI", "manual", "Manual");
+            "dotnet", "Project file edit", "dotnet-source", "Source rewrite", "composer", "Build file edit",
+            "rector", "Recipe", "ai", "AI", "manual", "Manual");
 
     private final Navigator nav;
     private final Engine engine;

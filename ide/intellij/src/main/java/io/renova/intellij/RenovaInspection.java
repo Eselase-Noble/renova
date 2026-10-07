@@ -55,7 +55,7 @@ public final class RenovaInspection extends LocalInspectionTool {
     private static String message(RenovaProjectService.Assessment a, Finding f) {
         String strategy = a.plan().steps().stream().filter(s -> s.rule().id().equals(f.ruleId())).findFirst()
                 .map(s -> switch (s.strategy()) {
-                    case "recipe", "replace", "maven", "gradle", "dotnet", "dotnet-source" -> "Renova fixes this automatically";
+                    case "recipe", "replace", "maven", "gradle", "dotnet", "dotnet-source", "composer", "rector" -> "Renova fixes this automatically";
                     case "ai" -> "Renova fixes this with AI, checked by the build";
                     case "manual" -> "For a person: see the guidance in the Renova tool window";
                     default -> "Strategy " + s.strategy();

@@ -43,6 +43,8 @@ export const STRATEGY_NAMES: Record<string, string> = {
   gradle: "Build file edit",
   dotnet: "Project file edit",
   "dotnet-source": "Source rewrite",
+  composer: "Build file edit",
+  rector: "Recipe",
   ai: "AI",
   manual: "Manual",
 };

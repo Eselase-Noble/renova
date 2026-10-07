@@ -24,7 +24,7 @@ public final class Phases {
 
     private static final List<Definition> DEFINITIONS = List.of(
             new Definition("plan", "Plan", Pattern.compile("^(Plan:|Copying project)"), true),
-            new Definition("rewrite", "Rewrite", Pattern.compile("^Stage (recipe|replace|maven|gradle|dotnet)"), true),
+            new Definition("rewrite", "Rewrite", Pattern.compile("^Stage (recipe|replace|maven|gradle|dotnet|composer|rector)"), true),
             new Definition("ai", "AI edits", Pattern.compile("^Stage ai"), false),
             new Definition("guards", "Guards", Pattern.compile("^(Checking \\d+ guard|Stage guard)"), true),
             new Definition("build", "Build and tests", Pattern.compile("^Verifying build"), true),

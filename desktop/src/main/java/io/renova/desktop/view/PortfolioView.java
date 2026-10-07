@@ -125,7 +125,7 @@ public final class PortfolioView {
         if (r.entries().isEmpty()) {
             page.getChildren().setAll(header(chooseButton("Choose another folder…", true)),
                     Ui.section(r.root().toString(), null, Ui.empty(Icons.FOLDER_OPEN, "No projects found here",
-                            "Renova looks up to four folders down for a project it recognises (pom.xml, build.gradle, a .NET solution or project file).")));
+                            "Renova looks up to four folders down for a project it recognises (pom.xml, build.gradle, a .NET solution or project file, composer.json).")));
             return;
         }
         long assessed = r.entries().stream().filter(e -> e.error() == null).count();

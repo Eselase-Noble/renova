@@ -12,7 +12,7 @@ import type { Assessment, PlanStep } from "@/lib/api";
 import { CATEGORY_NAMES, plural, RESOLVER_NAMES, resolverOf, STRATEGY_NAMES, type Resolver } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-const STRATEGY_TONE: Record<string, Tone> = { recipe: "good", replace: "good", maven: "good", gradle: "good", dotnet: "good", "dotnet-source": "good", ai: "brand", manual: "warn" };
+const STRATEGY_TONE: Record<string, Tone> = { recipe: "good", replace: "good", maven: "good", gradle: "good", dotnet: "good", "dotnet-source": "good", composer: "good", rector: "good", ai: "brand", manual: "warn" };
 const STRATEGY_ICON: Record<Resolver, typeof Cog> = { automatic: Cog, ai: Bot, person: User };
 
 export function StrategyBadge({ strategy }: { strategy: string }) {

@@ -19,7 +19,7 @@ Nothing is sent anywhere, so it works on machines without internet access, which
 |---|---|---|
 | Licensee | Who it was issued to | Shown |
 | Edition | A name for what was sold: `trial`, `team`, ... | Shown |
-| Ecosystems | `java`, `dotnet`, or `*` for every ecosystem, including ones added later | Yes |
+| Ecosystems | `java`, `dotnet`, `php`, or `*` for every ecosystem, including ones added later | Yes |
 | Expires | The last day it is valid | Yes |
 | Seats | How many people may use it | No: stated in the file, not counted |
 

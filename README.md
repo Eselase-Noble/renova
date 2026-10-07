@@ -7,7 +7,8 @@ of the project. Deterministic rewrites handle the mechanical bulk. Context-depen
 AI model or a person, and the real build checks every change.
 
 > **Status:** early development (`0.1.0-SNAPSHOT`). The engine, command-line interface, web console and desktop
-> app, IntelliJ plugin and VS Code extension work for Java and for .NET (C# and Visual Basic) projects. What
+> app, IntelliJ plugin and VS Code extension work for Java, .NET (C# and Visual Basic) and PHP (Composer,
+> Laravel) projects. What
 > has been shown to work, and what has not, is in [docs/verified-migrations.md](docs/verified-migrations.md);
 > a one-page summary is in [docs/product-brief.md](docs/product-brief.md). See the [roadmap](#roadmap).
 
@@ -47,7 +48,7 @@ most of the effort. Renova treats the two differently:
   Compiler, build-file and test failures become structured errors that feed an automatic repair loop. One repair can change a source file and its build file together. Tests are never changed to make them pass; the one exception is a test that a rewrite step left uncompilable, where only the compiler's errors may be repaired.
 - **Bring your own AI key.** Each user or organisation supplies its own provider credentials. Token
   usage is reported per migration.
-- **Any ecosystem.** The engine has no Java-specific code. Java is the first plugin, .NET the second.
+- **Any ecosystem.** The engine has no Java-specific code. Java is the first plugin, .NET the second, PHP the third.
 
 ## How it works
 
@@ -81,6 +82,7 @@ Every finding belongs to a change category, and plan steps run in the order A â†
 | [`engine/core`](engine) | Ecosystem-neutral engine: playbooks, plugin SPI, analysis, planning, migration, AI loop, reports | Working |
 | [`engine/java`](engine) | Java plugin: Maven/Gradle model, Java detectors, OpenRewrite fixer, Maven verifier, bundled playbooks | Working |
 | [`engine/dotnet`](engine) | .NET plugin: C# and Visual Basic project model, .NET detectors, project-file fixer, `dotnet` verifier, bundled playbooks | First targets working |
+| [`engine/php`](engine) | PHP plugin: Composer project model, PHP detectors, Rector and `composer.json` fixers, Composer and PHPUnit verifier, bundled PHP and Laravel playbooks | First targets working |
 | [`engine/ai-anthropic`](engine) | AI provider for Claude, using each user's own Anthropic API key | Working |
 | [`engine/ai-openai`](engine) | AI provider for OpenAI or any OpenAI-compatible server (Azure OpenAI, vLLM, Ollama), using the user's own key | Working |
 | [`cli`](cli) | `renova` command for terminals and CI pipelines | Working |
@@ -99,6 +101,9 @@ Every finding belongs to a change category, and plan steps run in the order A â†
 - For .NET projects: the .NET SDK of the target (10 or 8) and network access to nuget.org or your own feed.
   Renova looks for `dotnet` on the PATH, in `DOTNET_ROOT`, `~/.dotnet` and the usual install folders;
   `RENOVA_DOTNET` names another one
+- For PHP projects: Composer, and the PHP of the target (8.3, 8.4 or 8.5) beside whatever PHP is on the PATH.
+  Renova looks for `php` on the PATH, in the folders of `RENOVA_PHP`, in `~/.local/share/renova/php` and where
+  Homebrew, Herd, phpbrew, asdf, XAMPP and Laragon install it
 
 ### Build
 
@@ -286,6 +291,8 @@ rules:
 | `gradle` | Edits to Gradle build files in the file's own style: `addDependency`, `removeDependency`, `setPluginVersion`, `setWrapperVersion` |
 | `maven` | Format-preserving pom.xml edits: `setScope`, `setPluginVersion`, `setProperty`, `changeProperty`, `setParentVersion`, `addDependency`, `addAnnotationProcessor`, `setVersion`, `removeDuplicates` |
 | `dotnet` | Edits to .NET project files: `convertToSdkStyle`, `setTargetFramework`, `setPackageVersion`, `addPackage`, `replacePackage`, `removePackage`, `setProperty` |
+| `composer` | Edits to `composer.json`: `setPhp`, `setVersion`, `add`, `remove`, `replace` |
+| `rector` | [Rector](https://getrector.com), the rewrite tool for PHP, deterministic and type-aware. Installed into Renova's cache, never into the project |
 | `dotnet-source` | Rewrites of C# that follow from the text alone: `nunit3` (NUnit 2 tests to NUnit 3) |
 | `ai` | The configured AI provider. The build verifies the result. One request per file; with `params.together`, one request for everything a rule found plus the files named in `params.with`, new files where `params.create` allows, and removal of files the result no longer has: for a change no single file holds, such as replacing a web framework |
 | `manual` | A person, guided by the rule's `hint` in the report |
@@ -430,6 +437,31 @@ Microsoft's Windows targeting pack, which Renova turns on by itself; their tests
 Windows only, and the report says so when a migration is verified elsewhere. What still has to be shown on a
 Windows machine, and how, is in [docs/windows-test-plan.md](docs/windows-test-plan.md).
 
+### PHP targets
+
+| Playbook | Takes | To | Suggested for |
+|---|---|---|---|
+| `php-to-8.3`, `php-to-8.4`, `php-to-8.5` | Any Composer project, from PHP 5.4 on | That PHP version, and nothing else: frameworks stay | Projects without Laravel (`php-to-8.4`) |
+| `laravel-11`, `laravel-12`, `laravel-13` | A Laravel application on any older Laravel | That Laravel, on PHP 8.3 (Laravel 11) or 8.4 | Laravel applications (`laravel-13`) |
+
+What these do today, with no AI ([results](docs/verified-migrations.md#php)):
+
+- **composer.json.** The PHP version the project requires; `laravel/framework` and the packages released
+  with it, to constraints that can reach a release for the target; packages the framework took in
+  (`fruitcake/laravel-cors`, `fideloper/proxy`) or that were renamed (`facade/ignition`, `fzaninotto/faker`);
+  a PHPUnit that runs there.
+- **Code.** Rector's rules for every PHP release up to the target (removed functions and syntax, deprecated
+  forms) and for every Laravel release up to the target, and the PHPUnit changes for the version installed.
+  A file Rector cannot read as PHP is left as it is and named in the report.
+- **Verification on the target PHP.** `composer update` resolves and installs what `composer.json` now asks
+  for, every file of the project is checked to parse, and the project's tests run with PHPUnit or Pest. PHP
+  has no compiler to catch the rest, so a project without tests is reported as unproven.
+
+Rector's rule sets also move code to newer idioms (constructor promotion, arrow functions, and in Laravel 13
+attributes in place of `$fillable`): more is changed than the target strictly needs, and the tests are what
+shows that nothing else did. Not yet done: projects without Composer, the `mysql_*` functions and closure
+factories (planned for AI, not run), Symfony and other frameworks' own upgrades, behavioural verification.
+
 ## Extending Renova
 
 All extension points are Java interfaces discovered with `ServiceLoader`. Adding a jar to the
@@ -481,7 +513,9 @@ source migrates without one. See [docs/licensing.md](docs/licensing.md).
    AI, ASP.NET MVC 5 and Web API 2 â†’ ASP.NET Core. Next: a larger real MVC application, Entity Framework 6 â†’
    EF Core, Windows Forms and WPF verified on Windows, behavioural verification for ASP.NET Core (the original
    needs IIS on Windows), Web Forms.
-7. **PHP:** a chosen PHP version, a chosen Laravel version.
+7. **PHP:** a chosen PHP version (8.3, 8.4, 8.5) and a chosen Laravel version (11, 12, 13) are in. Next: an
+   option to change only what the target requires, PHP paths that need AI (`mysql_*`, closure factories), a
+   real Laravel application, Symfony, projects without Composer, behavioural verification.
 
 ## Contributing
 

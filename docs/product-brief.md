@@ -1,11 +1,12 @@
 # Renova in one page
 
-**Renova moves legacy Java and .NET applications to current platforms on the customer's own machines, and
-proves the result by building it and running its tests.**
+**Renova moves legacy Java, .NET and PHP applications to current platforms on the customer's own machines,
+and proves the result by building it and running its tests.**
 
 ## The problem
 
-Java 8 and Java EE applications, .NET Framework applications, Spring Boot 2, Struts, ASP.NET MVC 5: they run
+Java 8 and Java EE applications, .NET Framework applications, Spring Boot 2, Struts, ASP.NET MVC 5, PHP 5 and
+7, old Laravel: they run
 the business and sit on platforms that are out of support or close to it. A platform upgrade touches thousands
 of files. Most edits are mechanical; a few need judgement and take most of the time. Teams put it off because
 nobody can say how big it is or whether the result still works.
@@ -42,6 +43,8 @@ nobody can say how big it is or whether the result still works.
 | Struts 1, Jersey 1, Commons HttpClient 3 | Spring MVC, Jersey 3, HttpClient 5 | With AI |
 | .NET Framework, .NET Core, .NET 5 to 9 (C# and Visual Basic) | .NET 10 or 8 | No AI |
 | ASP.NET MVC 5 and Web API 2 | ASP.NET Core | With AI |
+| PHP 5.4 to 8.2 (Composer projects) | PHP 8.3, 8.4 or 8.5 | No AI |
+| Laravel 8, 9, 10 and later | Laravel 11, 12 or 13 | No AI |
 
 Maven and Gradle; Kotlin on the JVM; JUnit 4 to 5, Mockito, Log4j, NUnit 2 to 3 and other library upgrades.
 
@@ -58,7 +61,9 @@ was checked and what was not, is in [verified-migrations.md](verified-migrations
 | A Struts 1 application → Spring MVC | Builds; same answers as the original on 6 of 9 requests, the other 3 differ in form markup only |
 | A Jersey 1 application → Jersey 3 | Builds, 9 tests pass, same answers as the original on 6 of 6 requests |
 | An ASP.NET MVC 5 application → ASP.NET Core on .NET 10 | Builds and runs; pages, routes, API, validation and anti-forgery checked by hand |
-| 21 Java and 5 .NET paths in the benchmark suites | All pass without AI |
+| FastRoute 1.3 (public PHP library, written for PHP 5.4), → PHP 8.4 | Installs, 204 tests pass, no AI |
+| Laravel 8 and Laravel 10 applications → Laravel 13 on PHP 8.4 | Install, 7 tests pass each, no AI |
+| 21 Java, 5 .NET and 5 PHP paths in the benchmark suites | All pass without AI |
 
 ## What it does not do yet
 
@@ -71,7 +76,8 @@ Said plainly, because a buyer will ask:
   applications could not be run here, so .NET results are checked by build and tests, not against the original.
 - Java: EJB 2, JAX-RPC, Faces managed beans and iBATIS are planned with the mapping written out and have not
   been run. Nothing larger than seven modules has been tried.
-- PHP and Laravel are next and not started.
+- PHP: Symfony upgrades, projects without Composer, and the paths that need AI are not done. The Laravel
+  results are Laravel's own skeleton with one feature added, not a business application.
 - Licences are issued by hand as signed files; there is no shop or portal, and seats are stated, not counted.
 - The installers are not code-signed yet, so Windows and macOS warn when they are opened. Single sign-on is
   not built.

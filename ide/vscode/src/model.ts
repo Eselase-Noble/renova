@@ -50,6 +50,8 @@ const RESOLUTION: Record<string, string> = {
   gradle: "Renova fixes this automatically",
   dotnet: "Renova fixes this automatically",
   "dotnet-source": "Renova fixes this automatically",
+  composer: "Renova fixes this automatically",
+  rector: "Renova fixes this automatically",
   ai: "Renova fixes this with AI, checked by the build",
   manual: "For a person: see the guidance in the Renova view",
 };
@@ -61,6 +63,8 @@ export const STRATEGY_LABEL: Record<string, string> = {
   gradle: "build file edit",
   dotnet: "project file edit",
   "dotnet-source": "source rewrite",
+  composer: "build file edit",
+  rector: "recipe",
   ai: "AI",
   manual: "for a person",
 };

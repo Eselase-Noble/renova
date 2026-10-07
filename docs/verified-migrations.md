@@ -88,6 +88,24 @@ framework, 4.8). Their tests and the applications themselves have not been run: 
 Framework builds, and the MVC application beside its original under IIS Express are the subject of
 [windows-test-plan.md](windows-test-plan.md).
 
+## PHP
+
+Run on 7 October 2026, no AI, verified on PHP 8.4.23 with Composer 2.9:
+`cli/bin/renova benchmark --suite benchmark/php.yaml --out /tmp/php --configs deterministic`.
+
+| Project | From | To | Install, syntax and tests | Checks |
+|---|---|---|---|---|
+| Ledger (a library using what PHP 8 removed: `each()`, curly-brace offsets, reversed `implode()`, `(real)`; PHPUnit 7 tests with `@expectedException`) | PHP 7.4, PHPUnit 7.5 | PHP 8.4, PHPUnit 9.6 | Pass (7 tests) | 6/6 |
+| FastRoute 1.3.0 (public, BSD-3-Clause: the request router under Slim and Lumen) | PHP 5.4 and later, PHPUnit 4.8 | PHP 8.4, PHPUnit 9.6 | Pass (204 tests) | 4/4 |
+| Orders (Laravel's own application skeleton with an orders API, a model, a factory, feature tests on SQLite) | Laravel 10, PHP 8.1 | Laravel 13, PHP 8.4 | Pass (7 tests) | 5/5 |
+| Shop (the same on the Laravel 8 skeleton, with `fruitcake/laravel-cors`, `facade/ignition` and `$dates`) | Laravel 8, PHP 7.3/8.0 | Laravel 13, PHP 8.4 | Pass (7 tests) | 5/5 |
+| Orders (same as above) | Laravel 10 | Laravel 12, PHP 8.4 | Pass (7 tests) | 2/2 |
+
+Each original was first run as it was, on the PHP it was written for, in Docker (PHP 7.4, 7.1, 8.2 and 8.0):
+all tests passed there, one of FastRoute's 204 skipped. The two Laravel applications are Laravel's real
+skeletons with one small feature added; no application anyone runs a business on has been tried. Not run:
+`php-to-8.3` and `php-to-8.5`, `laravel-11`, any PHP path with AI, Symfony, a project without tests.
+
 ## With AI
 
 Run on 7 October 2026 with Claude Opus (`claude-opus-5-5`), retrieval on, on the maintainer's own key. AI output
