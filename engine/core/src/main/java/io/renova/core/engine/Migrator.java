@@ -49,6 +49,9 @@ public final class Migrator {
     }
 
     public MigrationOutcome migrate(AnalysisResult analysis, MigrationPlan plan, MigrationOptions options) throws Exception {
+        // Assessing is free; changing code needs a licence for the ecosystem (not in a development build).
+        io.renova.core.licence.Licences.installed().requireMigration(plan.playbook().ecosystem(),
+                registry.plugin(plan.playbook().ecosystem()).displayName());
         // Create the provider first so bad credentials fail before any copying or building.
         try (MeteredAiProvider ai = new MeteredAiProvider(registry.ai(options.ai()))) {
             progress.accept("Copying project to " + options.outputDir());
