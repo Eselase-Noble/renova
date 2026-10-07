@@ -1,0 +1,183 @@
+# The project file itself: the format the dotnet tools build, and what a test project needs for its tests to
+# be found. Shared by every .NET target.
+
+rules:
+
+  - id: sdk-style-project
+    title: Convert the project file to the SDK style
+    category: A
+    severity: BLOCKER
+    detect: { type: legacyProjectFormat, exceptKinds: [aspnet] }
+    fix:
+      strategy: dotnet
+      params: { action: convertToSdkStyle }
+    rationale: >
+      Modern .NET builds only SDK-style projects. The old format lists every source file and framework
+      assembly and keeps NuGet packages in packages.config; the SDK style finds sources by pattern, gets the
+      framework from the target, and names packages in the project file. Renova writes out whatever the old
+      file said that the new format would not assume, so the same files are compiled as before.
+
+  - id: aspnet-classic
+    title: Classic ASP.NET (System.Web) has no modern .NET release
+    category: C
+    severity: BLOCKER
+    detect: { type: projectKind, kinds: [aspnet] }
+    fix:
+      strategy: manual
+      hint: >
+        Web Forms, MVC 5, Web API 2 and WCF services hosted in IIS are built on System.Web, which modern .NET
+        does not have. The project is left as it is. Move it to ASP.NET Core: controllers and Razor views of
+        MVC 5 map closely (System.Web.Mvc.Controller becomes Microsoft.AspNetCore.Mvc.Controller, Global.asax
+        and App_Start become Program.cs, web.config settings become appsettings.json, HttpContext.Current
+        becomes an injected IHttpContextAccessor, bundles become static files); Web API 2 controllers become
+        ControllerBase with [ApiController]; Web Forms pages have no counterpart and are rewritten as Razor
+        Pages or Blazor components; WCF services move to CoreWCF or gRPC. Class libraries the web project uses
+        are migrated by the other rules and can be shared by the old and the new web project meanwhile.
+
+  - id: guard-test-sdk
+    phase: guard
+    title: A test project needs Microsoft.NET.Test.Sdk
+    category: E
+    severity: BLOCKER
+    detect:
+      type: nugetPackage
+      ids: [NUnit, xunit, MSTest.TestFramework]
+      unless: [Microsoft.NET.Test.Sdk, MSTest]
+    fix:
+      strategy: dotnet
+      params: { action: addPackage, packages: ["Microsoft.NET.Test.Sdk:18.10.1"] }
+    rationale: >
+      dotnet test finds tests through this package. Projects from the old format never had it, because Visual
+      Studio ran their tests itself: without it the build passes and no test runs.
+
+  - id: guard-mstest-packages
+    phase: guard
+    title: MSTest comes from NuGet packages now
+    category: E
+    severity: BLOCKER
+    detect:
+      type: namespaceWithoutPackage
+      prefixes: [Microsoft.VisualStudio.TestTools.UnitTesting]
+      packages: [MSTest.TestFramework, MSTest]
+    fix:
+      strategy: dotnet
+      params: { action: addPackage, packages: ["MSTest.TestFramework:3.11.1", "MSTest.TestAdapter:3.11.1", "Microsoft.NET.Test.Sdk:18.10.1"] }
+    rationale: >
+      Old test projects referenced Microsoft.VisualStudio.QualityTools.UnitTestFramework, an assembly installed
+      with Visual Studio. The same attributes and assertions, in the same namespace, are in MSTest.TestFramework.
+
+  - id: guard-mstest-adapter
+    phase: guard
+    title: MSTest tests are found by MSTest.TestAdapter
+    category: E
+    severity: BLOCKER
+    detect: { type: nugetPackage, ids: [MSTest.TestFramework], unless: [MSTest.TestAdapter, MSTest] }
+    fix:
+      strategy: dotnet
+      params: { action: addPackage, packages: ["MSTest.TestAdapter:3.11.1"] }
+
+  - id: guard-nunit-adapter
+    phase: guard
+    title: NUnit tests are found by NUnit3TestAdapter
+    category: E
+    severity: BLOCKER
+    detect: { type: nugetPackage, ids: [NUnit], unless: [NUnit3TestAdapter] }
+    fix:
+      strategy: dotnet
+      params: { action: addPackage, packages: ["NUnit3TestAdapter:5.2.0"] }
+
+  - id: guard-xunit-runner
+    phase: guard
+    title: xUnit tests are found by xunit.runner.visualstudio
+    category: E
+    severity: BLOCKER
+    detect: { type: nugetPackage, ids: [xunit], unless: [xunit.runner.visualstudio] }
+    fix:
+      strategy: dotnet
+      params: { action: addPackage, packages: ["xunit.runner.visualstudio:3.1.5"] }
+
+  - id: mstest-3
+    title: MSTest 1 and 2 do not run on modern .NET's current releases
+    category: E
+    severity: BLOCKER
+    detect: { type: nugetPackage, ids: [MSTest.TestFramework, MSTest.TestAdapter], versionBelow: "3.0" }
+    fix:
+      strategy: dotnet
+      params: { action: setPackageVersion, version: "3.11.1" }
+
+  - id: nunit-3
+    title: NUnit and its adapter must be releases that know modern .NET
+    category: E
+    severity: BLOCKER
+    detect: { type: nugetPackage, ids: [NUnit], versionBelow: "3.14" }
+    fix:
+      strategy: dotnet
+      params: { action: setPackageVersion, version: "3.14.0" }
+    rationale: >
+      3.14 is the last NUnit 3 and runs on every modern .NET. Tests written for NUnit 2 use names NUnit 3
+      removed (TestFixtureSetUp is OneTimeSetUp, ExpectedException is Assert.Throws): they stop compiling, and
+      a person or the AI repair has to rename them.
+
+  - id: nunit-adapter
+    title: The NUnit test adapter must know modern .NET
+    category: E
+    severity: BLOCKER
+    detect: { type: nugetPackage, ids: [NUnit3TestAdapter], versionBelow: "4.5" }
+    fix:
+      strategy: dotnet
+      params: { action: setPackageVersion, version: "5.2.0" }
+
+  - id: nunit-2-adapter
+    title: The NUnit 2 adapter does not run NUnit 3 tests
+    category: E
+    severity: BLOCKER
+    detect: { type: nugetPackage, ids: [NUnitTestAdapter] }
+    fix:
+      strategy: dotnet
+      params: { action: replacePackage, packages: ["NUnit3TestAdapter:5.2.0"] }
+
+  - id: xunit-2-9
+    title: xUnit and its runner must be releases that know modern .NET
+    category: E
+    severity: WARNING
+    detect: { type: nugetPackage, ids: [xunit], versionBelow: "2.9" }
+    fix:
+      strategy: dotnet
+      params: { action: setPackageVersion, version: "2.9.3" }
+
+  - id: xunit-runner
+    title: The xUnit runner must know modern .NET
+    category: E
+    severity: BLOCKER
+    detect: { type: nugetPackage, ids: [xunit.runner.visualstudio], versionBelow: "2.8" }
+    fix:
+      strategy: dotnet
+      params: { action: setPackageVersion, version: "3.1.5" }
+
+  - id: test-sdk
+    title: Microsoft.NET.Test.Sdk must know the target framework
+    category: E
+    severity: BLOCKER
+    detect: { type: nugetPackage, ids: [Microsoft.NET.Test.Sdk], versionBelow: "17.8" }
+    fix:
+      strategy: dotnet
+      params: { action: setPackageVersion, version: "18.10.1" }
+
+knowledge:
+
+  - id: dotnet-project-format
+    title: SDK-style projects
+    triggers: ["csproj", "vbproj", "PackageReference", "packages.config", "TargetFramework", "NU1", "MSB", "CS0246", "CS0234", "BC30002"]
+    body: |
+      An SDK-style project (<Project Sdk="Microsoft.NET.Sdk">) compiles every .cs or .vb file under its folder,
+      so a file is taken out with <Compile Remove="..." />, not by leaving it unlisted. NuGet packages are
+      <PackageReference Include="Id" Version="x" /> items; there is no packages.config and no HintPath into a
+      packages folder. Framework assemblies are not referenced one by one: what .NET Framework had built in and
+      modern .NET does not is a package (System.Configuration.ConfigurationManager, System.Data.SqlClient or
+      Microsoft.Data.SqlClient, System.Drawing.Common, System.ServiceModel.Primitives and .Http for WCF
+      clients, System.Runtime.Caching, System.DirectoryServices, System.Management). "The type or namespace
+      name X could not be found" (CS0246, CS0234, or BC30002 in Visual Basic) after a migration usually means
+      such a package is missing from the project file: add it there and leave the code alone. A project with
+      its own AssemblyInfo file sets <GenerateAssemblyInfo>false</GenerateAssemblyInfo>, or the attributes are
+      defined twice (CS0579). Windows Forms and WPF projects target netN.0-windows with
+      <UseWindowsForms>true</UseWindowsForms> or <UseWPF>true</UseWPF>.

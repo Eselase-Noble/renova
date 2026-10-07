@@ -1,0 +1,263 @@
+# What .NET Framework had and modern .NET does not, or has elsewhere. Where the code is right and only a
+# package is missing, a guard adds it; where the API is gone, the change needs judgement and goes to AI or a
+# person with the mapping written out.
+
+rules:
+
+  - id: guard-configuration-manager
+    phase: guard
+    title: System.Configuration is a package
+    category: E
+    severity: BLOCKER
+    detect:
+      type: namespaceWithoutPackage
+      prefixes: [System.Configuration]
+      packages: [System.Configuration.ConfigurationManager]
+    fix:
+      strategy: dotnet
+      params: { action: addPackage, packages: ["System.Configuration.ConfigurationManager:10.0.12"] }
+    rationale: >
+      ConfigurationManager, AppSettings and the configuration sections read App.config as before once the
+      package is referenced. An ASP.NET Core application normally moves these settings to appsettings.json.
+
+  - id: guard-sqlclient
+    phase: guard
+    title: System.Data.SqlClient is a package
+    category: E
+    severity: BLOCKER
+    detect:
+      type: namespaceWithoutPackage
+      prefixes: [System.Data.SqlClient]
+      packages: [System.Data.SqlClient]
+    fix:
+      strategy: dotnet
+      params: { action: addPackage, packages: ["System.Data.SqlClient:4.9.1"] }
+    rationale: >
+      The same classes in the same namespace, so the code is unchanged. Microsoft now develops
+      Microsoft.Data.SqlClient instead; moving to it changes the namespace and encrypts connections by default,
+      which is a decision of its own and is left to the project.
+
+  - id: guard-drawing
+    phase: guard
+    title: System.Drawing is a package, for Windows
+    category: E
+    severity: WARNING
+    detect:
+      type: namespaceWithoutPackage
+      prefixes: [System.Drawing]
+      exclude: [System.Drawing.Primitives]
+      packages: [System.Drawing.Common, Microsoft.Windows.Compatibility]
+    fix:
+      strategy: dotnet
+      params: { action: addPackage, packages: ["System.Drawing.Common:10.0.12"] }
+    rationale: >
+      Bitmap, Graphics and Font are in System.Drawing.Common, which since .NET 7 works on Windows only. An
+      application that has to run on Linux needs another imaging library (ImageSharp, SkiaSharp).
+
+  - id: guard-wcf-client
+    phase: guard
+    title: WCF clients need the System.ServiceModel packages
+    category: E
+    severity: BLOCKER
+    detect:
+      type: namespaceWithoutPackage
+      prefixes: [System.ServiceModel]
+      packages: [System.ServiceModel.Primitives, CoreWCF.Primitives]
+    fix:
+      strategy: dotnet
+      params: { action: addPackage, packages: ["System.ServiceModel.Primitives:8.1.2", "System.ServiceModel.Http:8.1.2"] }
+    rationale: >
+      Calling a WCF service works on modern .NET with these packages (BasicHttpBinding, ChannelFactory,
+      generated clients). Hosting one does not: see the rule on ServiceHost.
+
+  - id: guard-runtime-caching
+    phase: guard
+    title: System.Runtime.Caching is a package
+    category: E
+    severity: BLOCKER
+    detect: { type: namespaceWithoutPackage, prefixes: [System.Runtime.Caching], packages: [System.Runtime.Caching] }
+    fix:
+      strategy: dotnet
+      params: { action: addPackage, packages: ["System.Runtime.Caching:10.0.12"] }
+
+  - id: guard-directory-services
+    phase: guard
+    title: System.DirectoryServices is a package, for Windows
+    category: E
+    severity: BLOCKER
+    detect: { type: namespaceWithoutPackage, prefixes: [System.DirectoryServices], packages: [System.DirectoryServices, Microsoft.Windows.Compatibility] }
+    fix:
+      strategy: dotnet
+      params: { action: addPackage, packages: ["System.DirectoryServices:10.0.12"] }
+
+  - id: guard-management
+    phase: guard
+    title: System.Management is a package, for Windows
+    category: E
+    severity: BLOCKER
+    detect: { type: namespaceWithoutPackage, prefixes: [System.Management], packages: [System.Management, Microsoft.Windows.Compatibility] }
+    fix:
+      strategy: dotnet
+      params: { action: addPackage, packages: ["System.Management:10.0.12"] }
+
+  - id: guard-odbc-oledb
+    phase: guard
+    title: System.Data.Odbc is a package
+    category: E
+    severity: BLOCKER
+    detect: { type: namespaceWithoutPackage, prefixes: [System.Data.Odbc], packages: [System.Data.Odbc] }
+    fix:
+      strategy: dotnet
+      params: { action: addPackage, packages: ["System.Data.Odbc:10.0.12"] }
+
+  - id: guard-oledb
+    phase: guard
+    title: System.Data.OleDb is a package, for Windows
+    category: E
+    severity: BLOCKER
+    detect: { type: namespaceWithoutPackage, prefixes: [System.Data.OleDb], packages: [System.Data.OleDb] }
+    fix:
+      strategy: dotnet
+      params: { action: addPackage, packages: ["System.Data.OleDb:10.0.12"] }
+
+  - id: entity-framework-6
+    title: Entity Framework 6 runs on modern .NET from 6.4
+    category: E
+    severity: BLOCKER
+    detect: { type: nugetPackage, ids: [EntityFramework], versionBelow: "6.4" }
+    fix:
+      strategy: dotnet
+      params: { action: setPackageVersion, version: "6.5.2" }
+    rationale: >
+      EF6 itself was ported, so the model, the queries and the migrations stay. Moving to EF Core is a larger
+      change with different behaviour (lazy loading, query translation) and is not made here.
+
+  - id: binary-formatter
+    title: BinaryFormatter was removed in .NET 9
+    category: C
+    severity: BLOCKER
+    detect:
+      type: namespace
+      prefixes: [System.Runtime.Serialization.Formatters.Binary]
+    fix:
+      strategy: ai
+      hint: >
+        BinaryFormatter throws PlatformNotSupportedException on .NET 9 and later; it was removed because any
+        data it reads can run code. Replace it where the data is the application's own and both sides are
+        changed together: System.Text.Json for object graphs of plain properties (JsonSerializer.Serialize and
+        Deserialize; [Serializable] is not needed, public properties are), DataContractSerializer where the
+        types are already data contracts. A deep copy made by serializing and deserializing becomes the same
+        round trip through System.Text.Json or a copy constructor. If stored data in the old format must still
+        be read (files, a cache, a session store), say so and leave the code: that needs a conversion plan.
+
+  - id: javascript-serializer
+    title: JavaScriptSerializer is part of System.Web
+    category: C
+    severity: BLOCKER
+    detect:
+      type: namespace
+      prefixes: [System.Web.Script.Serialization]
+    fix:
+      strategy: ai
+      hint: >
+        System.Web.Script.Serialization.JavaScriptSerializer does not exist in modern .NET. Use System.Text.Json:
+        new JavaScriptSerializer().Serialize(x) is JsonSerializer.Serialize(x), Deserialize<T>(s) is
+        JsonSerializer.Deserialize<T>(s). JavaScriptSerializer matched property names without regard to case
+        and wrote dates as "\/Date(ms)\/": pass new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+        when reading, and keep the date format with a converter if other systems read the output.
+
+  - id: system-web-in-libraries
+    title: System.Web used outside a web project
+    category: C
+    severity: BLOCKER
+    detect:
+      type: namespace
+      prefixes: [System.Web]
+      exclude: [System.Web.Script.Serialization]
+    fix:
+      strategy: manual
+      hint: >
+        Only System.Web.HttpUtility (UrlEncode, HtmlEncode, ParseQueryString) exists in modern .NET, and code
+        that uses nothing else compiles as it is. HttpContext.Current, HttpRequest, sessions, caching
+        (System.Web.Caching) and hosting are gone: pass in what the code needs from the request instead of
+        reaching for HttpContext.Current, use IMemoryCache or System.Runtime.Caching for the cache, and move
+        configuration read through WebConfigurationManager to ConfigurationManager or IConfiguration.
+
+  - id: wcf-service-host
+    title: Hosting WCF services
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.cs", "**/*.vb"]
+      pattern: "\\b(ServiceHost|WebServiceHost|ServiceHostBase)\\b"
+    fix:
+      strategy: manual
+      hint: >
+        Modern .NET has the WCF client and not the server. CoreWCF (the CoreWCF.* packages) hosts the same
+        service contracts on ASP.NET Core with BasicHttpBinding, WSHttpBinding and NetTcpBinding; the services
+        and contracts stay, the hosting code and the system.serviceModel configuration are rewritten. gRPC is
+        the alternative where both sides can change.
+
+  - id: remoting-and-appdomains
+    title: .NET Remoting and application domains
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.cs", "**/*.vb"]
+      pattern: "System\\.Runtime\\.Remoting|AppDomain\\.CreateDomain|MarshalByRefObject"
+    fix:
+      strategy: manual
+      hint: >
+        Modern .NET has one application domain and no Remoting. Code that loaded plug-ins into a domain of
+        their own uses AssemblyLoadContext (which can be unloaded); calls between processes use gRPC, named
+        pipes or HTTP; isolation for untrusted code needs a separate process.
+
+  - id: thread-abort
+    title: Thread.Abort is not supported
+    category: D
+    severity: WARNING
+    detect:
+      type: fileContains
+      include: ["**/*.cs", "**/*.vb"]
+      pattern: "\\.Abort\\(\\s*\\)|ThreadAbortException"
+    fix:
+      strategy: manual
+      hint: >
+        Thread.Abort throws PlatformNotSupportedException on modern .NET: the code compiles and fails when it
+        runs. Stop work with a CancellationToken the worker checks, and wait for it with Join or by awaiting it.
+
+  - id: code-page-encodings
+    title: Code-page encodings must be registered
+    category: D
+    severity: WARNING
+    detect:
+      type: fileContains
+      include: ["**/*.cs", "**/*.vb"]
+      pattern: "Encoding\\.GetEncoding\\(\\s*(\\d+|\"(?!utf|us-ascii|iso-8859-1)[^\"]+\")"
+    fix:
+      strategy: manual
+      hint: >
+        Modern .NET knows UTF-8, UTF-16, UTF-32, ASCII and Latin-1 by itself. Windows-1252, IBM437 and the other
+        code pages throw NotSupportedException when they are asked for, unless the application calls
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance) once when it starts. The code compiles
+        either way: files and messages in those encodings fail only when they are read.
+
+knowledge:
+
+  - id: dotnet-framework-to-modern
+    title: From .NET Framework to modern .NET
+    triggers: ["System.Web", "System.Configuration", "System.ServiceModel", "BinaryFormatter", "AppDomain", "net48", "net472", "PlatformNotSupportedException"]
+    body: |
+      Modern .NET (5 and later) is the continuation of .NET Core, not of .NET Framework. Gone without a
+      replacement in the box: System.Web (ASP.NET Core replaces it), WCF hosting (CoreWCF), Remoting,
+      application domains beyond the first, Code Access Security, Workflow Foundation, and since .NET 9
+      BinaryFormatter. Present as NuGet packages: System.Configuration.ConfigurationManager,
+      System.Data.SqlClient and Microsoft.Data.SqlClient, System.Drawing.Common (Windows only),
+      System.ServiceModel.* for WCF clients, System.Runtime.Caching, System.DirectoryServices,
+      System.Management, System.Data.Odbc and OleDb. Microsoft.Windows.Compatibility brings most of the
+      Windows-only ones at once. An API that exists and throws PlatformNotSupportedException (Thread.Abort,
+      code-page encodings without the provider registered) compiles and fails at run time, so the project's
+      tests matter more than the compiler. App.config is still read by ConfigurationManager for an
+      executable; binding redirects in it are no longer needed and are ignored.

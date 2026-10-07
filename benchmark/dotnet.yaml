@@ -1,0 +1,52 @@
+# Renova .NET suite: one app per path, each expected to pass with project-file edits and guards alone, without
+# an AI key. Needs the .NET SDK (10, and 8 for the last entry).
+#
+# Run: cli/bin/renova benchmark --suite benchmark/dotnet.yaml --out <empty dir> --configs deterministic
+
+id: dotnet-targets
+appsDir: ../../renova-test-apps
+
+configurations:
+  - id: deterministic
+    behaviour: false
+
+apps:
+  # C#, the format before the SDK: packages.config, an embedded resource, a file left on disk that was never
+  # part of the project, NUnit run by Visual Studio.
+  - id: netfx48-csharp-to-10
+    path: billing-netfx48
+    playbook: dotnet-to-10
+    checks:
+      - { file: src/Billing/Billing.csproj, contains: '<Project Sdk="Microsoft.NET.Sdk">', why: "the format the dotnet tools build" }
+      - { file: src/Billing/Billing.csproj, contains: "<TargetFramework>net10.0</TargetFramework>", why: "on the target" }
+      - { file: src/Billing/Billing.csproj, contains: '<Compile Remove="Legacy\OldTax.cs" />', why: "a file the old project did not compile stays out" }
+      - { file: src/Billing/Billing.csproj, contains: 'PackageReference Include="System.Configuration.ConfigurationManager"', why: "ConfigurationManager is a package now" }
+      - { file: tests/Billing.Tests/Billing.Tests.csproj, contains: "Microsoft.NET.Test.Sdk", why: "without it no test runs" }
+      - { file: "**/*.cs", absent: "Microsoft.Extensions", why: "the code is not rewritten to move a class library" }
+
+  # Visual Basic with MSTest from Visual Studio's own assembly, and no solution file.
+  - id: netfx472-vb-to-10
+    path: ledger-vbnet472
+    playbook: dotnet-to-10
+    checks:
+      - { file: Ledger/Ledger.vbproj, contains: "<TargetFramework>net10.0</TargetFramework>", why: "on the target" }
+      - { file: Ledger/Ledger.vbproj, contains: "<OptionStrict>On</OptionStrict>", why: "the compiler options the code was written under" }
+      - { file: Ledger/Ledger.vbproj, absent: "<MyType>", why: "My.Computer exists with Windows Forms only" }
+      - { file: Ledger.Tests/Ledger.Tests.vbproj, contains: 'PackageReference Include="MSTest.TestFramework"', why: "MSTest comes from NuGet now" }
+      - { file: Ledger.Tests/Ledger.Tests.vbproj, contains: '<Import Include="Microsoft.VisualStudio.TestTools.UnitTesting" />', why: "project-wide Imports are kept" }
+
+  # ASP.NET Core 3.1 with Entity Framework Core and tests that start the application in memory.
+  - id: aspnetcore31-to-10
+    path: orders-netcore31
+    playbook: dotnet-to-10
+    checks:
+      - { file: src/Orders.Api/Orders.Api.csproj, contains: "<TargetFramework>net10.0</TargetFramework>", why: "on the target" }
+      - { file: src/Orders.Api/Orders.Api.csproj, contains: 'Microsoft.EntityFrameworkCore.InMemory" Version="10.0.*"', why: "the Entity Framework Core built for the target" }
+      - { file: tests/Orders.Api.Tests/Orders.Api.Tests.csproj, contains: 'Microsoft.AspNetCore.Mvc.Testing" Version="10.0.*"', why: "the test host built for the target" }
+
+  - id: aspnetcore31-to-8
+    path: orders-netcore31
+    playbook: dotnet-to-8
+    checks:
+      - { file: src/Orders.Api/Orders.Api.csproj, contains: "<TargetFramework>net8.0</TargetFramework>", why: "on the chosen target, not the newest" }
+      - { file: src/Orders.Api/Orders.Api.csproj, contains: 'Microsoft.EntityFrameworkCore.InMemory" Version="8.0.*"', why: "the Entity Framework Core built for .NET 8" }

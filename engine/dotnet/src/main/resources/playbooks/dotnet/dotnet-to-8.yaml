@@ -1,0 +1,48 @@
+# Any C# or Visual Basic project → .NET 8: from .NET Framework, .NET Core, or an older modern .NET. Class
+# libraries, console applications, test projects, and ASP.NET Core applications. Classic ASP.NET (System.Web)
+# projects are found and planned, and left for a person: see packs/project-format.yaml.
+
+id: dotnet-to-8
+name: ".NET → 8"
+ecosystem: dotnet
+version: 0.1.0
+description: >
+  Moves C# and Visual Basic projects to .NET 8: project files to the SDK style, packages.config to package
+  references, the target framework, the parts of .NET Framework that became NuGet packages, test projects that
+  dotnet test can run, and ASP.NET Core and Entity Framework Core packages to the release that matches.
+targets:
+  dotnet: "8.0"
+
+include:
+  - packs/project-format.yaml
+  - packs/framework-apis.yaml
+
+rules:
+
+  - id: target-framework
+    title: Target .NET 8
+    category: A
+    severity: BLOCKER
+    detect: { type: targetFrameworkBelow, version: "8.0" }
+    fix:
+      strategy: dotnet
+      params: { action: setTargetFramework, version: "8.0" }
+    rationale: >
+      .NET 8 is a long-term-support release. .NET Framework 4.8 is still serviced and gets no new features;
+      .NET Core 3.1 and .NET 5, 6 and 7 are out of support. Libraries built for .NET Standard are left alone:
+      they already run on .NET 8. A Windows Forms or WPF project becomes net8.0-windows.
+
+  - id: platform-packages
+    title: ASP.NET Core, Entity Framework Core and Microsoft.Extensions packages follow the target
+    category: E
+    severity: BLOCKER
+    detect:
+      type: nugetPackage
+      ids: ["Microsoft.AspNetCore.*", "Microsoft.EntityFrameworkCore", "Microsoft.EntityFrameworkCore.*", "Microsoft.Extensions.*"]
+      versionBelow: "8.0"
+    fix:
+      strategy: dotnet
+      params: { action: setPackageVersion, version: "8.0.*" }
+    rationale: >
+      These packages are released with each .NET and built for it: the 3.1 ones do not run on .NET 8. The
+      version is written as 8.0.* so that a restore takes the latest servicing release of that line.
