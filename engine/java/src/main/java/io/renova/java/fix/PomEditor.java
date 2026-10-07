@@ -168,7 +168,10 @@ final class PomEditor {
             String tail = exclusions < 0 ? "" : text.substring(exclusions);
             head = head.replaceFirst("<groupId>\\s*" + Pattern.quote(g) + "\\s*</groupId>", "<groupId>" + groupId + "</groupId>")
                     .replaceFirst("<artifactId>\\s*" + Pattern.quote(a) + "\\s*</artifactId>", "<artifactId>" + artifactId + "</artifactId>");
-            if (tag(own, "version") != null) {
+            if (version == null) {
+                // The build's platform manages the new artifact: a version written for the old one would be wrong.
+                head = head.replaceFirst("[ \\t]*<version>[^<]*</version>[ \\t]*\\r?\\n?", "");
+            } else if (tag(own, "version") != null) {
                 head = head.replaceFirst("<version>[^<]*</version>", "<version>" + version + "</version>");
             } else if (!inside(managed, block.start())) {
                 int at = head.indexOf("</artifactId>") + "</artifactId>".length();
@@ -462,6 +465,38 @@ final class PomEditor {
         int start = parent.start() + declared.start(1);
         int end = parent.start() + declared.end(1);
         return new Result(pom.substring(0, start) + version + pom.substring(end), 1);
+    }
+
+    /** Removes a dependency that build plugins declare for themselves; a plugin left with none loses the empty list. */
+    static Result removePluginDependency(String pom, String artifactId) {
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        int changes = 0;
+        Matcher plugin = Pattern.compile("(?s)<plugin>.*?</plugin>").matcher(pom);
+        while (plugin.find()) {
+            String text = plugin.group();
+            String without = text.replaceAll("(?s)[ \\t]*<dependency>(?:(?!</dependency>).)*?<artifactId>\\s*" + Pattern.quote(artifactId)
+                    + "\\s*</artifactId>.*?</dependency>[ \\t]*\\r?\\n?", "");
+            if (without.equals(text)) {
+                continue;
+            }
+            without = without.replaceAll("(?s)[ \\t]*<dependencies>\\s*</dependencies>[ \\t]*\\r?\\n?", "");
+            out.append(pom, last, plugin.start()).append(without);
+            last = plugin.end();
+            changes++;
+        }
+        out.append(pom.substring(last));
+        return new Result(out.toString(), changes);
+    }
+
+    /** Removes a property from the pom's {@code <properties>}, with its line. */
+    static Result removeProperty(String pom, String name) {
+        Matcher m = Pattern.compile("(?m)^[ \\t]*<" + Pattern.quote(name) + ">[^<]*</" + Pattern.quote(name) + ">[ \\t]*\\r?\\n").matcher(pom);
+        if (m.find()) {
+            return new Result(pom.substring(0, m.start()) + pom.substring(m.end()), 1);
+        }
+        Matcher inline = Pattern.compile("<" + Pattern.quote(name) + ">[^<]*</" + Pattern.quote(name) + ">").matcher(pom);
+        return inline.find() ? new Result(pom.substring(0, inline.start()) + pom.substring(inline.end()), 1) : new Result(pom, 0);
     }
 
     /** Gives an existing property a new value, wherever the pom sets it; a pom without it is left alone. */

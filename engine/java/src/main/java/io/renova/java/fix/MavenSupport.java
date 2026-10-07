@@ -44,7 +44,9 @@ final class MavenSupport {
         }
         cmd.add(executable);
         cmd.add("-B");
-        cmd.add("-ntp");
+        // Quiet downloads, in the form every Maven 3 understands: a project's wrapper may run one from before
+        // --no-transfer-progress existed (3.6.1), which answers an unknown option with its help text.
+        cmd.add("-Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn");
         String settings = context.options().toolOption("maven.settings");
         if (settings != null) {
             cmd.add("-s");
@@ -62,6 +64,34 @@ final class MavenSupport {
             cmd.add("-Daether.connector.requestTimeout=120000");
         }
         return cmd;
+    }
+
+    /** The oldest Maven the plugins of current frameworks run on (Spring Boot 3 asks for 3.6.3). */
+    static final String MINIMUM_WRAPPER = "3.6.3";
+    static final String NEW_WRAPPER = "3.9.9";
+    private static final java.util.regex.Pattern WRAPPER_MAVEN = java.util.regex.Pattern.compile(
+            "(distributionUrl\\s*=.*?/apache-maven/)([0-9][\\w.\\-]*)(/apache-maven-)\\2(-bin\\.(?:zip|tar\\.gz))");
+
+    /**
+     * Moves a Maven wrapper that names a Maven too old for the migrated build to a current one, as the Gradle
+     * wrapper is moved: the migrated project must build with its own wrapper.
+     *
+     * @return what was done, or null when there is no wrapper or it is new enough
+     */
+    static String upgradeWrapper(Path buildRoot) throws java.io.IOException {
+        Path properties = buildRoot.resolve(".mvn/wrapper/maven-wrapper.properties");
+        if (!Files.isRegularFile(properties)) {
+            return null;
+        }
+        String text = Files.readString(properties);
+        java.util.regex.Matcher m = WRAPPER_MAVEN.matcher(text);
+        if (!m.find() || !io.renova.core.util.Versions.isBelow(m.group(2), MINIMUM_WRAPPER)) {
+            return null;
+        }
+        Files.writeString(properties, text.substring(0, m.start()) + m.group(1) + NEW_WRAPPER + m.group(3) + NEW_WRAPPER + m.group(4)
+                + text.substring(m.end()));
+        return "Maven wrapper " + m.group(2) + " → " + NEW_WRAPPER + ": the migrated build's plugins need Maven " + MINIMUM_WRAPPER
+                + " or later";
     }
 
     /**

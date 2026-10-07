@@ -275,7 +275,7 @@ rules:
 | `recipe` | An ecosystem rewrite tool (OpenRewrite for Java), deterministic and type-aware |
 | `replace` | Text replacement driven by the playbook, for files without a parser |
 | `gradle` | Edits to Gradle build files in the file's own style: `addDependency`, `removeDependency` |
-| `maven` | Format-preserving pom.xml edits: `setScope`, `setPluginVersion`, `setProperty`, `setParentVersion`, `addDependency`, `addAnnotationProcessor`, `setVersion`, `removeDuplicates` |
+| `maven` | Format-preserving pom.xml edits: `setScope`, `setPluginVersion`, `setProperty`, `changeProperty`, `setParentVersion`, `addDependency`, `addAnnotationProcessor`, `setVersion`, `removeDuplicates` |
 | `ai` | The configured AI provider. The build verifies the result |
 | `manual` | A person, guided by the rule's `hint` in the report |
 
@@ -297,6 +297,32 @@ list in the desktop app):
 | `spring-boot-4` | Spring Boot 2, 3 or 4.0 applications | Spring Boot 4.1, Java 21, Spring Framework 7 | Spring Boot 3 applications |
 | `micronaut-4` | Micronaut 2 or 3 applications | Micronaut 4, Java 21 | Micronaut applications |
 | `quarkus-3` | Quarkus 1 or 2 applications | Quarkus 3.33, Java 21, Jakarta EE 10 | Quarkus applications |
+| `jakarta-ee-to-spring-boot` | Java EE or Jakarta EE applications on an application server (EJB, CDI, JAX-RS, JPA, servlets) | Spring Boot 3.5 on Java 21, without a server: a change of platform | Chosen by hand |
+
+**From an application server to Spring Boot.** `jakarta-ee-to-spring-boot` keeps the standard APIs Spring Boot
+runs as they are (REST resources stay JAX-RS and run on Jersey, entities stay JPA, Bean Validation and `@Inject`
+stay) and replaces what only a server provides: session beans and CDI scopes become Spring components (session
+beans transactional, as the container made them), `persistence.xml`, `web.xml` and the server's descriptors
+become `application.properties` and a configuration class, and the build gets Spring Boot's starters in place
+of the platform API. The application keeps the address the server published it under. A test that the whole
+application starts is added. Timers, message-driven beans, CDI producers and events, and interceptors go to AI
+with the mapping written out; Faces pages, security domains and the database connection are listed for a person.
+
+**Ant projects, and projects without a build file.** Renova gives the migrated copy a Maven build in the
+standard layout (`src/main/java`, `src/test/java`, `src/main/webapp`), read from `build.xml` or from the
+folders such projects use. Each jar the project carried becomes a declared dependency: the published library
+when the jar names its coordinates or Maven Central has a file with the same checksum, so that upgrades can
+change its version, and otherwise the same file in a repository folder inside the project (`renova-libs`).
+Then the project is migrated like any other. The original is never changed.
+
+**Kotlin.** Kotlin sources in a Maven build are rewritten by the same recipes, and the Kotlin compiler is moved
+to one that knows the target Java release. Groovy and Scala sources are read when a project is assessed.
+
+**Frameworks that ended before Jakarta EE** (Struts 1, EJB 2.x home interfaces and entity beans, JAX-RPC and
+Axis 1, Jersey 1, Faces managed beans, RichFaces, Seam 2, iBATIS 2, Hibernate's legacy Criteria, Commons
+HttpClient 3, Quartz 1, CORBA, applets, and code tied to one server's own classes) have no recipe that carries
+code across. Renova finds them, plans them, and gives AI, or a person where a build cannot check the result,
+the mapping to their successor.
 
 The Jakarta targets also move Hibernate (to 6.6 with Jakarta EE 10, to 7.1 with Jakarta EE 11) and the
 namespaces of Faces pages. Every target replaces Mockito 1 to 4 with Mockito 5, because the older ones do not
@@ -313,13 +339,11 @@ run on Java 21.
 | `commons-lang3` | Apache Commons Lang 2 → 3 |
 | `commons-collections4` | Apache Commons Collections 3 → 4 |
 | `httpclient5` | Apache HttpClient 4 → 5 |
-| `struts7` | Struts 2 → 7 (suggested with the Jakarta target for Struts projects); callers of the changed `*Aware` interfaces are listed for a person |
+| `struts7` | Struts 2 → 7 (suggested with the Jakarta target for Struts projects), with the renamed `*Aware` setters followed into the code that calls them |
 
-A build that passes without running a single test is reported as failed: a migration that silently stops the
-tests from running has not been verified.
-
-Projects built with Ant, or with no build file, are not migrated: Renova needs a Maven or Gradle build to
-resolve the classpath and to prove the result, and says so when it is pointed at one.
+A build that passes without running the tests is reported as failed, and so is one that leaves a test class
+out (JUnit 4 tests beside new JUnit 5 ones, for example): a migration that silently stops tests from running
+has not been verified.
 
 Maven and Gradle builds are both supported: recipes run through the project's own wrapper (`mvnw`, `gradlew`)
 when it has one, and Gradle builds are changed without adding anything to their build files. Build-file
@@ -384,8 +408,9 @@ Linux, Windows and macOS, the web bundle, the CLI and both IDE plugins. See [doc
    [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.
 4. **Web console:** single sign-on and licensing (the audit log and local mode are in). **Desktop:** signed installers.
 5. **More targets and ecosystems:** Java 17/21/25, Spring Boot 3 and 4.1, Spring Framework 7 with Jakarta EE 11,
-   Micronaut 4, Quarkus 3, Hibernate 6 and 7, Struts 7, library add-ons and Gradle builds are in. Next for Java:
-   more build-file guards for Gradle, Ant builds. Then .NET (C# and VB: .NET Framework → modern .NET), then
+   Micronaut 4, Quarkus 3, Hibernate 6 and 7, Struts 7, library add-ons, Gradle builds, Ant builds, Kotlin and
+   Java EE → Spring Boot are in. Next for Java: Gradle builds of Kotlin, Micronaut and Quarkus projects,
+   re-platforming a Gradle build, multi-module Ant builds. Then .NET (C# and VB: .NET Framework → modern .NET), then
    PHP (a chosen PHP version, a chosen Laravel version).
 
 ## Contributing

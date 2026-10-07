@@ -27,6 +27,11 @@ Last run: 6 October 2026, on Java 21 and Maven 3.8, Renova at the commit that ad
 | Stock (same) | Maven | Hibernate 5.6 | Hibernate 7.1, Jakarta EE 11, Java 21 | Pass | 2/2 |
 | Greeter service (validation) | Maven | Micronaut 3.10, Java 11 | Micronaut 4.10, Java 21 | Pass | 3/3 |
 | Catalog service (REST, CDI, validation) | Maven | Quarkus 2.16, Java 11 | Quarkus 3.33, Java 21 | Pass | 4/4 |
+| Payroll web application (servlet, JSP, six jars in `lib` folders, one of them unpublished) | Ant | Java 6, Servlet 2.5 | A Maven build in the standard layout, Java 21, Jakarta EE 10 | Pass | 5/5 |
+| Payroll (same) | Ant | Java 6, Servlet 2.5 | Spring Boot 3.5 WAR that also runs on its own, Java 21 | Pass | 4/4 |
+| Ledger (EJB, CDI, JAX-RS, JPA, JBoss descriptors) | Maven | Java EE 7 on JBoss, Java 8 | Spring Boot 3.5 executable jar, Java 21 | Pass | 8/8 |
+| Helpdesk (Struts actions, with a test that sets one up by hand) | Maven | Struts 2.5, Java 8 | Struts 7.4, Jakarta EE 10, Java 21 | Pass | 3/3 |
+| Tasks service in Kotlin (web, JPA, validation) | Maven | Spring Boot 2.7, Kotlin 1.6, Java 11 | Spring Boot 3.5, Kotlin 1.9, Java 21 | Pass | 4/4 |
 
 The suite's thirteen runs take about twelve minutes in total, with dependencies already downloaded.
 
@@ -46,14 +51,22 @@ and not part-way, that no `javax.persistence` import is left, that a security co
 rules, and that a Gradle build was not given a migration plugin. They are listed in
 [`benchmark/targets.yaml`](../benchmark/targets.yaml).
 
+The two re-platformed applications were also started and called over HTTP, outside the suite: the Ledger's
+JAX-RS resource created and listed accounts at its old address, rejected a request that failed validation and
+rolled back a transfer without funds; the Payroll WAR, started with `java -jar`, answered from its servlet and
+its JSP page under the context path the server used to give it.
+
 ## What is not covered here
 
-- **Struts 2 → 7 does not finish by itself.** On the Struts sample the recipes move the actions to the new
-  `*Aware` interfaces (`withSession` for `setSession`), but not the code that calls them; the run ends with one
-  build error and that step listed for a person. It is reported as failed, not passed.
-- **Ant builds, and projects with no build file,** are refused with the reason: Renova needs Maven or Gradle
-  to resolve the classpath and to build the result.
-- **Gradle builds of Micronaut and Quarkus applications** have not been run; the Maven ones have.
+- **Frameworks that ended before Jakarta EE.** Struts 1, EJB 2.x, JAX-RPC, Jersey 1, Faces managed beans,
+  RichFaces and the others in the legacy-frameworks pack are found and planned, and the change goes to AI or a
+  person with the mapping written out. None of those AI paths has been run here: they cost tokens on a key.
+- **Re-platforming is verified by a start-up test and the project's own tests,** not by comparing behaviour.
+  The data source, security domain and anything the server's console configured are listed for a person.
+- **Gradle builds of Kotlin, Micronaut and Quarkus applications** have not been run; the Maven ones have.
+  Re-platforming to Spring Boot and the generated build for Ant projects are Maven only.
+- **Ant builds with several modules** (one build.xml calling others) get one Maven module from the root build.
+- **Identifying jars needs the network.** Offline, an Ant project's libraries stay files and are not upgraded.
 - **Changes that need judgement.** The original suite ([`benchmark/suite.yaml`](../benchmark/suite.yaml)) has
   four applications built so that the last changes need AI or a person: removed JDK APIs whose replacement
   depends on other code, upload limits that must not change, runtime-only failures. Without AI those builds fail,

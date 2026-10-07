@@ -105,6 +105,10 @@ public final class OpenRewriteFixer implements Fixer {
             details.add(result.tail(result.ok() ? 8 : 40));
             if (result.ok()) {
                 succeeded++;
+                String upgraded = MavenSupport.upgradeWrapper(root);
+                if (upgraded != null) {
+                    details.add(upgraded);
+                }
             }
         }
         int all = roots.size() + gradleRoots.size();

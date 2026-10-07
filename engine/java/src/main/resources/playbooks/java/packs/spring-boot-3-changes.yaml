@@ -96,6 +96,91 @@ rules:
         mapped, and callers get 404. Either add the trailing-slash forms explicitly where clients use them, or
         redirect them in one place with a filter. Check links, API clients and monitoring probes.
 
+  - id: guard-boot-javax-api-dependencies
+    phase: guard
+    title: javax API dependencies Spring Boot 3 no longer manages
+    category: E
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates:
+        - "javax.validation:validation-api"
+        - "javax.servlet:javax.servlet-api"
+        - "javax.persistence:javax.persistence-api"
+        - "javax.annotation:javax.annotation-api"
+        - "javax.transaction:javax.transaction-api"
+        - "javax.xml.bind:jaxb-api"
+        - "javax.websocket:javax.websocket-api"
+        - "javax.ws.rs:javax.ws.rs-api"
+        - "javax.inject:javax.inject"
+        - "javax.mail:javax.mail-api"
+        - "javax.json:javax.json-api"
+    fix:
+      strategy: maven
+      params:
+        action: replaceManaged
+        replacements:
+          "javax.validation:validation-api": "jakarta.validation:jakarta.validation-api"
+          "javax.servlet:javax.servlet-api": "jakarta.servlet:jakarta.servlet-api"
+          "javax.persistence:javax.persistence-api": "jakarta.persistence:jakarta.persistence-api"
+          "javax.annotation:javax.annotation-api": "jakarta.annotation:jakarta.annotation-api"
+          "javax.transaction:javax.transaction-api": "jakarta.transaction:jakarta.transaction-api"
+          "javax.xml.bind:jaxb-api": "jakarta.xml.bind:jakarta.xml.bind-api"
+          "javax.websocket:javax.websocket-api": "jakarta.websocket:jakarta.websocket-api"
+          "javax.ws.rs:javax.ws.rs-api": "jakarta.ws.rs:jakarta.ws.rs-api"
+          "javax.inject:javax.inject": "jakarta.inject:jakarta.inject-api"
+          "javax.mail:javax.mail-api": "jakarta.mail:jakarta.mail-api"
+          "javax.json:javax.json-api": "jakarta.json:jakarta.json-api"
+    rationale: >
+      Spring Boot 2 managed the versions of the javax APIs; Spring Boot 3 manages their jakarta successors
+      only. A javax dependency declared without a version, where the code that used it has already moved to
+      jakarta, stops the build with "version is missing". Each becomes its successor, whose version Spring
+      Boot manages.
+
+  - id: guard-boot-managed-version-overrides
+    phase: guard
+    title: Version properties that pin what Spring Boot manages
+    category: E
+    severity: BLOCKER
+    detect:
+      type: pomProperty
+      whenParent: "org.springframework.boot:spring-boot-starter-parent"
+      overrides: [assertj.version, mockito.version, junit-jupiter.version, junit.version, hamcrest.version, byte-buddy.version,
+                  hibernate.version, hibernate-validator.version, jackson-bom.version, jackson.version, lombok.version,
+                  h2.version, mysql.version, postgresql.version, hikaricp.version, slf4j.version, logback.version,
+                  log4j2.version, snakeyaml.version, tomcat.version, jetty.version, undertow.version, netty.version,
+                  reactor-bom.version, micrometer.version, flyway.version, liquibase.version, thymeleaf.version,
+                  spring-framework.version, spring-security.version, spring-data-bom.version, spring-kafka.version,
+                  spring-amqp.version, spring-batch.version, spring-integration.version, spring-session-bom.version,
+                  kafka.version, elasticsearch.version, mongodb.version, lettuce.version, jedis.version, groovy.version,
+                  gson.version, json-path.version, glassfish-jaxb.version, selenium.version, rest-assured.version,
+                  caffeine.version, ehcache3.version, jooq.version, awaitility.version, servlet-api.version]
+    fix:
+      strategy: maven
+      params: { action: removeProperty }
+    rationale: >
+      A property such as assertj.version overrides the version Spring Boot's parent would choose. One set for
+      Spring Boot 2 names a release from that time, which the libraries of Spring Boot 3 do not work with, and
+      sometimes one whose bill of materials does not exist ("Non-resolvable import POM"). Without the
+      property, Spring Boot's own version applies. Pin it again, to a current release, only if you must.
+
+  - id: guard-boot-jaxb-api
+    phase: guard
+    title: Code that imports jakarta.xml.bind needs the JAXB API declared
+    category: E
+    severity: BLOCKER
+    detect:
+      type: importWithoutDependency
+      provides:
+        - { package: jakarta.xml.bind, dependency: "jakarta.xml.bind:jakarta.xml.bind-api:${jakarta-xml-bind.version}" }
+    fix:
+      strategy: maven
+      params: { action: addDependency }
+    rationale: >
+      With Spring Boot 2 the javax.xml.bind API came along with other libraries. Their Spring Boot 3 versions
+      no longer bring the jakarta one, so code that uses JAXB annotations stops compiling with "package
+      jakarta.xml.bind.annotation does not exist". Spring Boot manages the version.
+
   - id: guard-gradle-jaxb-api
     phase: guard
     title: A Gradle build must declare the Jakarta XML Binding API the code imports

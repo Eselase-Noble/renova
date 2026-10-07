@@ -66,3 +66,20 @@ rules:
       Recipes that add a dependency can miss an existing declaration they renamed, leaving two copies that
       disagree on version or scope. Maven only warns. The first declaration, normally the project's own,
       is kept and later copies are removed.
+
+  - id: guard-surefire-old-junit-platform-provider
+    phase: guard
+    title: Surefire carries the JUnit Platform provider from before it ran JUnit 5 itself
+    category: A
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/pom.xml"]
+      pattern: "<artifactId>junit-platform-surefire-provider</artifactId>"
+    fix:
+      strategy: maven
+      params: { action: removePluginDependency, artifactId: junit-platform-surefire-provider }
+    rationale: >
+      Surefire has run JUnit 5 by itself since 2.22. The separate provider was written for Surefire 2.19 and
+      breaks Surefire 3 with "A required class was missing". It ended in 2018; upgrade recipes still add it
+      to builds that had no Surefire configuration.

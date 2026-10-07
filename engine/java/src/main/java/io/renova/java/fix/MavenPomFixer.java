@@ -79,6 +79,37 @@ public final class MavenPomFixer implements Fixer {
                             params.optString("groupId").orElse("org.apache.maven.plugins"),
                             params.string("plugin"), params.string("version"));
                     case "setProperty" -> PomEditor.setProperty(before, params.string("name"), params.string("value"));
+                    case "removePluginDependency" -> PomEditor.removePluginDependency(before, params.string("artifactId"));
+                    case "removeProperty" -> {
+                        String content = before;
+                        int changes = 0;
+                        for (Finding f : step.findings()) {
+                            if (f.file().equals(file) && f.data().containsKey("property")) {
+                                PomEditor.Result removed = PomEditor.removeProperty(content, f.data().get("property"));
+                                content = removed.content();
+                                changes += removed.changes();
+                            }
+                        }
+                        yield new PomEditor.Result(content, changes);
+                    }
+                    case "replaceManaged" -> {
+                        // {old "g:a": new "g:a"}: each old dependency becomes the new one, without a version.
+                        Object raw = step.rule().fix().params().get("replacements");
+                        if (!(raw instanceof java.util.Map<?, ?> replacements)) {
+                            throw new IllegalArgumentException("Rule '" + ruleId + "': replaceManaged needs 'replacements: {\"g:a\": \"g:a\"}'");
+                        }
+                        String content = before;
+                        int changes = 0;
+                        for (java.util.Map.Entry<?, ?> entry : replacements.entrySet()) {
+                            String from = entry.getKey().toString();
+                            String[] to = entry.getValue().toString().split(":");
+                            PomEditor.Result replaced = PomEditor.replaceDependency(content, (g, a) -> (g + ":" + a).equals(from),
+                                    to[0], to[1], null);
+                            content = replaced.content();
+                            changes += replaced.changes();
+                        }
+                        yield new PomEditor.Result(content, changes);
+                    }
                     case "changeProperty" -> PomEditor.changeProperty(before, params.string("name"), params.string("value"));
                     case "setParentVersion" -> PomEditor.setParentVersion(before, params.string("version"));
                     case "addAnnotationProcessor" -> {
