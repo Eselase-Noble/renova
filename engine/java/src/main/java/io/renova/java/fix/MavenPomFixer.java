@@ -79,6 +79,7 @@ public final class MavenPomFixer implements Fixer {
                             params.optString("groupId").orElse("org.apache.maven.plugins"),
                             params.string("plugin"), params.string("version"));
                     case "setProperty" -> PomEditor.setProperty(before, params.string("name"), params.string("value"));
+                    case "changeProperty" -> PomEditor.changeProperty(before, params.string("name"), params.string("value"));
                     case "setParentVersion" -> PomEditor.setParentVersion(before, params.string("version"));
                     case "addAnnotationProcessor" -> {
                         String[] gav = params.string("processor").split(":");

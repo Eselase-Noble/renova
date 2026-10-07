@@ -31,6 +31,7 @@ include:
   - packs/jdk-removed-apis.yaml
   - packs/legacy-frameworks.yaml
   - packs/maven-build-guards.yaml
+  - packs/kotlin.yaml
 
 # These keep a WAR fit for an application server: the APIs it supplies declared, and not packaged. Spring Boot
 # brings the APIs with its starters and packages them.

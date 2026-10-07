@@ -171,3 +171,14 @@ apps:
       - { file: pom.xml, matches: '(?s)<artifactId>struts2-core</artifactId>\s*<version>7\.', why: "Struts 7, the first line on Jakarta EE" }
       - { file: src/main/java/com/acme/helpdesk/TicketAction.java, contains: "org.apache.struts2.action.SessionAware", why: "the interface Struts 7 has" }
       - { file: src/test/java/com/acme/helpdesk/TicketActionTest.java, contains: "action.withSession(session)", why: "callers follow the renamed setter" }
+
+  # Kotlin on the JVM: the same recipes rewrite Kotlin sources, and a guard moves the Kotlin compiler to one
+  # that knows Java 21.
+  - id: kotlin-spring-boot-2-to-3
+    path: tasks-kotlin-boot2
+    playbook: spring-boot-3
+    checks:
+      - { file: pom.xml, matches: '<artifactId>spring-boot-starter-parent</artifactId>\s*<version>3\.5\.', why: "on the target release" }
+      - { file: pom.xml, contains: "<kotlin.version>1.9.25</kotlin.version>", why: "a Kotlin compiler that knows Java 21" }
+      - { file: src/main/kotlin/com/acme/tasks/Task.kt, contains: "import jakarta.persistence.Entity", why: "Kotlin sources are migrated like Java ones" }
+      - { file: "**/*.kt", absent: "import javax.", why: "Jakarta EE" }

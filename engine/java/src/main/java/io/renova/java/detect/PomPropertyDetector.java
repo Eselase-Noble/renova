@@ -15,6 +15,9 @@ import java.util.List;
  * {@code type: pomProperty, missing: maven.compiler.target, requires?: maven.compiler.source,
  * unless?: [maven.compiler.release]} — one finding per pom that lacks the {@code missing} property
  * while declaring {@code requires} and none of {@code unless}.
+ *
+ * <p>{@code type: pomProperty, name: kotlin.version, versionBelow: "1.9.25"} — one finding per pom that sets
+ * the property to a version older than the bound; a value that is not a plain version is left alone.
  */
 public final class PomPropertyDetector implements DetectorFactory {
 
@@ -26,6 +29,20 @@ public final class PomPropertyDetector implements DetectorFactory {
     @Override
     public Detector create(Rule rule) {
         Params params = rule.detectParams();
+        if (params.optString("name").isPresent()) {
+            String name = params.string("name");
+            String bound = params.string("versionBelow");
+            return ctx -> {
+                List<Finding> findings = new ArrayList<>();
+                for (Path pom : ctx.files("**/pom*.xml")) {
+                    String value = DependencyDetector.readPom(ctx, pom).properties().get(name);
+                    if (value != null && value.matches("\\d[\\w.\\-]*") && io.renova.core.util.Versions.isBelow(value, bound)) {
+                        findings.add(ctx.finding(rule, pom, DependencyDetector.lineOf(ctx, pom, "<" + name + ">"), name + "=" + value));
+                    }
+                }
+                return findings;
+            };
+        }
         String missing = params.string("missing");
         String requires = params.optString("requires").orElse(null);
         List<String> unless = params.strings("unless");

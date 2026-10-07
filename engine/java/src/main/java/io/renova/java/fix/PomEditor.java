@@ -464,6 +464,21 @@ final class PomEditor {
         return new Result(pom.substring(0, start) + version + pom.substring(end), 1);
     }
 
+    /** Gives an existing property a new value, wherever the pom sets it; a pom without it is left alone. */
+    static Result changeProperty(String pom, String name, String value) {
+        Matcher m = Pattern.compile("(<" + Pattern.quote(name) + ">)\\s*([^<]*?)\\s*(</" + Pattern.quote(name) + ">)").matcher(pom);
+        StringBuilder out = new StringBuilder();
+        int changes = 0;
+        while (m.find()) {
+            if (!m.group(2).equals(value)) {
+                changes++;
+            }
+            m.appendReplacement(out, Matcher.quoteReplacement(m.group(1) + value + m.group(3)));
+        }
+        m.appendTail(out);
+        return new Result(changes == 0 ? pom : out.toString(), changes);
+    }
+
     /** Adds a project-level property unless it already exists. */
     static Result setProperty(String pom, String name, String value) {
         List<Span> profiles = spans(pom, "profiles");

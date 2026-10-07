@@ -23,6 +23,7 @@ settings:
 include:
   - packs/jdk-removed-apis.yaml
   - packs/maven-build-guards.yaml
+  - packs/kotlin.yaml
 
 rules:
 

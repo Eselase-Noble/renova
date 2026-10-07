@@ -30,6 +30,7 @@ include:
   - packs/jdk-removed-apis.yaml
   - packs/legacy-frameworks.yaml
   - packs/maven-build-guards.yaml
+  - packs/kotlin.yaml
 
 rules:
 

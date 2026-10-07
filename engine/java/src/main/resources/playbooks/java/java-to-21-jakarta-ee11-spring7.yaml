@@ -37,6 +37,7 @@ include:
   - packs/legacy-frameworks.yaml
   - packs/servlet-containers.yaml
   - packs/maven-build-guards.yaml
+  - packs/kotlin.yaml
 
 rules:
 

@@ -105,7 +105,8 @@ final class TestsRan {
 
     static long testClasses(Path buildRoot) {
         try (Stream<Path> files = Files.walk(buildRoot)) {
-            return files.filter(p -> p.toString().endsWith(".java") && p.toString().replace('\\', '/').contains("/src/test/"))
+            // Kotlin and Groovy tests are tests too.
+            return files.filter(p -> p.toString().matches(".*\\.(java|kt|groovy)") && p.toString().replace('\\', '/').contains("/src/test/"))
                     .filter(p -> {
                         try {
                             return TEST_METHOD.matcher(Files.readString(p)).find();

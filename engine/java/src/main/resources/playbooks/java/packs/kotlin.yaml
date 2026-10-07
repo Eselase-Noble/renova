@@ -1,0 +1,31 @@
+# Kotlin sources in a Maven build. The recipes rewrite Kotlin as they do Java; what needs care is the Kotlin
+# compiler itself, which has to know the Java release it compiles for.
+
+rules:
+
+  - id: guard-kotlin-compiles-for-java-21
+    phase: guard
+    title: The Kotlin compiler must know Java 21
+    category: A
+    severity: BLOCKER
+    detect: { type: pomProperty, name: kotlin.version, versionBelow: "1.9.20" }
+    fix:
+      strategy: maven
+      params: { action: changeProperty, name: kotlin.version, value: "1.9.25" }
+    rationale: >
+      Kotlin compilers before 1.9.20 stop with "Unknown JVM target version: 21". 1.9.25 is the last 1.9 release:
+      it compiles for Java 21 and is the version Spring Boot 3.5 manages. Kotlin 2 changes the compiler front
+      end and is a step of its own.
+
+knowledge:
+
+  - id: kotlin-on-newer-java
+    title: Kotlin and the Java release
+    triggers: ["kotlin.version", "kotlin-maven-plugin", "jvmTarget", "Unknown JVM target version"]
+    body: |
+      The Kotlin compiler targets a JVM release it must know: Java 17 needs Kotlin 1.6 or later, Java 21 needs
+      1.9.20 or later, Java 25 needs 2.3 or later. In a Maven build the version is the kotlin.version property
+      (Spring Boot's parent manages it unless the project sets it) and the target is jvmTarget in the
+      kotlin-maven-plugin configuration, which defaults to java.version under Spring Boot. Compiler plugins
+      (kotlin-maven-allopen, kotlin-maven-noarg) must have the compiler's version. With jakarta.persistence,
+      the "jpa" compiler plugin of Kotlin 1.8.20 and later recognises jakarta annotations; older ones only javax.

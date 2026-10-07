@@ -21,6 +21,8 @@ import java.util.regex.Pattern;
  */
 public final class MavenVerifier implements Verifier {
 
+    /** The Kotlin compiler: "/path/File.kt: (12, 5) message", or "file:///path/File.kt:12:5 message" from Kotlin 1.9. */
+    private static final Pattern KOTLIN_ERROR = Pattern.compile("^\\[ERROR\\] (?:file://)?(.+?\\.kts?):? ?\\(?(\\d+)[,:] ?\\d+\\)? (.*)$");
     private static final Pattern COMPILER_ERROR = Pattern.compile("^\\[ERROR\\] (.+?\\.(?:java|kt|groovy)):\\[(\\d+)(?:,\\d+)?\\] (.*)$");
     /** Plugin failures (bad build configuration, missing dependency): attributed to the build file. */
     private static final Pattern GOAL_FAILURE = Pattern.compile("^\\[ERROR\\] Failed to execute goal .*? on project [^:]+: (.*?)(?: -> \\[Help \\d+])?$");
@@ -71,8 +73,20 @@ public final class MavenVerifier implements Verifier {
             if (!result.ok()) {
                 success = false;
                 log.append(result.tail(40)).append('\n');
+                int known = errors.size();
                 errors.addAll(parse(result.output(), workspace, root));
                 errors.addAll(TestReports.parse(workspace, root));
+                if (errors.size() == known) {
+                    // A failure in a form nothing above reads (another compiler, a plugin that only prints): the
+                    // build's own words, so that the report and the repair loop have something to go on.
+                    List<String> said = result.output().lines().filter(l -> l.startsWith("[ERROR]"))
+                            .map(l -> l.substring("[ERROR]".length()).strip())
+                            .filter(l -> !l.isBlank() && !l.startsWith("->") && !l.startsWith("To see the full stack trace")
+                                    && !l.startsWith("Re-run Maven") && !l.startsWith("For more information") && !l.startsWith("[Help"))
+                            .distinct().limit(6).toList();
+                    errors.add(new BuildError(workspace.relativize(root.resolve("pom.xml")).toString().replace('\\', '/'), 0,
+                            said.isEmpty() ? "the build failed without saying why; see the build log" : String.join(" | ", said)));
+                }
             } else if (goals.equals(DEFAULT_GOALS)) {
                 // A passing build proves nothing if it stopped running the tests.
                 java.util.Optional<BuildError> noTests = TestsRan.check(workspace, root, "pom.xml", "surefire-reports", "failsafe-reports");
@@ -116,6 +130,9 @@ public final class MavenVerifier implements Verifier {
                 continue;
             }
             Matcher m = COMPILER_ERROR.matcher(line);
+            if (!m.matches()) {
+                m = KOTLIN_ERROR.matcher(line);
+            }
             if (m.matches()) {
                 BuildError error = new BuildError(relative(Path.of(m.group(1)), workspace), Integer.parseInt(m.group(2)),
                         m.group(3).strip());

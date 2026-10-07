@@ -18,7 +18,9 @@ import java.util.regex.Pattern;
  */
 public final class ImportDetector implements DetectorFactory {
 
-    private static final Pattern JAVA_IMPORT = Pattern.compile("^\\s*import\\s+(?:static\\s+)?([\\w.]+(?:\\.\\*)?)\\s*;");
+    private static final Pattern JAVA_IMPORT = Pattern.compile(
+            // Java ends an import with a semicolon; Kotlin, Groovy and Scala need none, and may alias or group.
+            "^\\s*import\\s+(?:static\\s+)?([\\w.]+?(?:\\.\\*)?)(?:\\s*;|\\s*$|\\s+as\\b|\\._\\s*$|\\.\\{)");
     private static final Pattern JSP_IMPORT = Pattern.compile("import\\s*=\\s*\"([^\"]+)\"");
 
     @Override
@@ -26,16 +28,19 @@ public final class ImportDetector implements DetectorFactory {
         return "import";
     }
 
+    static final List<String> JVM_SOURCES = List.of("**/*.java", "**/*.kt", "**/*.groovy", "**/*.scala");
+
     @Override
     public Detector create(Rule rule) {
         Params params = rule.detectParams();
         List<String> prefixes = params.requiredStrings("prefixes");
         List<String> exclude = params.strings("exclude");
-        List<String> include = params.strings("include").isEmpty() ? List.of("**/*.java") : params.strings("include");
+        // Kotlin, Groovy and Scala on the JVM import the same classes, and the same recipes rewrite them.
+        List<String> include = params.strings("include").isEmpty() ? JVM_SOURCES : params.strings("include");
         return ctx -> {
             List<Finding> findings = new ArrayList<>();
             for (Path file : ctx.files(include)) {
-                boolean jsp = !file.toString().endsWith(".java");
+                boolean jsp = JVM_SOURCES.stream().noneMatch(glob -> file.toString().endsWith(glob.substring(4)));
                 List<String> lines = ctx.lines(file);
                 for (int i = 0; i < lines.size(); i++) {
                     for (String imported : imports(lines.get(i), jsp)) {

@@ -357,13 +357,13 @@ public final class JavaPlugin implements EcosystemPlugin {
     }
 
     private static final java.util.regex.Pattern JAVA_EE_IMPORT = java.util.regex.Pattern.compile(
-            "^import\\s+javax\\.(servlet|persistence|ejb|ws\\.rs|faces|jms|enterprise|validation|xml\\.bind|xml\\.ws)\\.");
+            "^\\s*import\\s+javax\\.(servlet|persistence|ejb|ws\\.rs|faces|jms|enterprise|validation|xml\\.bind|xml\\.ws)\\.");
     private static final int SOURCES_TO_SAMPLE = 1500;
 
     /** Whether the code uses Java EE (javax) APIs, from the imports of a bounded number of source files. */
     private static boolean importsJavaEe(Path root) throws IOException {
         try (java.util.stream.Stream<Path> files = Files.find(root, 12, (p, attrs) -> attrs.isRegularFile()
-                && p.toString().endsWith(".java") && !p.toString().contains("/target/") && !p.toString().contains("/build/"))) {
+                && p.toString().matches(".*\\.(java|kt|groovy)") && !p.toString().contains("/target/") && !p.toString().contains("/build/"))) {
             return files.limit(SOURCES_TO_SAMPLE).anyMatch(file -> {
                 try (java.util.stream.Stream<String> lines = Files.lines(file)) {
                     // Imports sit at the top of a file; the class body is not read.
