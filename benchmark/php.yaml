@@ -147,3 +147,14 @@ apps:
     checks:
       - { file: composer.json, contains: '"symfony/framework-bundle": "6.4.*"', why: "on the chosen target, not the newest" }
       - { file: composer.lock, matches: '"name": "symfony/framework-bundle",\s+"version": "v6\.4\.', why: "Symfony 6.4 is what was installed and tested" }
+
+  # Symfony 8, which dropped annotations' classes and XML configuration altogether: Rector reads the code
+  # against Symfony 7.4, and the application is installed and tested on 8.1.
+  - id: symfony-54-to-81
+    path: notes-symfony54
+    playbook: symfony-8.1
+    checks:
+      - { file: composer.lock, matches: '"name": "symfony/framework-bundle",\s+"version": "v8\.1\.', why: "Symfony 8.1 is what was installed and tested" }
+      - { file: src/Controller/NoteController.php, contains: "#[Route(path: '/notes', name: 'note_add', methods: ['POST'])]", why: "routes are attributes, which is all Symfony 8 reads" }
+      - { file: config/routes/framework.yaml, contains: "routing/errors.php", why: "the framework's routes are no longer shipped as XML" }
+      - { file: composer.json, absent: "composer.renova", why: "nothing of Renova's own is left in the project" }

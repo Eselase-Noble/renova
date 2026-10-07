@@ -1,0 +1,101 @@
+# A Symfony application → Symfony 8.1 on PHP 8.4, from Symfony 4, 5, 6 or 7. The
+# framework's packages, PHP, annotations as attributes, the bundle the framework took in, and the code changes
+# of every Symfony release on the way, as far as rules can; configuration that a release removed goes to the
+# build's errors, AI repair and a person.
+
+id: symfony-8.1
+name: "Symfony → 8.1 (PHP 8.4)"
+ecosystem: php
+version: 0.1.0
+description: >
+  Moves a Symfony application to Symfony 8.1 on PHP 8.4: every symfony/* package released with the framework,
+  annotations to attributes, SensioFrameworkExtraBundle out, Rector's Symfony rules for each release on the
+  way, and PHP 8.4 syntax. Verified on PHP 8.4 with Composer, a syntax check and the application's tests.
+targets:
+  php: "8.4"
+  symfony: "8.1"
+
+settings:
+  rector:
+    packages: ["rector/rector:2.7.0", "driftingly/rector-laravel:2.6.2"]
+    # Rector reads the code against Symfony 7.4, the last release that still has the classes annotations were
+    # written with: with Symfony 8 installed it cannot tell what an @Route is, and leaves it. The project
+    # itself is then installed and tested on 8.1.
+    analyseWith: { "8.1.*": "7.4.*" }
+
+include:
+  - packs/symfony.yaml
+  - packs/php-language.yaml
+
+rules:
+
+  - id: php-version
+    title: Require PHP 8.4
+    category: A
+    severity: BLOCKER
+    detect: { type: phpVersionBelow, version: "8.4" }
+    fix:
+      strategy: composer
+      params: { action: setPhp, constraint: "^8.4" }
+    rationale: Symfony 8.1 needs PHP 8.4 or later; 8.4 is a release every package of the framework supports.
+
+  - id: symfony-packages
+    title: Upgrade the Symfony packages to 8.1
+    category: A
+    severity: BLOCKER
+    detect:
+      type: composerPackage
+      names: ["symfony/*"]
+      # Packages that have their own version numbers, not the framework's.
+      except: ["symfony/flex", "symfony/monolog-bundle", "symfony/maker-bundle", "symfony/webpack-encore-bundle",
+               "symfony/polyfill-*", "symfony/contracts", "symfony/*-contracts", "symfony/stimulus-bundle", "symfony/ux-*",
+               "symfony/panther", "symfony/thanks", "symfony/orm-pack", "symfony/test-pack", "symfony/debug-pack",
+               "symfony/profiler-pack", "symfony/twig-pack", "symfony/serializer-pack", "symfony/apache-pack",
+               "symfony/deprecation-contracts", "symfony/requirements-checker", "symfony/mercure*", "symfony/asset-mapper-*"]
+      constraintBelow: "8.1"
+    fix:
+      strategy: composer
+      params: { action: setVersion, constraint: "8.1.*" }
+
+  - id: symfony-flex-require
+    title: The Symfony version Flex holds every package to
+    category: A
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["composer.json"]
+      pattern: "\"require\"\\s*:\\s*\"[2-7]\\.\\d+\\.\\*\""
+    fix:
+      strategy: replace
+      include: "composer.json"
+      regex: true
+      find: "(\"symfony\"\\s*:\\s*\\{[^}]*?\"require\"\\s*:\\s*\")[^\"]*(\")"
+      replace: "$18.1.*$2"
+    rationale: extra.symfony.require restricts every symfony/* package; left at the old release, nothing can be installed.
+
+  - id: symfony-code
+    title: Code changes of every Symfony release up to 8.1, and PHP 8.4 syntax
+    category: C
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [symfony/framework-bundle], constraintBelow: "8.1" }
+    fix:
+      strategy: rector
+      recipes: ["composer-based:symfony", "composer-based:twig", "composer-based:doctrine", "Rector\\Set\\ValueObject\\LevelSetList::UP_TO_PHP_84"]
+
+  - id: symfony-xml-routes-of-bundles
+    title: The framework's own routes are no longer shipped as XML
+    category: A
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["config/routes.yaml", "config/routes/*.yaml", "config/routes/*/*.yaml"]
+      pattern: "@(FrameworkBundle|WebProfilerBundle)/Resources/config/routing/\\w+\\.xml"
+    fix:
+      strategy: replace
+      include: "config/{routes.yaml,routes/*.yaml,routes/*/*.yaml}"
+      regex: true
+      find: "(@(?:FrameworkBundle|WebProfilerBundle)/Resources/config/routing/\\w+)\\.xml"
+      replace: "$1.php"
+    rationale: >
+      Symfony 8 dropped XML as a configuration format, and with it the XML route files of its bundles (the
+      error preview pages, the profiler and its toolbar). The same routes are in PHP files of the same name.

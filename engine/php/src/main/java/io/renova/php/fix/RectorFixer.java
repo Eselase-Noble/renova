@@ -13,6 +13,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -68,12 +69,26 @@ public final class RectorFixer implements Fixer {
         for (io.renova.core.model.Module module : context.project().modules()) {
             Path dir = root.resolve(module.path()).normalize();
             boolean installed = Files.isRegularFile(dir.resolve("vendor/composer/installed.json"));
+            // Where the playbook says so, the libraries Rector reads are not the target's but an earlier release's
+            // (settings.rector.analyseWith: text in composer.json to replace for this one installation).
+            Map<String, String> environment = new java.util.LinkedHashMap<>(PhpRuntimes.environment());
+            Path analysed = dir.resolve("composer.renova-analysis.json");
+            if (context.playbook().setting("rector.analyseWith") instanceof Map<?, ?> replacements && !replacements.isEmpty()) {
+                String json = Files.readString(dir.resolve("composer.json"), StandardCharsets.UTF_8);
+                for (Map.Entry<?, ?> r : replacements.entrySet()) {
+                    json = json.replace(r.getKey().toString(), r.getValue().toString());
+                }
+                Files.writeString(analysed, json, StandardCharsets.UTF_8);
+                environment.put("COMPOSER", analysed.getFileName().toString());
+                installed = false;
+                details.add(module.path() + ": for Rector, dependencies are installed as " + replacements);
+            }
             if (!installed) {
                 // The types the code uses, for Rector to read: what composer.json asks for now, on whatever PHP is here.
                 // The project's Composer plugins run, as they will when it is verified: Symfony Flex is what holds
                 // every symfony/* package to the release the project asks for.
                 Proc.Result install = Proc.run(PhpRuntimes.composerCommand(php, composer, "update", "--no-interaction", "--no-progress",
-                        "--no-scripts", "--ignore-platform-reqs", "-W"), dir, TIMEOUT, PhpRuntimes.environment());
+                        "--no-scripts", "--ignore-platform-reqs", "-W"), dir, TIMEOUT, environment);
                 installed = install.ok() && Files.isRegularFile(dir.resolve("vendor/composer/installed.json"));
                 details.add(module.path() + ": the project's dependencies were " + (installed ? "installed for Rector to read"
                         : "not installable as composer.json asks for them now; Rector ran without them, and without the rules it "
@@ -113,6 +128,9 @@ public final class RectorFixer implements Fixer {
                 run = Proc.run(List.of(php.executable().toString(), "-d", "memory_limit=-1", rector.toString(), "process",
                         "--config", config.toString(), "--no-progress-bar", "--no-diffs", "--clear-cache"), dir, TIMEOUT, PhpRuntimes.environment());
             }
+            // The stand-in composer file and its lock are Renova's; the verification installs what the project asks for.
+            Files.deleteIfExists(analysed);
+            Files.deleteIfExists(dir.resolve("composer.renova-analysis.lock"));
             details.add("== " + module.path() + ": exit " + run.exitCode());
             details.add(run.tail(12));
             if (run.ok()) {

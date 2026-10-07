@@ -447,7 +447,7 @@ Windows machine, and how, is in [docs/windows-test-plan.md](docs/windows-test-pl
 |---|---|---|---|
 | `php-to-8.3`, `php-to-8.4`, `php-to-8.5` | Any Composer project, from PHP 5.4 on, or a site without Composer | That PHP version, and nothing else: frameworks stay | Projects without Laravel (`php-to-8.4`) |
 | `laravel-11`, `laravel-12`, `laravel-13` | A Laravel application on any older Laravel | That Laravel, on PHP 8.3 (Laravel 11) or 8.4 | Laravel applications (`laravel-13`) |
-| `symfony-6.4`, `symfony-7.4` | A Symfony application on Symfony 4, 5 or 6 | That Symfony (both long-term-support releases), on PHP 8.3 or 8.4 | Symfony applications (`symfony-7.4`) |
+| `symfony-6.4`, `symfony-7.4`, `symfony-8.1` | A Symfony application on an older Symfony | That Symfony (6.4 and 7.4 are long-term-support releases), on PHP 8.3 or 8.4 | Symfony applications (`symfony-7.4`) |
 
 What these do today, with no AI ([results](docs/verified-migrations.md#php)):
 
@@ -532,10 +532,10 @@ source migrates without one. See [docs/licensing.md](docs/licensing.md).
    AI, ASP.NET MVC 5 and Web API 2 → ASP.NET Core. Next: a larger real MVC application, Entity Framework 6 →
    EF Core, Windows Forms and WPF verified on Windows, Web Forms. Behavioural verification runs ASP.NET Core
    applications; classic ASP.NET originals need IIS on Windows.
-7. **PHP:** a chosen PHP version (8.3, 8.4, 8.5), Laravel version (11, 12, 13) and Symfony version (6.4, 7.4)
+7. **PHP:** a chosen PHP version (8.3, 8.4, 8.5), Laravel version (11, 12, 13) and Symfony version (6.4, 7.4, 8.1)
    are in, with sites without Composer, a PHPUnit add-on and behavioural verification. Next: an option to
    change only what the target requires, a real Laravel or Symfony application with a database and security
-   configuration, `mysql_*` with AI, Symfony 8.
+   configuration, `mysql_*` with AI.
 
 ## Contributing
 

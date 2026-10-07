@@ -114,6 +114,7 @@ Run on 7 October 2026, no AI, verified on PHP 8.4.23 with Composer 2.9:
 
 | Notes (Symfony's skeleton with a controller whose routes are annotations, `@Method` from SensioFrameworkExtraBundle, `doctrine/annotations`, functional tests) | Symfony 5.4, PHP 7.2 to 7.4 | Symfony 7.4, PHP 8.4 | Pass (6 tests); side by side on PHP 7.4 and 8.4, the same answer to 6 of 6 requests | 7/7 |
 | Notes (same) | Symfony 5.4 | Symfony 6.4, PHP 8.3 | Pass (6 tests) | 2/2 |
+| Notes (same) | Symfony 5.4 | Symfony 8.1, PHP 8.4 | Pass (6 tests); side by side, the same answer to 6 of 6 requests | 4/4 |
 | Brochure (a site without Composer or tests: three pages and an include using `each()`, `create_function()`, curly-brace offsets, reversed `implode()`) | PHP 5.3 to 7.4 | PHP 8.4, with a `composer.json` | Pass (no tests); side by side on PHP 7.4 and 8.4, the same answer to 6 of 6 requests | 5/5 |
 
 Each original was first run as it was, on the PHP it was written for, in Docker (PHP 7.4, 7.1, 8.2 and 8.0):

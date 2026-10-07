@@ -45,7 +45,7 @@ nobody can say how big it is or whether the result still works.
 | ASP.NET MVC 5 and Web API 2 | ASP.NET Core | With AI |
 | PHP 5.4 to 8.2 (Composer projects, and sites without Composer) | PHP 8.3, 8.4 or 8.5 | No AI |
 | Laravel 7, 8, 9, 10 and later | Laravel 11, 12 or 13 | No AI |
-| Symfony 4, 5, 6 | Symfony 6.4 or 7.4 | No AI for code and packages |
+| Symfony 4, 5, 6, 7 | Symfony 6.4, 7.4 or 8.1 | No AI for code and packages |
 
 Maven and Gradle; Kotlin on the JVM; JUnit 4 to 5, Mockito, Log4j, NUnit 2 to 3 and other library upgrades.
 
@@ -66,7 +66,7 @@ was checked and what was not, is in [verified-migrations.md](verified-migrations
 | Laravel 8 and Laravel 10 applications → Laravel 13 on PHP 8.4 | 7 tests pass each, no AI; Laravel 8 beside 13: same answers to 8 of 9 requests, the ninth being the page that prints the version |
 | A Laravel 7 application (closure factories, PHP 7.4) → Laravel 13 on PHP 8.4 | 6 tests pass, no AI; same answers as the original to 9 of 9 requests |
 | An ASP.NET Core 3.1 API → .NET 10 | 4 tests pass, no AI; same answers as the original to 9 of 9 requests |
-| 21 Java, 5 .NET and 13 PHP paths in the benchmark suites | All pass without AI |
+| 21 Java, 5 .NET and 14 PHP paths in the benchmark suites | All pass without AI |
 
 ## What it does not do yet
 
