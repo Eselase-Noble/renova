@@ -42,6 +42,28 @@ publishes nothing. On macOS an installer's version may not start with 0, so `0.3
 Installers are not code-signed yet: Windows and macOS warn on first launch until signing certificates are added to
 the workflow.
 
+## Signing the installers
+
+Unsigned installers work and are met with a warning: Windows SmartScreen says "Windows protected your PC", and
+macOS Gatekeeper refuses to open the application until the user allows it in System Settings. Both go away
+with a certificate in the vendor's name. Neither is bought or set up yet.
+
+| System | What to buy | What is in place |
+|---|---|---|
+| macOS | An Apple Developer Program membership (99 USD a year) and a *Developer ID Application* certificate from it | `desktop/package.sh` signs when `MAC_SIGNING_IDENTITY` names the certificate in the keychain. Notarising the `.dmg` (`xcrun notarytool submit --wait`, then `xcrun stapler staple`) is a step still to add to the release workflow |
+| Windows | A code-signing certificate. Since 2023 these are kept on a hardware token or in a cloud service, not in a file; the least effort is Microsoft's Trusted Signing (an Azure subscription, about 10 USD a month, and identity validation that takes days) | Nothing: the `.msi` from `jpackage` is signed afterwards with `signtool` and the service's plug-in, a step to add to the release workflow once the account exists |
+| Linux | Nothing | `.deb` packages are not signed individually |
+
+Until then, tell customers on Windows to choose **More info → Run anyway**, and on macOS to open the
+application once from **System Settings → Privacy & Security**; the checksums in the release let them check
+that the file is the one that was published.
+
+## Licences
+
+A released build assesses projects freely and asks for a licence before it migrates one; see
+[licensing.md](licensing.md). A build from source (a `-SNAPSHOT` version, including an installer made by hand
+with `desktop/package.sh`) does not ask.
+
 ## Building the same things by hand
 
 ```sh

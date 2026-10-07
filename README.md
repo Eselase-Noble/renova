@@ -22,6 +22,7 @@ AI model or a person, and the real build checks every change.
 - [Playbooks](#playbooks)
 - [Extending Renova](#extending-renova)
 - [Deploying](#deploying)
+- [Licensing](#licensing)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
@@ -451,6 +452,13 @@ Renova runs on machines the customer controls; it is not a hosted service and ne
 (`git tag v0.2.0 && git push origin v0.2.0`) builds and publishes a GitHub release with the desktop installers for
 Linux, Windows and macOS, the web bundle, the CLI and both IDE plugins. See [docs/deployment.md](docs/deployment.md).
 
+## Licensing
+
+A released build assesses any project without a licence and needs one to migrate. A licence is a signed file,
+checked on the customer's machine with no call to any server; it names the licensee, the ecosystems it covers
+and its last day. `renova licence install FILE`, or **Settings → Licence** in the desktop app. A build from
+source migrates without one. See [docs/licensing.md](docs/licensing.md).
+
 ## Roadmap
 
 1. **RAG:** phase 1 (structural code retrieval and curated knowledge, no key needed) is in and on by default.
@@ -460,7 +468,9 @@ Linux, Windows and macOS, the web bundle, the CLI and both IDE plugins. See [doc
    ([design](docs/behavioural-verification-design.md)).
 3. **Benchmark harness:** `renova benchmark` scores migrations of synthetic legacy apps (see
    [`benchmark/`](benchmark)). Next: more apps, including public open-source legacy projects.
-4. **Web console:** single sign-on and licensing (the audit log and local mode are in). **Desktop:** signed installers.
+4. **Web console:** single sign-on (the audit log and local mode are in). **Licensing** is in: signed licence
+   files checked offline. **Desktop:** signed installers need certificates that are not bought yet
+   ([what and how](docs/deployment.md#signing-the-installers)).
 5. **More targets and ecosystems:** Java 17/21/25, Spring Boot 3 and 4.1, Spring Framework 7 with Jakarta EE 11,
    Micronaut 4, Quarkus 3, Hibernate 6 and 7, Struts 7, library add-ons, Gradle builds, Ant builds, Kotlin and
    Java EE → Spring Boot are in, with Gradle builds of Kotlin, Micronaut and Quarkus projects. Next for Java:

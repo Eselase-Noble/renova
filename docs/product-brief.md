@@ -72,4 +72,6 @@ Said plainly, because a buyer will ask:
 - Java: EJB 2, JAX-RPC, Faces managed beans and iBATIS are planned with the mapping written out and have not
   been run. Nothing larger than seven modules has been tried.
 - PHP and Laravel are next and not started.
-- Single sign-on, licensing and signed installers are not built.
+- Licences are issued by hand as signed files; there is no shop or portal, and seats are stated, not counted.
+- The installers are not code-signed yet, so Windows and macOS warn when they are opened. Single sign-on is
+  not built.
