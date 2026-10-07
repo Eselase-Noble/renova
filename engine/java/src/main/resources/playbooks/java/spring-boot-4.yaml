@@ -27,6 +27,7 @@ include:
   - packs/spring-boot-3-changes.yaml
   - packs/spring-framework-6.yaml
   - packs/jdk-removed-apis.yaml
+  - packs/legacy-frameworks.yaml
   - packs/maven-build-guards.yaml
 
 rules:

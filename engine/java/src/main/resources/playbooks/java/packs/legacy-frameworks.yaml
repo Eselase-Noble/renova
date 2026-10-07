@@ -1,0 +1,303 @@
+# Frameworks and server APIs from before Java EE 6 that have no line on Jakarta EE, or changed so much that no
+# recipe carries code across. They are found and planned here; the change itself needs judgement, so it goes
+# to AI with the mapping written out, or to a person when it cannot be checked by a build.
+
+rules:
+
+  - id: struts-1
+    title: Struts 1 has no Jakarta EE release
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [org.apache.struts.action, org.apache.struts.actions, org.apache.struts.upload, org.apache.struts.util,
+                 org.apache.struts.validator, org.apache.struts.tiles, org.apache.struts.taglib, org.apache.struts.config]
+    fix:
+      strategy: ai
+      hint: >
+        Struts 1 ended in 2013 and only runs on javax.servlet. Turn each Action into a Spring MVC @Controller:
+        execute(mapping, form, request, response) becomes a handler method mapped to the path struts-config.xml
+        gives the action (@RequestMapping("/x.do") keeps old links working); the ActionForm becomes a plain
+        class bound with @ModelAttribute, its validate() a Validator or Bean Validation annotations;
+        mapping.findForward("name") becomes the view name the forward points to in struts-config.xml;
+        ActionMessages/ActionErrors become BindingResult errors or model attributes; DispatchAction methods
+        become one handler method per value of the dispatch parameter. Keep the JSP pages; replace the
+        html:, bean: and logic: tags with Spring's form: tags and JSTL in the pages each controller renders.
+
+  - id: struts-1-configuration
+    title: struts-config.xml and Tiles definitions
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/struts-config*.xml", "**/tiles-defs*.xml", "**/validation.xml", "**/validator-rules.xml"]
+      pattern: "<(struts-config|tiles-definitions|form-validation)\\b"
+    fix:
+      strategy: manual
+      hint: >
+        Once the actions are controllers, struts-config.xml (action mappings, form beans, forwards, message
+        resources, plug-ins) has no reader: check that every mapping has a controller method and every
+        forward a view, move message resources to a MessageSource, then remove the file and the ActionServlet
+        from web.xml. Tiles definitions can stay with Tiles 3 only on javax; on Jakarta use Thymeleaf layouts
+        or JSP includes.
+
+  - id: ejb-2-components
+    title: EJB 2.x home and component interfaces
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [javax.ejb.EJBHome, javax.ejb.EJBLocalHome, javax.ejb.EJBObject, javax.ejb.EJBLocalObject,
+                 javax.ejb.SessionBean, javax.ejb.EntityBean, javax.ejb.MessageDrivenBean, javax.ejb.CreateException,
+                 javax.ejb.FinderException, javax.ejb.RemoveException, javax.ejb.EntityContext, javax.rmi.PortableRemoteObject]
+    fix:
+      strategy: ai
+      hint: >
+        EJB 2.x entity beans and the home/remote interface model were removed from Jakarta EE. A session bean
+        (implements SessionBean, with Home and Remote/Local interfaces) becomes a plain class annotated
+        @Stateless or @Stateful that implements one business interface: delete the home interface, ejbCreate
+        becomes @PostConstruct, ejbRemove @PreDestroy, setSessionContext an injected @Resource SessionContext,
+        and callers that looked up the home in JNDI and called create() inject the bean with @EJB. A CMP or BMP
+        entity bean becomes a JPA @Entity (abstract getters and setters become fields; finders in ejb-jar.xml
+        become named queries; relationships become @ManyToOne/@OneToMany) and its home's finders and create
+        methods move to a stateless bean that uses an EntityManager. PortableRemoteObject.narrow is a cast.
+        ejb-jar.xml transaction attributes become @TransactionAttribute where they differ from REQUIRED.
+
+  - id: ejb-2-deployment-descriptor
+    title: EJB 2.x deployment descriptors
+    category: A
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/ejb-jar.xml", "**/jboss.xml", "**/jbosscmp-jdbc.xml", "**/weblogic-ejb-jar.xml", "**/weblogic-cmp-rdbms-jar.xml",
+                "**/ibm-ejb-jar-bnd.xmi"]
+      pattern: "<(entity|session|message-driven|cmp-field|weblogic-rdbms-bean|jbosscmp-jdbc)\\b"
+    fix:
+      strategy: manual
+      hint: >
+        These descriptors define the beans, their transactions, security roles and, for entity beans, the
+        table and column mappings. Carry each setting to an annotation on the bean or entity (@Table, @Column,
+        @TransactionAttribute, @RolesAllowed) and check the mappings against the database, then remove the
+        descriptor. The build cannot verify that the mappings match the schema.
+
+  - id: jax-rpc
+    title: JAX-RPC web services (removed in Java EE 8 and Java 11)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [javax.xml.rpc, org.apache.axis.client, org.apache.axis.encoding, org.apache.axis.message, org.apache.axis.AxisFault]
+    fix:
+      strategy: ai
+      hint: >
+        JAX-RPC and Axis 1 have no Jakarta version. A service endpoint interface extending java.rmi.Remote
+        becomes a JAX-WS @WebService interface (jakarta.jws), its implementation
+        @WebService(endpointInterface = ...); generated stubs (Locator, Stub, BindingStub classes) are replaced
+        by a jakarta.xml.ws.Service client generated from the same WSDL with wsimport (jaxws-maven-plugin).
+        ServiceException becomes WebServiceException, RemoteException on operations is dropped. rpc/encoded
+        WSDLs are not supported by JAX-WS: if the WSDL uses use="encoded", say so and leave the client alone.
+
+  - id: jersey-1
+    title: Jersey 1 (com.sun.jersey) to Jersey 3
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [com.sun.jersey]
+    fix:
+      strategy: ai
+      hint: >
+        Jersey 1 runs only on javax. Use the JAX-RS standard API where there is one and org.glassfish.jersey
+        otherwise: com.sun.jersey.api.client.Client/WebResource/ClientResponse become
+        jakarta.ws.rs.client.Client/WebTarget and jakarta.ws.rs.core.Response
+        (client.resource(u).path(p).get(T.class) is client.target(u).path(p).request().get(T.class);
+        ClientResponse.getEntity(T.class) is Response.readEntity(T.class)); UniformInterfaceException becomes
+        WebApplicationException; com.sun.jersey.spi.container.servlet.ServletContainer in web.xml becomes
+        org.glassfish.jersey.servlet.ServletContainer with a ResourceConfig; @InjectParam becomes @BeanParam or
+        @Inject; multipart moves to org.glassfish.jersey.media.multipart. In the pom, replace com.sun.jersey
+        artifacts with org.glassfish.jersey.containers:jersey-container-servlet, org.glassfish.jersey.inject:jersey-hk2
+        and org.glassfish.jersey.media:jersey-media-json-jackson, version 3.1.x.
+
+  - id: faces-managed-beans
+    title: Faces managed beans (removed in Faces 4)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [javax.faces.bean, jakarta.faces.bean]
+    fix:
+      strategy: ai
+      hint: >
+        javax.faces.bean was removed in Jakarta Faces 4. @ManagedBean(name = "x") becomes
+        jakarta.inject.Named("x") (no name: the class name with a lower-case first letter, as before); the
+        scopes become CDI's: @RequestScoped, @SessionScoped and @ApplicationScoped from
+        jakarta.enterprise.context, @ViewScoped from jakarta.faces.view, and @NoneScoped becomes @Dependent.
+        Session, view and application scoped beans must implement Serializable. @ManagedProperty("#{x}")
+        becomes @Inject of the bean x (or @Inject @ManagedProperty from jakarta.faces.annotation for an EL
+        value). eager = true becomes an @Observes @Initialized(ApplicationScoped.class) method. The project
+        needs a beans.xml (bean-discovery-mode="all") for CDI to find the beans.
+
+  - id: faces-component-libraries
+    title: Faces component libraries without a Jakarta release
+    category: E
+    severity: BLOCKER
+    detect:
+      type: dependency
+      coordinates: ["org.richfaces*:*", "org.richfaces.ui:*", "org.icefaces:*", "org.apache.myfaces.tomahawk:*",
+                    "org.apache.myfaces.trinidad:*", "com.sun.faces:jsf-api", "com.sun.facelets:jsf-facelets", "org.jboss.seam:*"]
+    fix:
+      strategy: manual
+      hint: >
+        RichFaces, ICEfaces 3, Tomahawk, Trinidad and Seam 2 ended before Jakarta EE and do not run on Faces 4.
+        Their pages must be rewritten with a library that does: PrimeFaces (use the artifact with classifier
+        "jakarta") covers most RichFaces and ICEfaces components (rich:dataTable is p:dataTable, a4j:commandButton
+        is p:commandButton with ajax, rich:modalPanel is p:dialog). This is page-by-page work that a build does
+        not verify. Facelets is part of Faces itself since 2.0: remove com.sun.facelets.
+
+  - id: primefaces-jakarta-classifier
+    title: PrimeFaces needs its jakarta build
+    category: E
+    severity: WARNING
+    detect:
+      type: fileContains
+      include: ["**/pom.xml"]
+      pattern: "<groupId>org\\.primefaces</groupId>"
+      unless: "<classifier>jakarta</classifier>"
+    fix:
+      strategy: manual
+      hint: >
+        PrimeFaces publishes two builds of each version from 10 on. On Jakarta EE use version 13 or later with
+        <classifier>jakarta</classifier>; the default build is compiled against javax.faces. PrimeFaces
+        Extensions and themes need the same classifier.
+
+  - id: hibernate-legacy-criteria
+    title: Hibernate's legacy Criteria and classic APIs (removed in Hibernate 6)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [org.hibernate.criterion, org.hibernate.Criteria, org.hibernate.classic, org.hibernate.type.StringType,
+                 org.hibernate.type.LongType, org.hibernate.type.IntegerType, org.hibernate.usertype.UserType]
+    fix:
+      strategy: ai
+      hint: >
+        org.hibernate.Criteria and org.hibernate.criterion were removed in Hibernate 6. Rewrite each query with
+        the JPA Criteria API (session.getCriteriaBuilder(), CriteriaQuery, Root): Restrictions.eq("p", v) is
+        cb.equal(root.get("p"), v), Restrictions.in is root.get("p").in(values), Order.asc is cb.asc,
+        Projections.rowCount is cb.count(root), createAlias is root.join. Simple queries may be clearer as HQL.
+        setFirstResult/setMaxResults move to the TypedQuery. The type constants (StringType.INSTANCE) become
+        StandardBasicTypes.STRING; UserType has new method signatures (nullSafeGet takes a position, returnedClass
+        is typed). Results must be the same rows in the same order.
+
+  - id: ibatis-2
+    title: iBATIS 2 to MyBatis 3
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [com.ibatis]
+    fix:
+      strategy: ai
+      hint: >
+        iBATIS 2 ended in 2010. SqlMapClient becomes SqlSession (queryForObject is selectOne, queryForList is
+        selectList, the statement id is namespace.id); SqlMapClientTemplate/SqlMapClientDaoSupport from Spring
+        become SqlSessionTemplate from mybatis-spring. In the map files: sqlMap becomes mapper with a namespace,
+        #name# becomes #{name} and $name$ becomes ${name}, parameterClass/resultClass become
+        parameterType/resultType, <isNotNull>/<isEqual> dynamic tags become <if test="...">, and the DTD is
+        mybatis-3-mapper.dtd. Keep the SQL itself unchanged.
+
+  - id: commons-httpclient-3
+    title: Commons HttpClient 3 (org.apache.commons.httpclient)
+    category: C
+    severity: WARNING
+    detect:
+      type: import
+      prefixes: [org.apache.commons.httpclient]
+    fix:
+      strategy: ai
+      hint: >
+        Commons HttpClient 3 ended in 2011 and has known security issues. Use Apache HttpClient 5
+        (org.apache.hc.client5:httpclient5): new HttpClient() is HttpClients.createDefault(); GetMethod/PostMethod
+        are HttpGet/HttpPost; executeMethod(m) with m.getResponseBodyAsString() is
+        client.execute(request, response -> EntityUtils.toString(response.getEntity())); NameValuePair request
+        bodies are UrlEncodedFormEntity; timeouts move to RequestConfig. Close the client or share one instance.
+
+  - id: quartz-1
+    title: Quartz 1 job and trigger classes
+    category: C
+    severity: WARNING
+    detect:
+      type: dependency
+      coordinates: ["opensymphony:quartz*", "org.opensymphony.quartz:*", "quartz:quartz"]
+    fix:
+      strategy: ai
+      hint: >
+        Quartz 2 made JobDetail and the triggers interfaces built with builders: new JobDetail(name, group, X.class)
+        is JobBuilder.newJob(X.class).withIdentity(name, group).build(); new CronTrigger(name, group, expr) is
+        TriggerBuilder.newTrigger().withIdentity(name, group).withSchedule(CronScheduleBuilder.cronSchedule(expr)).build();
+        SimpleTrigger likewise with SimpleScheduleBuilder; scheduler.getJobNames(group) is
+        getJobKeys(GroupMatcher.groupEquals(group)). Use org.quartz-scheduler:quartz 2.5 or later, which is on
+        jakarta. Spring's JobDetailBean/CronTriggerBean are JobDetailFactoryBean/CronTriggerFactoryBean.
+
+  - id: application-server-apis
+    title: Code tied to one application server
+    category: D
+    severity: WARNING
+    detect:
+      type: import
+      prefixes: [weblogic., com.bea., com.ibm.websphere, com.ibm.ws., com.ibm.ejs, org.jboss.ejb3, org.jboss.annotation,
+                 org.jboss.security, org.jboss.mx, org.jboss.system, org.jboss.naming, com.sun.appserv, oracle.oc4j, com.evermind]
+    fix:
+      strategy: manual
+      hint: >
+        These classes belong to one server (WebLogic, WebSphere, JBoss, GlassFish, OC4J) and are not on the
+        classpath anywhere else, including that vendor's current release in many cases. Each use needs its
+        standard replacement: vendor EJB annotations become jakarta.ejb ones, vendor security and JNDI helpers
+        become jakarta.security.enterprise or plain injection, work managers become
+        jakarta.enterprise.concurrent.ManagedExecutorService, vendor JMX and startup classes become a
+        @Singleton @Startup bean. Find out first whether the target is the same server's new release or another.
+
+  - id: corba-and-rmi-iiop
+    title: CORBA and RMI-IIOP (removed in Java 11)
+    category: C
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [org.omg., javax.rmi.CORBA, com.sun.corba]
+    fix:
+      strategy: manual
+      hint: >
+        The JDK's CORBA implementation was removed in Java 11. If the peer still speaks IIOP, add a CORBA
+        library (org.glassfish.corba:glassfish-corba-orb, or JacORB) and keep the code; if both sides are
+        yours, replace the interface with REST or gRPC. This is an integration decision, not a code change
+        Renova should make by itself.
+
+  - id: applets-and-web-start
+    title: Applets and Java Web Start (removed from the JDK)
+    category: D
+    severity: BLOCKER
+    detect:
+      type: import
+      prefixes: [java.applet, javax.swing.JApplet, javax.jnlp, netscape.javascript]
+    fix:
+      strategy: manual
+      hint: >
+        Browsers stopped running applets and Java 11 removed Web Start; java.applet is deprecated for removal.
+        An applet's panel can be hosted in a JFrame and shipped as a desktop application with jpackage, or the
+        screen rebuilt as a web page. OpenWebStart can still launch JNLP applications if rewriting is not an
+        option yet.
+
+knowledge:
+
+  - id: legacy-frameworks-baseline
+    title: Frameworks that ended before Jakarta EE
+    triggers: ["org.apache.struts.action", "EJBHome", "SessionBean", "javax.xml.rpc", "com.sun.jersey", "@ManagedBean",
+               "org.hibernate.criterion", "com.ibatis"]
+    body: |
+      Struts 1, EJB 2.x entity beans and home interfaces, JAX-RPC, Axis 1, Jersey 1, Faces managed beans,
+      RichFaces, Seam 2, iBATIS 2 and Hibernate's legacy Criteria have no release on jakarta.* packages.
+      Renaming their imports does not make them work: the code that uses them has to move to the successor
+      (Spring MVC or Struts 7, EJB 3 session beans and JPA entities, JAX-WS, Jersey 3 or the JAX-RS client
+      API, CDI @Named beans, PrimeFaces, MyBatis 3, the JPA Criteria API). When changing such code, keep
+      URLs, JNDI-free injection, transaction boundaries, SQL and query results exactly as they were: the
+      behaviour is the specification, and the old tests, where there are any, still have to pass.

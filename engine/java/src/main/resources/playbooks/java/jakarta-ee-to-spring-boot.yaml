@@ -29,6 +29,7 @@ settings:
 include:
   - packs/jakarta-ee10.yaml
   - packs/jdk-removed-apis.yaml
+  - packs/legacy-frameworks.yaml
   - packs/maven-build-guards.yaml
 
 # These keep a WAR fit for an application server: the APIs it supplies declared, and not packaged. Spring Boot
