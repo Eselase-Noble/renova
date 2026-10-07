@@ -34,10 +34,10 @@ public interface BehaviourRunner {
     }
 
     /**
-     * Environment variables that give the application these settings, e.g. for Java the JVM system
-     * properties in {@code CATALINA_OPTS}. Used to point each application at its own sandbox database.
+     * Environment variables that give this project's application these settings, e.g. for Java the JVM
+     * system properties in {@code CATALINA_OPTS}. Used to point each application at its own sandbox database.
      */
-    default Map<String, String> environment(Map<String, String> settings) {
+    default Map<String, String> environment(ProjectModel model, Map<String, String> settings) {
         return Map.of();
     }
 

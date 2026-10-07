@@ -82,8 +82,8 @@ public final class BehaviourVerifier {
             }
             database = new DockerSandbox.Database(db.image(), scenarioPath.getParent().resolve(db.init()), db.ignoreColumns());
             deployments = new BehaviourRunner.Deployments(
-                    deployments.baseline().withEnvironment(runner.get().environment(withHost(db.app(), DockerSandbox.BASELINE_DB))),
-                    deployments.candidate().withEnvironment(runner.get().environment(withHost(db.app(), DockerSandbox.CANDIDATE_DB))));
+                    deployments.baseline().withEnvironment(runner.get().environment(originalModel, withHost(db.app(), DockerSandbox.BASELINE_DB))),
+                    deployments.candidate().withEnvironment(runner.get().environment(originalModel, withHost(db.app(), DockerSandbox.CANDIDATE_DB))));
         }
         DockerSandbox.Run run = DockerSandbox.run(deployments, scenarios, database, workDir, progress);
         String baselinePlatform = deployments.baseline().platform();

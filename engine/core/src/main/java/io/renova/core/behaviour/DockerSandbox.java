@@ -188,6 +188,7 @@ public final class DockerSandbox {
         app.mounts().forEach((host, container) -> cmd.addAll(List.of("-v", host.toAbsolutePath() + ":" + container + ":ro")));
         app.environment().forEach((k, v) -> cmd.addAll(List.of("-e", k + "=" + v)));
         cmd.add(app.image());
+        cmd.addAll(app.command());
         containers.add(name);
         check(exec(cmd, null, 300), "start the " + alias + " container from " + app.image());
     }
