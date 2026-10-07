@@ -62,16 +62,34 @@ public final class DotnetVerifier implements Verifier {
         boolean skipTests = "true".equals(context.options().toolOption("verify.skipTests"));
         // The workspace as it is now: a stage may have changed which projects are tests.
         List<Module> modules = new DotnetPlugin().model(workspace).modules();
-        boolean hasTests = modules.stream().anyMatch(m -> Boolean.TRUE.equals(m.fact("test")));
-        List<BuildError> errors = new ArrayList<>();
         StringBuilder log = new StringBuilder();
+        boolean hasTests = modules.stream().anyMatch(m -> Boolean.TRUE.equals(m.fact("test")));
+        // Windows Forms and WPF compile anywhere with the Windows targeting pack and run on Windows only.
+        boolean onWindows = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("win");
+        boolean windowsProjects = modules.stream().anyMatch(io.renova.dotnet.detect.WindowsReferenceDetector::windows);
+        boolean elsewhere = windowsProjects && !onWindows;
+        List<Module> runnableTests = modules.stream().filter(m -> Boolean.TRUE.equals(m.fact("test"))
+                && !io.renova.dotnet.detect.WindowsReferenceDetector.windows(m)).toList();
+        if (elsewhere) {
+            hasTests = !runnableTests.isEmpty();
+            log.append(VerifyResult.NOTE).append("Projects that target Windows (Windows Forms, WPF) were compiled with the Windows "
+                    + "targeting pack. Their tests and the applications themselves run on Windows only")
+                    .append(runnableTests.isEmpty() ? ", so no test was run on this machine" : ", so only the other tests were run here")
+                    .append(": build and test the migrated copy on Windows before relying on it.\n");
+        }
+        List<BuildError> errors = new ArrayList<>();
         boolean success = true;
+        boolean testedHere = false;
         int ran = 0;
         int number = 0;
         for (Path root : buildRoots(workspace, modules)) {
             String name = workspace.relativize(root).toString().replace('\\', '/');
-            Proc.Result build = Proc.run(List.of(dotnet.toString(), "build", root.toString(), "--nologo", "-v:q", "-clp:NoSummary",
-                    "-p:UseSharedCompilation=false"), workspace, TIMEOUT, Dotnet.environment(dotnet));
+            List<String> buildCommand = new ArrayList<>(List.of(dotnet.toString(), "build", root.toString(), "--nologo", "-v:q",
+                    "-clp:NoSummary", "-p:UseSharedCompilation=false"));
+            if (elsewhere) {
+                buildCommand.add("-p:EnableWindowsTargeting=true");
+            }
+            Proc.Result build = Proc.run(buildCommand, workspace, TIMEOUT, Dotnet.environment(dotnet));
             log.append("== ").append(name).append(": build exit ").append(build.exitCode()).append('\n');
             if (!build.ok()) {
                 success = false;
@@ -80,21 +98,27 @@ public final class DotnetVerifier implements Verifier {
                 errors.addAll(found.isEmpty() ? List.of(new BuildError(name, 0, said(build.output()))) : found);
                 continue;
             }
-            if (skipTests || !hasTests) {
+            if (skipTests || !hasTests || (elsewhere && testedHere)) { // off Windows the test projects are run once, not per root
                 continue;
             }
-            Path results = context.workspace().lcDir().resolve("test-results").resolve(String.valueOf(++number));
-            deleteRecursively(results);
-            Proc.Result test = Proc.run(List.of(dotnet.toString(), "test", root.toString(), "--no-build", "--nologo",
-                    "--logger", "trx", "--results-directory", results.toString()), workspace, TIMEOUT, Dotnet.environment(dotnet));
-            log.append("== ").append(name).append(": test exit ").append(test.exitCode()).append('\n');
-            TestRun run = testResults(results, workspace);
-            ran += run.ran();
-            if (!test.ok()) {
-                success = false;
-                log.append(test.tail(40)).append('\n');
-                errors.addAll(run.failures().isEmpty() ? List.of(new BuildError(name, 0, said(test.output()))) : run.failures());
+            // Off Windows only the test projects that can run here, one by one; otherwise the whole root.
+            List<Path> testRoots = elsewhere ? runnableTests.stream().map(m -> workspace.resolve(m.buildFile())).toList() : List.of(root);
+            for (Path testRoot : testRoots) {
+                Path results = context.workspace().lcDir().resolve("test-results").resolve(String.valueOf(++number));
+                deleteRecursively(results);
+                Proc.Result test = Proc.run(List.of(dotnet.toString(), "test", testRoot.toString(), "--no-build", "--nologo",
+                        "--logger", "trx", "--results-directory", results.toString()), workspace, TIMEOUT, Dotnet.environment(dotnet));
+                String testName = workspace.relativize(testRoot).toString().replace('\\', '/');
+                log.append("== ").append(testName).append(": test exit ").append(test.exitCode()).append('\n');
+                TestRun run = testResults(results, workspace);
+                ran += run.ran();
+                if (!test.ok()) {
+                    success = false;
+                    log.append(test.tail(40)).append('\n');
+                    errors.addAll(run.failures().isEmpty() ? List.of(new BuildError(testName, 0, said(test.output()))) : run.failures());
+                }
             }
+            testedHere = true;
         }
         if (success && hasTests && !skipTests && ran == 0) {
             // A passing build proves nothing if it stopped running the tests.
@@ -103,6 +127,9 @@ public final class DotnetVerifier implements Verifier {
             errors.add(new BuildError(project, 0, "the build passes but ran none of the project's tests: a test project needs "
                     + "Microsoft.NET.Test.Sdk and its framework's test adapter for dotnet test to find them"));
             log.append("no tests ran\n");
+        }
+        if (success && ran > 0) {
+            log.append(VerifyResult.NOTE).append(ran).append(" test(s) ran and passed.\n");
         }
         return new VerifyResult(success, errors.stream().distinct().toList(), log.toString());
     }

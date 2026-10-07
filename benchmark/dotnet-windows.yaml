@@ -1,0 +1,45 @@
+# Renova .NET suite, the paths that need Windows to be proved: Windows Forms and WPF applications. They compile
+# anywhere with the Windows targeting pack; their tests, and the applications themselves, run on Windows only.
+# On another system this suite still checks the conversion and the build, and says the tests were not run.
+#
+# Run (Windows, .NET SDK 10):
+#   java -jar cli\target\renova.jar benchmark --suite benchmark\dotnet-windows.yaml --out C:\renova-out\windows --configs deterministic
+# Then start each migrated application as docs/windows-test-plan.md describes.
+
+id: dotnet-windows
+appsDir: ../../renova-test-apps
+
+configurations:
+  - id: deterministic
+    behaviour: false
+
+apps:
+  # C# Windows Forms: a form with its designer file and resources, App.config, MSTest from Visual Studio.
+  - id: winforms-csharp-to-10
+    path: desk-winforms-net472
+    playbook: dotnet-to-10
+    checks:
+      - { file: Desk/Desk.csproj, contains: "<TargetFramework>net10.0-windows</TargetFramework>", why: "Windows Forms exists on Windows only" }
+      - { file: Desk/Desk.csproj, contains: "<UseWindowsForms>true</UseWindowsForms>", why: "what brings Windows Forms in on modern .NET" }
+      - { file: Desk/Desk.csproj, contains: "<OutputType>WinExe</OutputType>", why: "still an application without a console window" }
+      - { file: Desk/Desk.csproj, absent: "System.Drawing.Common", why: "the desktop framework already has System.Drawing" }
+      - { file: Desk.Tests/Desk.Tests.csproj, contains: "<TargetFramework>net10.0-windows</TargetFramework>", why: "tests of a Windows project must target Windows" }
+
+  # C# WPF: App.xaml, a window, a view model with commands, NUnit tests of the view model.
+  - id: wpf-csharp-to-10
+    path: notes-wpf-net48
+    playbook: dotnet-to-10
+    checks:
+      - { file: Notes/Notes.csproj, contains: "<UseWPF>true</UseWPF>", why: "what brings WPF in on modern .NET" }
+      - { file: Notes/Notes.csproj, absent: "<Page ", why: "the SDK finds XAML files itself; naming them again stops the build" }
+      - { file: Notes/Notes.csproj, absent: "ApplicationDefinition", why: "App.xaml is found the same way" }
+      - { file: Notes.Tests/Notes.Tests.csproj, contains: "<TargetFramework>net10.0-windows</TargetFramework>", why: "tests of a Windows project must target Windows" }
+
+  # Visual Basic Windows Forms with the application framework (My.Application, a start-up form, no Sub Main).
+  - id: winforms-vb-to-10
+    path: till-vb-winforms-net48
+    playbook: dotnet-to-10
+    checks:
+      - { file: Till/Till.vbproj, contains: "<MyType>WindowsForms</MyType>", why: "My.Application and My.Forms are kept for a Windows Forms project" }
+      - { file: Till/Till.vbproj, contains: "<StartupObject>Acme.Till.My.MyApplication</StartupObject>", why: "the application framework still starts the program" }
+      - { file: Till/Till.vbproj, contains: '<Import Include="System.Windows.Forms" />', why: "project-wide Imports are kept" }

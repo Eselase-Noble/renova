@@ -31,13 +31,14 @@ import java.util.Map;
  *   <li>{@code action: replacePackage, packages: ["New:1.0"]} removes the packages the rule found and adds these.</li>
  *   <li>{@code action: removePackage} removes the packages the rule found.</li>
  *   <li>{@code action: setProperty, name: X, value: y} sets an MSBuild property.</li>
+ *   <li>{@code action: targetWindows} ties the project's target framework to Windows ({@code net10.0-windows}).</li>
  * </ul>
  */
 public final class DotnetProjectFixer implements Fixer {
 
     public static final String STRATEGY = "dotnet";
     private static final List<String> ACTIONS = List.of("convertToSdkStyle", "setTargetFramework", "setPackageVersion", "addPackage",
-            "replacePackage", "removePackage", "setProperty");
+            "replacePackage", "removePackage", "setProperty", "targetWindows");
 
     @Override
     public String strategy() {
@@ -109,6 +110,7 @@ public final class DotnetProjectFixer implements Fixer {
                 }
             }
             case "setProperty" -> xml = ProjectXml.setProperty(xml, params.string("name"), params.string("value"));
+            case "targetWindows" -> xml = ProjectXml.targetWindows(xml);
             default -> { }
         }
         if (action.equals("addPackage") || action.equals("replacePackage")) {

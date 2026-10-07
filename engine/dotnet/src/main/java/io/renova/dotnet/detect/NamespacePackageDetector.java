@@ -15,7 +15,7 @@ import java.util.Locale;
 
 /**
  * {@code type: namespaceWithoutPackage, prefixes: [System.Configuration], packages: [System.Configuration.ConfigurationManager],
- * exclude?: [...], sdkStyleOnly?: true} — one finding per project whose own code uses one of the namespaces while
+ * exclude?: [...], exceptKinds?: [winforms, wpf]} (projects of those kinds are skipped) — one finding per project whose own code uses one of the namespaces while
  * the project has none of the packages. .NET Framework had these namespaces built in; modern .NET ships them
  * as NuGet packages, so the code is right and only the project file is missing a line.
  */
@@ -34,10 +34,14 @@ public final class NamespacePackageDetector implements DetectorFactory {
         List<String> prefixes = params.requiredStrings("prefixes");
         List<String> exclude = params.strings("exclude");
         List<String> packages = params.requiredStrings("packages").stream().map(p -> p.toLowerCase(Locale.ROOT)).toList();
+        List<String> exceptKinds = params.strings("exceptKinds");
         return ctx -> {
             List<Finding> findings = new ArrayList<>();
             List<Module> modules = ctx.model().modules();
             for (Module module : modules) {
+                if (exceptKinds.contains(String.valueOf(module.fact("kind")))) {
+                    continue;
+                }
                 if (module.fact("packages") instanceof List<?> used && used.stream()
                         .anyMatch(p -> packages.contains(p.toString().split(":")[0].toLowerCase(Locale.ROOT)))) {
                     continue;

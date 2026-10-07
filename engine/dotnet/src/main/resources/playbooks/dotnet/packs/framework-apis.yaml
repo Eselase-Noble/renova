@@ -46,6 +46,7 @@ rules:
       type: namespaceWithoutPackage
       prefixes: [System.Drawing]
       exclude: [System.Drawing.Primitives]
+      exceptKinds: [winforms, wpf]   # the Windows desktop framework brings it
       packages: [System.Drawing.Common, Microsoft.Windows.Compatibility]
     fix:
       strategy: dotnet

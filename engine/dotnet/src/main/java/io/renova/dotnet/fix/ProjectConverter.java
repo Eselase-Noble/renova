@@ -105,6 +105,13 @@ public final class ProjectConverter {
                         items.add(item("None", include.startsWith("../") ? "Include" : "Update", item.include(), metadata));
                     }
                 }
+                case "Page", "ApplicationDefinition" -> {
+                    // With UseWPF the SDK finds every .xaml file under the project and App.xaml itself;
+                    // naming them again is an error. A file from outside the project is still named.
+                    if (include.startsWith("../") || metadata.containsKey("Link")) {
+                        items.add(item(item.type(), "Include", item.include(), metadata));
+                    }
+                }
                 default -> {
                     if (!DROPPED_ITEMS.contains(item.type())) {
                         items.add(item(item.type(), "Include", item.include(), metadata));

@@ -95,6 +95,19 @@ rules:
         each rewritten page takes over its URL. Class libraries the web project uses are migrated by the other
         rules and can serve both applications meanwhile.
 
+  - id: guard-windows-reference
+    phase: guard
+    title: A project that uses a Windows desktop project must target Windows too
+    category: A
+    severity: BLOCKER
+    detect: { type: referencesWindowsProject }
+    fix:
+      strategy: dotnet
+      params: { action: targetWindows }
+    rationale: >
+      A Windows Forms or WPF project targets netN.0-windows, and NuGet refuses a reference to it from a
+      project that targets plain netN.0 (NU1201). The tests of a desktop application are the usual case.
+
   - id: guard-test-sdk
     phase: guard
     title: A test project needs Microsoft.NET.Test.Sdk

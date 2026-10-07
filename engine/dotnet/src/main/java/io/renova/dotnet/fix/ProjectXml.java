@@ -38,6 +38,22 @@ public final class ProjectXml {
         return m.appendTail(out).toString();
     }
 
+    /** Ties every modern .NET target of the project to Windows ({@code net10.0} becomes {@code net10.0-windows}). */
+    public static String targetWindows(String xml) {
+        Matcher m = FRAMEWORKS.matcher(xml);
+        StringBuilder out = new StringBuilder();
+        while (m.find()) {
+            Set<String> tied = new LinkedHashSet<>();
+            for (String tfm : m.group(2).split(";")) {
+                if (!tfm.isBlank()) {
+                    tied.add(Tfm.kind(tfm) == Tfm.Kind.MODERN && Tfm.platform(tfm).isEmpty() ? tfm.strip() + "-windows" : tfm.strip());
+                }
+            }
+            m.appendReplacement(out, Matcher.quoteReplacement("<" + m.group(1) + ">" + String.join(";", tied) + "</" + m.group(1) + ">"));
+        }
+        return m.appendTail(out).toString();
+    }
+
     /** Sets the version of a package the file references, in either way of writing it. */
     public static String setPackageVersion(String xml, String id, String version) {
         String quoted = Pattern.quote(id);

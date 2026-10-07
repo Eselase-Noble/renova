@@ -164,4 +164,37 @@ class ProjectConverterTest {
                 "test Acme.Billing.Tests.TaxTests.ReadsTheRate failed: System.PlatformNotSupportedException : Thread abort is not supported on this platform."));
         assertThat(run.failures().getFirst().fromFailedTest()).isTrue();
     }
+
+    @Test
+    void aWpfProjectLeavesItsXamlToTheSdkAndStaysOnWindows(@TempDir Path root) throws Exception {
+        write(root, "Notes/Notes.csproj", """
+                <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+                  <PropertyGroup>
+                    <OutputType>WinExe</OutputType>
+                    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+                  </PropertyGroup>
+                  <ItemGroup>
+                    <Reference Include="PresentationFramework" />
+                    <Reference Include="System.Xaml" />
+                  </ItemGroup>
+                  <ItemGroup>
+                    <ApplicationDefinition Include="App.xaml"><Generator>MSBuild:Compile</Generator></ApplicationDefinition>
+                    <Page Include="MainWindow.xaml"><Generator>MSBuild:Compile</Generator><SubType>Designer</SubType></Page>
+                    <Compile Include="MainWindow.xaml.cs"><DependentUpon>MainWindow.xaml</DependentUpon><SubType>Code</SubType></Compile>
+                    <Resource Include="Images\\logo.png" />
+                  </ItemGroup>
+                </Project>
+                """);
+        write(root, "Notes/MainWindow.xaml.cs", "class MainWindow {}\n");
+
+        String xml = ProjectConverter.convert(ProjectFile.read(root.resolve("Notes/Notes.csproj")), Map.of()).xml();
+
+        assertThat(xml).contains("<UseWPF>true</UseWPF>", "<OutputType>WinExe</OutputType>", "<Resource Include=\"Images\\logo.png\" />")
+                .doesNotContain("<Page ", "ApplicationDefinition");
+        assertThat(ProjectXml.setTargetFramework(xml, "10.0")).contains("<TargetFramework>net10.0-windows</TargetFramework>");
+        // A project that refers to it has to follow it to Windows; one already there, or on .NET Standard, is left.
+        assertThat(ProjectXml.targetWindows("<TargetFramework>net10.0</TargetFramework>")).isEqualTo("<TargetFramework>net10.0-windows</TargetFramework>");
+        assertThat(ProjectXml.targetWindows("<TargetFrameworks>net10.0-windows;netstandard2.0</TargetFrameworks>"))
+                .isEqualTo("<TargetFrameworks>net10.0-windows;netstandard2.0</TargetFrameworks>");
+    }
 }

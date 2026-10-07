@@ -154,7 +154,8 @@ public final class DotnetPlugin implements EcosystemPlugin {
     @Override
     public List<DetectorFactory> detectors() {
         return List.of(new TargetFrameworkDetector(), new LegacyProjectDetector(), new ProjectKindDetector(),
-                new NugetPackageDetector(), new NamespaceDetector(), new NamespacePackageDetector(), new AssemblyReferenceDetector());
+                new NugetPackageDetector(), new NamespaceDetector(), new NamespacePackageDetector(), new AssemblyReferenceDetector(),
+                new io.renova.dotnet.detect.WindowsReferenceDetector());
     }
 
     @Override
