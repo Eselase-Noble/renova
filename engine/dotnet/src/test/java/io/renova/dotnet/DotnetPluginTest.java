@@ -125,18 +125,33 @@ class DotnetPluginTest {
     }
 
     @Test
-    void classicAspNetIsFoundAndLeftForAPerson(@TempDir Path root) throws Exception {
-        write(root, "Shop.Web/Shop.Web.csproj", OLD_LIBRARY.replace("<OutputType>Library</OutputType>",
-                "<OutputType>Library</OutputType><ProjectTypeGuids>{349c5851-65df-11da-9384-00065b846f21};{fae04ec0-301f-11d3-bf4b-00c04f79efbc}</ProjectTypeGuids>"));
+    void classicAspNetGoesToAiAsAWholeAndWebFormsToAPerson(@TempDir Path root) throws Exception {
+        String web = OLD_LIBRARY.replace("<OutputType>Library</OutputType>",
+                "<OutputType>Library</OutputType><ProjectTypeGuids>{349c5851-65df-11da-9384-00065b846f21};{fae04ec0-301f-11d3-bf4b-00c04f79efbc}</ProjectTypeGuids>");
+        write(root, "Shop.Web/Shop.Web.csproj", web);
+        write(root, "Shop.Web/Controllers/HomeController.cs", "using System.Web.Mvc;\nclass HomeController {}\n");
+        write(root, "Shop.Web/Views/Home/Index.cshtml", "<h1>Shop</h1>\n");
+        write(root, "Shop.Web/Global.asax.cs", "class MvcApplication {}\n");
+        write(root, "Shop.Web/Web.config", "<configuration />\n");
+        write(root, "Shop.Web/obj/Debug/Temp.cs", "class Temp {}\n");
+        write(root, "Intranet/Intranet.csproj", web);
+        write(root, "Intranet/Default.aspx", "<%@ Page Language=\"C#\" %>\n");
+        write(root, "Shop.Core/Shop.Core.csproj", OLD_LIBRARY);
+        write(root, "Shop.Core/Price.cs", "class Price {}\n");
         PluginRegistry registry = PluginRegistry.load();
         Playbook playbook = registry.defaultPlaybook(root);
 
         List<Finding> findings = new Analyzer(registry).analyze(root, playbook).findings();
 
-        assertThat(new DotnetPlugin().model(root).modules().getFirst().fact("kind")).isEqualTo("aspnet");
-        assertThat(findings).anyMatch(f -> f.ruleId().equals("aspnet-classic"));
-        assertThat(findings).noneMatch(f -> f.ruleId().equals("sdk-style-project"));
-        assertThat(playbook.rules().stream().filter(r -> r.id().equals("aspnet-classic")).findFirst().orElseThrow().fix().strategy())
+        // Everything the change has to touch, from this project only; the library is converted by itself.
+        assertThat(findings).filteredOn(f -> f.ruleId().equals("aspnet-mvc")).extracting(Finding::file).containsExactlyInAnyOrder(
+                "Shop.Web/Shop.Web.csproj", "Shop.Web/Controllers/HomeController.cs", "Shop.Web/Views/Home/Index.cshtml", "Shop.Web/Web.config",
+                "Shop.Web/Global.asax.cs");
+        assertThat(findings).filteredOn(f -> f.ruleId().equals("aspnet-web-forms")).extracting(Finding::file)
+                .containsExactly("Intranet/Intranet.csproj");
+        assertThat(findings).filteredOn(f -> f.ruleId().equals("sdk-style-project")).extracting(Finding::file)
+                .containsExactly("Shop.Core/Shop.Core.csproj");
+        assertThat(playbook.rules().stream().filter(r -> r.id().equals("aspnet-web-forms")).findFirst().orElseThrow().fix().strategy())
                 .isEqualTo("manual");
     }
 

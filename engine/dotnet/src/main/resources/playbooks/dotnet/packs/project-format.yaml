@@ -7,32 +7,93 @@ rules:
     title: Convert the project file to the SDK style
     category: A
     severity: BLOCKER
-    detect: { type: legacyProjectFormat, exceptKinds: [aspnet] }
+    detect: { type: legacyProjectFormat, exceptKinds: [aspnet, webforms] }
     fix:
       strategy: dotnet
-      params: { action: convertToSdkStyle }
+      params:
+        action: convertToSdkStyle
+        # Libraries old projects kept as files beside the code, or took from Visual Studio: NuGet has them.
+        assemblies:
+          - { assembly: nunit.framework, package: "NUnit:3.14.0, NUnit3TestAdapter:5.2.0" }
+          - { assembly: xunit, package: "xunit:2.9.3, xunit.runner.visualstudio:3.1.5" }
+          - { assembly: Newtonsoft.Json, package: "Newtonsoft.Json:13.0.4" }
+          - { assembly: log4net, package: "log4net:3.5.0" }
+          - { assembly: Moq, package: "Moq:4.20.72" }
     rationale: >
       Modern .NET builds only SDK-style projects. The old format lists every source file and framework
       assembly and keeps NuGet packages in packages.config; the SDK style finds sources by pattern, gets the
       framework from the target, and names packages in the project file. Renova writes out whatever the old
       file said that the new format would not assume, so the same files are compiled as before.
 
-  - id: aspnet-classic
-    title: Classic ASP.NET (System.Web) has no modern .NET release
+  - id: aspnet-mvc
+    title: ASP.NET MVC 5 and Web API 2 to ASP.NET Core
     category: C
     severity: BLOCKER
-    detect: { type: projectKind, kinds: [aspnet] }
+    detect:
+      type: projectKind
+      kinds: [aspnet]
+      files: ["**/*.cs", "**/*.vb", "**/*.cshtml", "**/*.vbhtml", "Web.config", "Web.*.config", "Views/Web.config",
+              "Global.asax", "packages.config", "**/*.asax"]
+    fix:
+      strategy: ai
+      hint: >
+        This project is built on System.Web, which modern .NET does not have. Move the whole project to
+        ASP.NET Core on the goal's .NET version, keeping every URL, view and behaviour.
+        Project file: rewrite it as <Project Sdk="Microsoft.NET.Sdk.Web"> with <TargetFramework>netN.0</TargetFramework>
+        (N from the goal), the RootNamespace and AssemblyName it had, its ProjectReference items, and only the
+        NuGet packages the code still uses in versions that support that .NET (Microsoft.AspNet.*, Microsoft.Web.*,
+        Microsoft.CodeDom.*, WebGrease, Antlr, bundling and jQuery packages go: ASP.NET Core is part of the SDK).
+        Do not list source files. Remove packages.config, Global.asax, Global.asax.cs, App_Start files,
+        Properties/AssemblyInfo.cs, Web.config, Web.Debug.config, Web.Release.config and Views/Web.config through
+        "deletes". Start-up: add Program.cs with WebApplication.CreateBuilder, AddControllersWithViews(), static
+        files, routing, and the routes RouteConfig and WebApiConfig registered, in the same order
+        (MapControllerRoute with the same template and defaults); filters from FilterConfig become
+        options.Filters; what Application_Start set up becomes service registrations. End Program.cs with
+        "public partial class Program { }" so tests can start the application. Controllers: System.Web.Mvc.Controller
+        becomes Microsoft.AspNetCore.Mvc.Controller, ActionResult stays, HttpNotFound() is NotFound(),
+        new HttpStatusCodeResult(n) is StatusCode(n), [HttpPost], [ValidateAntiForgeryToken] and model binding
+        stay, Json(x, JsonRequestBehavior.AllowGet) is Json(x), Server.MapPath uses IWebHostEnvironment,
+        HttpContext.Current becomes the controller's HttpContext or an injected IHttpContextAccessor, Session
+        needs AddSession and UseSession, Request.QueryString["x"] is Request.Query["x"], Request.Url is built from
+        Request.Scheme, Host and Path. Web API 2: ApiController becomes ControllerBase with [ApiController] and
+        the same route attributes; IHttpActionResult becomes IActionResult; Ok(), NotFound() and BadRequest() stay.
+        Dependencies a controller created itself or took from a static stay as they are unless a container was
+        configured. Views: keep the .cshtml files and their paths; add Views/_ViewImports.cshtml with
+        @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers and the @using lines Views/Web.config gave every view;
+        @Html.ActionLink, @Html.BeginForm, @Html.EditorFor, @Html.ValidationMessageFor, @Html.Partial and
+        @Html.AntiForgeryToken work unchanged; @Scripts.Render and @Styles.Render become plain script and link
+        tags for the files the bundle listed; @helper blocks become partial views or local functions;
+        HttpContext.Current in a view becomes Context. Static files (Content, Scripts, images, fonts) are served
+        from wwwroot: they cannot be moved here, so serve the existing folders with app.UseStaticFiles and a
+        PhysicalFileProvider for each at its old request path. Configuration: appSettings and connectionStrings
+        from Web.config become appsettings.json ("AppSettings" section and "ConnectionStrings"), read through
+        IConfiguration; code that calls ConfigurationManager.AppSettings directly may keep doing so only if the
+        values are also given in an App.config, so prefer IConfiguration. Authentication and authorization
+        settings, HTTP modules and handlers from Web.config have no file to go to: say in the rationale which
+        ones there were and that they need a person.
+      # The project is replaced as one change: its code, views and configuration together, with the files
+      # ASP.NET Core needs added and the ones only System.Web read removed.
+      params:
+        together: true
+        create: ["**/*.cs", "**/*.cshtml", "**/appsettings*.json", "**/Properties/launchSettings.json"]
+    rationale: >
+      MVC 5 and Web API 2 map closely onto ASP.NET Core MVC: controllers, actions, model binding, Razor views
+      and routing are the same ideas under new namespaces. What has no counterpart is the hosting: Global.asax,
+      Web.config, bundles and the System.Web pipeline.
+
+  - id: aspnet-web-forms
+    title: ASP.NET Web Forms has no modern .NET release
+    category: C
+    severity: BLOCKER
+    detect: { type: projectKind, kinds: [webforms] }
     fix:
       strategy: manual
       hint: >
-        Web Forms, MVC 5, Web API 2 and WCF services hosted in IIS are built on System.Web, which modern .NET
-        does not have. The project is left as it is. Move it to ASP.NET Core: controllers and Razor views of
-        MVC 5 map closely (System.Web.Mvc.Controller becomes Microsoft.AspNetCore.Mvc.Controller, Global.asax
-        and App_Start become Program.cs, web.config settings become appsettings.json, HttpContext.Current
-        becomes an injected IHttpContextAccessor, bundles become static files); Web API 2 controllers become
-        ControllerBase with [ApiController]; Web Forms pages have no counterpart and are rewritten as Razor
-        Pages or Blazor components; WCF services move to CoreWCF or gRPC. Class libraries the web project uses
-        are migrated by the other rules and can be shared by the old and the new web project meanwhile.
+        Web Forms pages (.aspx, .ascx, .master) with code behind, view state and server controls have no
+        counterpart in ASP.NET Core, and the project is left as it is. Pages are rewritten as Razor Pages or
+        Blazor components, one at a time: keep the old application running and put a proxy (YARP) in front, so
+        each rewritten page takes over its URL. Class libraries the web project uses are migrated by the other
+        rules and can serve both applications meanwhile.
 
   - id: guard-test-sdk
     phase: guard
@@ -117,6 +178,24 @@ rules:
       3.14 is the last NUnit 3 and runs on every modern .NET. Tests written for NUnit 2 use names NUnit 3
       removed (TestFixtureSetUp is OneTimeSetUp, ExpectedException is Assert.Throws): they stop compiling, and
       a person or the AI repair has to rename them.
+
+  - id: nunit-2-tests
+    title: Tests written for NUnit 2
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.cs", "**/*.vb"]
+      pattern: "ExpectedException\\s*\\(|\\bTestFixtureSetUp\\b|\\bTestFixtureTearDown\\b|Assert\\.Is(Not)?NullOrEmpty|\\[Ignore(\\(\\s*\\))?\\]"
+      requires: "NUnit\\.Framework"
+    fix:
+      strategy: dotnet-source
+      params: { action: nunit3 }
+    rationale: >
+      NUnit 2 does not run on modern .NET, and NUnit 3 removed some of what it had. [ExpectedException(typeof(X))]
+      becomes Assert.Throws<X> around the test's body, which checks the same thing: that exception, of exactly
+      that type. TestFixtureSetUp and TestFixtureTearDown were renamed. An ExpectedException that also matches
+      a message is left as it is and stops the build, so that a person decides how to check the message.
 
   - id: nunit-adapter
     title: The NUnit test adapter must know modern .NET

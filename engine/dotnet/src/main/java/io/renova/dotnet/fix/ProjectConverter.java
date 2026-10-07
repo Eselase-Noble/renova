@@ -125,13 +125,16 @@ public final class ProjectConverter {
         List<String> references = new ArrayList<>();
         for (ProjectFile.Reference reference : project.references()) {
             String hint = reference.hintPath() == null ? null : reference.hintPath().replace('\\', '/');
-            if (hint != null && !hint.contains("packages/")) {
+            String known = assemblyPackages.get(reference.name().toLowerCase(Locale.ROOT));
+            if (hint != null && !hint.contains("packages/") && known == null) {
                 references.add("    <Reference Include=\"" + escape(reference.name()) + "\">\n      <HintPath>"
                         + escape(reference.hintPath()) + "</HintPath>\n    </Reference>");
                 notes.add(reference.name() + " is a file in the project (" + hint + "): it must be an assembly modern .NET can load");
                 continue;
             }
-            String replacement = hint == null ? assemblyPackages.get(reference.name().toLowerCase(Locale.ROOT)) : null;
+            // A framework assembly that is a package now, or a library kept as a file in the project that
+            // NuGet has: the package takes its place.
+            String replacement = hint == null || !hint.contains("packages/") ? known : null;
             if (replacement != null) {
                 for (String one : replacement.split("\\s*,\\s*")) {
                     String[] idVersion = one.split(":", 2);

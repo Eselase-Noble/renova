@@ -1,0 +1,31 @@
+# Renova .NET suite, the paths that need AI: an application on classic ASP.NET (System.Web), which no rule can
+# carry across and which is replaced as one change, then built and its solution's tests run.
+#
+# Run: cli/bin/renova benchmark --suite benchmark/dotnet-ai.yaml --out <empty dir> --ai anthropic
+#
+# Uses the AI provider on your own key: about 25,000 tokens with Claude Opus.
+
+id: dotnet-ai
+appsDir: ../../renova-test-apps
+
+configurations:
+  - id: ai-rag
+    ai: true
+    rag: true
+    behaviour: false
+
+apps:
+  # ASP.NET MVC 5 with a Web API 2 controller, Razor views, a style bundle, Global.asax and Web.config, beside
+  # a class library and its NUnit tests in the old project format.
+  - id: aspnet-mvc5-to-aspnetcore
+    path: shop-mvc5
+    playbook: dotnet-to-10
+    checks:
+      - { file: Shop.Web/Shop.Web.csproj, contains: 'Sdk="Microsoft.NET.Sdk.Web"', why: "an ASP.NET Core project" }
+      - { file: Shop.Web/Shop.Web.csproj, contains: "<TargetFramework>net10.0</TargetFramework>", why: "on the target" }
+      - { file: "Shop.Web/**/*.cs", absent: "System.Web", why: "modern .NET has no System.Web" }
+      - { file: Shop.Web/Program.cs, contains: "category/{category}", why: "the application's own route is kept, so its links still work" }
+      - { file: Shop.Web/appsettings.json, contains: "Acme Market", why: "the settings Web.config held are still given to the application" }
+      - { file: Shop.Web/Controllers/ProductsController.cs, contains: "ValidateAntiForgeryToken", why: "the form is still protected" }
+      - { file: Shop.Web/Views/Products/Index.cshtml, contains: "Html.ActionLink", why: "views are kept, not rewritten" }
+      - { file: Shop.Core/Shop.Core.csproj, contains: '<Project Sdk="Microsoft.NET.Sdk">', why: "the library it uses is converted without AI" }

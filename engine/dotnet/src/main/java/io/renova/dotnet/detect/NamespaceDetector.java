@@ -14,7 +14,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * {@code type: namespace, prefixes: [System.Web], exclude?: [System.Web.Http], include?: [globs]} — one
+ * {@code type: namespace, prefixes: [System.Web], exclude?: [System.Web.Http], include?: [globs],
+ * exceptKinds?: [aspnet]} (files of projects of those kinds are skipped) — one
  * finding per line of C# or Visual Basic that brings one of the namespaces in: {@code using X;},
  * {@code using static X.Y;}, {@code using A = X.Y;}, {@code global using X;}, Visual Basic's
  * {@code Imports X}, and Razor's {@code @using X}. A prefix matches the namespace and everything under it.
@@ -35,9 +36,14 @@ public final class NamespaceDetector implements DetectorFactory {
         List<String> prefixes = params.requiredStrings("prefixes");
         List<String> exclude = params.strings("exclude");
         List<String> include = params.strings("include").isEmpty() ? Sources.CODE : params.strings("include");
+        List<String> exceptKinds = params.strings("exceptKinds");
         return ctx -> {
             List<Finding> findings = new ArrayList<>();
             for (Path file : Sources.files(ctx, include)) {
+                if (!exceptKinds.isEmpty() && !ctx.model().modules().isEmpty() && exceptKinds.contains(String.valueOf(
+                        NamespacePackageDetector.owner(ctx.model().modules(), file).fact("kind")))) {
+                    continue;
+                }
                 List<String> lines = ctx.lines(file);
                 for (int i = 0; i < lines.size(); i++) {
                     String used = namespace(lines.get(i));

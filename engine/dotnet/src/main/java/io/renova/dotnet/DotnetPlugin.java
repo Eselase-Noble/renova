@@ -86,7 +86,11 @@ public final class DotnetPlugin implements EcosystemPlugin {
             facts.put("buildTool", "dotnet");
             facts.put("language", project.visualBasic() ? "Visual Basic" : "C#");
             facts.put("sdkStyle", project.sdkStyle());
-            facts.put("kind", project.kind());
+            String kind = project.kind();
+            if (kind.equals("aspnet") && hasWebForms(file.getParent())) {
+                kind = "webforms"; // pages with code behind: nothing in ASP.NET Core takes them as they are
+            }
+            facts.put("kind", kind);
             facts.put("test", project.test());
             facts.put("targetFrameworks", project.targetFrameworks());
             facts.put("packages", project.packages().stream().map(ProjectFile.Package::coordinates).toList());
@@ -97,7 +101,7 @@ public final class DotnetPlugin implements EcosystemPlugin {
                     base.relativize(file).toString().replace('\\', '/'), facts));
             languages.add(facts.get("language").toString());
             frameworks.addAll(project.targetFrameworks());
-            kinds.add(project.kind());
+            kinds.add(kind);
         }
         Map<String, Object> facts = new LinkedHashMap<>();
         facts.put("buildTools", List.of("dotnet"));
@@ -155,7 +159,7 @@ public final class DotnetPlugin implements EcosystemPlugin {
 
     @Override
     public List<Fixer> fixers() {
-        return List.of(new DotnetProjectFixer());
+        return List.of(new DotnetProjectFixer(), new io.renova.dotnet.fix.DotnetSourceFixer());
     }
 
     @Override
@@ -198,6 +202,16 @@ public final class DotnetPlugin implements EcosystemPlugin {
     @Override
     public List<String> bundledPlaybooks() {
         return List.of("playbooks/dotnet/dotnet-to-10.yaml", "playbooks/dotnet/dotnet-to-8.yaml");
+    }
+
+    private static boolean hasWebForms(Path projectDir) throws IOException {
+        try (Stream<Path> files = Files.walk(projectDir, 6)) {
+            return files.anyMatch(f -> {
+                String name = f.getFileName().toString().toLowerCase(Locale.ROOT);
+                return (name.endsWith(".aspx") || name.endsWith(".ascx") || name.endsWith(".master"))
+                        && !Sources.produced(projectDir.relativize(f));
+            });
+        }
     }
 
     static List<Path> projectFiles(Path root) throws IOException {

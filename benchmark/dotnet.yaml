@@ -50,3 +50,17 @@ apps:
     checks:
       - { file: src/Orders.Api/Orders.Api.csproj, contains: "<TargetFramework>net8.0</TargetFramework>", why: "on the chosen target, not the newest" }
       - { file: src/Orders.Api/Orders.Api.csproj, contains: 'Microsoft.EntityFrameworkCore.InMemory" Version="8.0.*"', why: "the Entity Framework Core built for .NET 8" }
+
+  # A project nobody wrote for Renova: Stateless as it was in February 2016 (benchmark/fetch-public.sh fetches
+  # it). A portable class library, three console examples, and 73 tests on NUnit 2.4 referenced as a file,
+  # five of them with [ExpectedException].
+  - id: stateless-2016-to-10
+    path: public/stateless-2016
+    playbook: dotnet-to-10
+    checks:
+      - { file: Stateless/Stateless.csproj, contains: "<TargetFramework>net10.0</TargetFramework>", why: "the portable library is on the target" }
+      - { file: Stateless/Stateless.csproj, contains: "<AssemblyOriginatorKeyFile>Stateless.snk</AssemblyOriginatorKeyFile>", why: "the assembly is still signed with the project's key" }
+      - { file: Stateless.Tests/Stateless.Tests.csproj, contains: 'PackageReference Include="NUnit" Version="3.14.0"', why: "NUnit from NuGet in place of the file" }
+      - { file: Stateless.Tests/Stateless.Tests.csproj, absent: "HintPath", why: "the NUnit 2 file is no longer referenced" }
+      - { file: "Stateless.Tests/*.cs", absent: "ExpectedException", why: "NUnit 3 has no such attribute" }
+      - { file: Stateless.Tests/StateMachineFixture.cs, contains: "Assert.Throws<", why: "the tests still check for the exception" }

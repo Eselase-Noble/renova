@@ -40,3 +40,17 @@ if [ ! -d "$apps/public/petclinic-microservices-boot26" ]; then
 else
   echo "Already there: $apps/public/petclinic-microservices-boot26"
 fi
+
+# Stateless (Apache-2.0), the .NET state-machine library, at a commit of February 2016: a portable class library
+# and its tests on NUnit 2.4 kept as a file, all in the project format before the .NET SDK. The folder of
+# documentation tools (Resource, binaries) is left out.
+if [ ! -d "$apps/public/stateless-2016" ]; then
+  clone="$(mktemp -d)"
+  git clone -q https://github.com/dotnet-state-machine/stateless.git "$clone"
+  mkdir -p "$apps/public/stateless-2016"
+  git -C "$clone" archive bf4b5428637515b90bc4224227832988649bae95 | tar -x -C "$apps/public/stateless-2016"
+  rm -rf "$clone" "$apps/public/stateless-2016/Resource"
+  echo "Fetched $apps/public/stateless-2016"
+else
+  echo "Already there: $apps/public/stateless-2016"
+fi
