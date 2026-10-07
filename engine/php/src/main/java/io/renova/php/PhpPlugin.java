@@ -188,6 +188,12 @@ public final class PhpPlugin implements EcosystemPlugin {
         return owner == null ? List.of() : List.of(new RelatedFile(owner.buildFile(), true, "the project's composer.json"));
     }
 
+    /** The project's own classes the file uses, for an AI request to read beside it. */
+    @Override
+    public List<RelatedFile> referencedFiles(ProjectModel model, Path root, String file) {
+        return PhpReferences.of(root, file);
+    }
+
     /** A file under tests/ (or test/, Tests/), or one named for a test, as PHPUnit and Pest find them. */
     @Override
     public boolean isTestFile(String file) {

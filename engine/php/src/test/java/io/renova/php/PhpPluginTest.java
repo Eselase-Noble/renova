@@ -108,4 +108,36 @@ class PhpPluginTest {
         assertThat(plugin.isTestFile("app/Models/Order.php")).isFalse();
         assertThat(plugin.isTestFile("src/Contest/Entry.php")).isFalse();
     }
+
+    @Test
+    void findsTheProjectsOwnClassesAFileUses(@TempDir Path root) throws Exception {
+        write(root, "composer.json", "{ \"require\": { \"php\": \"^7.2\" } }");
+        write(root, "src/Quote.php", """
+                <?php
+                namespace Acme\\Quotes;
+
+                use Acme\\Shared\\Clock as Time;
+                use Psr\\Log\\LoggerInterface;
+
+                class Quote extends Document implements Priced
+                {
+                    public function summary(LoggerInterface $log)
+                    {
+                        return Money::plain($this->total()) . Time::now() . new Rate(1);
+                    }
+                }
+                """);
+        write(root, "src/Money.php", "<?php\nnamespace Acme\\Quotes;\nclass Money {}\n");
+        write(root, "src/Document.php", "<?php\nnamespace Acme\\Quotes;\nabstract class Document {}\n");
+        write(root, "src/Priced.php", "<?php\nnamespace Acme\\Quotes;\ninterface Priced {}\n");
+        write(root, "src/Rate.php", "<?php\nnamespace Acme\\Quotes;\nfinal class Rate {}\n");
+        write(root, "lib/Clock.php", "<?php\nnamespace Acme\\Shared;\nclass Clock {}\n");
+        write(root, "src/Unused.php", "<?php\nnamespace Acme\\Quotes;\nclass Unused {}\n");
+        write(root, "vendor/psr/log/LoggerInterface.php", "<?php\nnamespace Psr\\Log;\ninterface LoggerInterface {}\n");
+        PhpPlugin plugin = new PhpPlugin();
+
+        assertThat(plugin.referencedFiles(plugin.model(root), root, "src/Quote.php")).extracting(io.renova.core.spi.RelatedFile::path)
+                .containsExactlyInAnyOrder("lib/Clock.php", "src/Document.php", "src/Priced.php", "src/Money.php", "src/Rate.php");
+        assertThat(plugin.referencedFiles(plugin.model(root), root, "src/Quote.php")).allMatch(r -> !r.editable());
+    }
 }

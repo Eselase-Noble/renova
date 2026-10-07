@@ -77,7 +77,7 @@ Said plainly, because a buyer will ask:
   applications could not be run here, so .NET results are checked by build and tests, not against the original.
 - Java: EJB 2, JAX-RPC, Faces managed beans and iBATIS are planned with the mapping written out and have not
   been run. Nothing larger than seven modules has been tried.
-- PHP: Symfony upgrades, projects without Composer, and the paths that need AI are not done. The Laravel
+- PHP: Symfony upgrades and projects without Composer are not done; one AI repair has been run, on a small library. The Laravel
   results are Laravel's own skeleton with one feature added, not a business application.
 - Licences are issued by hand as signed files; there is no shop or portal, and seats are stated, not counted.
 - The installers are not code-signed yet, so Windows and macOS warn when they are opened. Single sign-on is

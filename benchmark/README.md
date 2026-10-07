@@ -36,6 +36,7 @@ A run *passes* when the build passes and every check holds. Results go to `resul
 | [`suite.yaml`](suite.yaml) (default) | How well does Renova do on applications whose last changes need judgement? | With and without |
 | [`targets.yaml`](targets.yaml) | Does every target Renova offers work end to end? One app per path, including the public Spring PetClinic sample | Without |
 | [`php.yaml`](php.yaml) | Do the PHP targets work end to end? A PHP 7.4 library, the public FastRoute 1.3, and Laravel 8 and 10 applications, to PHP 8.4 and Laravel 12 and 13 | Without |
+| [`php-ai.yaml`](php-ai.yaml) | Can AI repair code that PHP 8 runs differently from PHP 7, with the project's tests as the judge? | With (about 5,000 tokens) |
 | [`dotnet.yaml`](dotnet.yaml) | Do the .NET targets work end to end? C# and Visual Basic on .NET Framework, and ASP.NET Core 3.1, to .NET 10 and 8 | Without |
 | [`dotnet-windows.yaml`](dotnet-windows.yaml) | Do Windows Forms (C#, Visual Basic) and WPF applications migrate? Builds anywhere; their tests run on Windows ([test plan](../docs/windows-test-plan.md)) | Without |
 | [`dotnet-ai.yaml`](dotnet-ai.yaml) | Can AI move an ASP.NET MVC 5 and Web API 2 application to ASP.NET Core as one change? | With (about 25,000 tokens) |

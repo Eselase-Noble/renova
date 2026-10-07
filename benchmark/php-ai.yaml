@@ -1,0 +1,30 @@
+# Renova PHP suite, what needs judgement: code that compiles on PHP 8 as it did on PHP 7 and behaves
+# differently, which no rewrite rule can decide. The project's tests show it; the AI repair loop fixes the code
+# they exercise, with the project's other classes in front of it.
+#
+# Run: cli/bin/renova benchmark --suite benchmark/php-ai.yaml --out <empty dir> --ai anthropic
+#
+# Uses the AI provider on your own key: about 5,000 tokens with Claude Opus.
+
+id: php-ai
+appsDir: ../../renova-test-apps
+
+configurations:
+  - id: deterministic           # fails by design: shows what the rules leave
+    behaviour: false
+  - id: ai-rag
+    ai: true
+    rag: true
+    behaviour: false
+
+apps:
+  # Order sheets filled in by hand: arithmetic on "", "n/a" and "12 bags", which PHP 7 read as 0, 0 and 12 and
+  # PHP 8 refuses with a TypeError; and a method called statically that is not static.
+  - id: php8-arithmetic-on-text
+    path: quotes-php74
+    playbook: php-to-8.4
+    checks:
+      - { file: composer.json, contains: '"php": "^8.4"', why: "on the target" }
+      - { file: tests/QuoteTest.php, contains: "$this->assertEquals(1215.0, $this->sheet()->subtotal());", why: "the test is the one the project had" }
+      - { file: tests/QuoteTest.php, contains: "array('Sand', '12 bags', '30')", why: "with the data it had" }
+      - { file: "src/*.php", absent: "@$row", why: "errors are not silenced" }

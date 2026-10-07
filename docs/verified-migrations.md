@@ -110,7 +110,7 @@ Run on 7 October 2026, no AI, verified on PHP 8.4.23 with Composer 2.9:
 Each original was first run as it was, on the PHP it was written for, in Docker (PHP 7.4, 7.1, 8.2 and 8.0):
 all tests passed there, one of FastRoute's 204 skipped. The two Laravel applications are Laravel's real
 skeletons with one small feature added; no application anyone runs a business on has been tried. Not run:
-any PHP path with AI, Symfony, a project without tests.
+Symfony, a project without tests, and the `mysql_*` rule, which goes to AI and has no application to run it on.
 
 **Side by side.** With `--verify-behaviour`, the Laravel 8 application on PHP 8.0 and its Laravel 13 migration
 on PHP 8.4 were started in containers, each with its own SQLite database, and sent nine requests: the routes
@@ -130,6 +130,7 @@ varies between runs; these are single runs, not averages. Repeat them with
 | Couriers (Jersey 1 resource and client, Commons HttpClient 3 client, 9 tests, two of the classes tested against a local HTTP server) | Jersey 1.19, HttpClient 3.1, Java 8 | Jersey 3.1, the JAX-RS client API, HttpClient 5, Jakarta EE 10, Java 21 | Pass | Same: 6 of 6 requests (Tomcat 9 beside Tomcat 10.1) | 18,536 / 10,551 |
 | Tickets (Struts 1 actions, form bean with validation, `struts-config.xml`, three pages with Struts tags) | Struts 1.3, Java 8 | Spring MVC 6.2 controllers on the same `*.do` addresses, Jakarta EE 10, Java 21 | Pass | 6 of 9 requests the same; 3 differ in the form's markup only (`name=` became `id=`, error text inside a `<span>`), with the same statuses and messages | 6,885 / 11,221 |
 | Spring PetClinic Microservices (seven modules, see below) | Spring Boot 2.6, Spring Cloud 2021 | Spring Boot 3.5, Spring Cloud 2025, Java 21 | Pass, in four repair rounds | Not run: several applications | 29,714 / 22,184 |
+| Quotes (PHP: a library that multiplies cells of a hand-filled sheet, `""`, `"n/a"`, `"12 bags"`, and calls an instance method statically; all of it runs on PHP 7.4) | PHP 7.2 to 7.4, PHPUnit 8.5 | PHP 8.4, PHPUnit 9.6 | Pass, in one repair round (6 tests). Without AI: 5 of 6 tests fail with `TypeError: Unsupported operand types: string * string` | Not run: a library | 2,588 / 2,248 |
 | Shop (.NET: ASP.NET MVC 5 with a Web API 2 controller, three Razor views and a layout, a style bundle, `Global.asax`, `Web.config`; beside a class library with NUnit tests) | ASP.NET MVC 5.2 on .NET Framework 4.8 | ASP.NET Core on .NET 10 | Pass, in one repair round (3 tests, of the library) | Not compared: the original needs IIS on Windows. The migrated application was started and called: 11 addresses answer as the code says (pages, the `category/{category}` route, 404 and 400, JSON from the API, the stylesheet), the form saves, rejects invalid input with the same messages, and refuses a post without its anti-forgery token | 13,656 / 11,764 |
 
 What these runs changed in Renova:
@@ -148,6 +149,10 @@ What these runs changed in Renova:
 - **A whole-layer request can remove files.** ASP.NET Core has no `Global.asax`, `Web.config` or `App_Start`;
   left in place they stop the build. A request that replaces a layer may now list the files it was given that
   the result no longer has. Nothing else can be removed, and never a test.
+- **PHP requests carry the project's classes a file uses.** Asked to fix a call to `Money::plain()` without
+  seeing `Money`, the model stopped, rightly, rather than guess its constructor. The PHP plugin now finds the
+  project's own classes a file imports, extends, creates or calls, as the Java plugin does, and sends them as
+  reference; with them one round fixed both problems.
 - **`web.xml` follows Jersey.** A text rule renames the Jersey 1 servlet there; the build passed without it and
   the application would not have deployed.
 - **Struts 1 projects are no longer offered the Struts 2 → 7 add-on.**

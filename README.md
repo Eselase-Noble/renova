@@ -461,8 +461,11 @@ What these do today, with no AI ([results](docs/verified-migrations.md#php)):
 
 Rector's rule sets also move code to newer idioms (constructor promotion, arrow functions, and in Laravel 13
 attributes in place of `$fillable`): more is changed than the target strictly needs, and the tests are what
-shows that nothing else did. Not yet done: projects without Composer, the `mysql_*` functions and closure
-factories (planned for AI, not run), Symfony and other frameworks' own upgrades.
+shows that nothing else did. Closure factories from Laravel 7 and older become factory classes without AI.
+What PHP 8 runs differently from PHP 7 (arithmetic on text, loose comparisons) no rule can decide: the tests
+show it and the AI repair loop fixes it ([one run](docs/verified-migrations.md#with-ai)). Not yet done:
+projects without Composer, the `mysql_*` functions (planned for AI, not run), Symfony and other frameworks'
+own upgrades.
 
 `--with phpunit11` (or `php-to-8.4+phpunit11`) goes on from PHPUnit 9 to 11: attributes in place of
 annotations, and a `phpunit.xml` in the form PHPUnit 10 and later read. `--verify-behaviour` runs the original
