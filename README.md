@@ -344,9 +344,11 @@ Then the project is migrated like any other. The original is never changed.
 Axis 1, Jersey 1, Faces managed beans, RichFaces, Seam 2, iBATIS 2, Hibernate's legacy Criteria, Commons
 HttpClient 3, Quartz 1, CORBA, applets, and code tied to one server's own classes) have no recipe that carries
 code across. Renova finds them, plans them, and gives AI, or a person where a build cannot check the result,
-the mapping to their successor. Two of these paths have been run end to end with AI and compared with the
-original over HTTP: Jersey 1 with Commons HttpClient 3, and Struts 1 to Spring MVC, where the actions, the form
-bean, the pages and `web.xml` change in one request
+the mapping to their successor. Four of these paths have been run end to end with AI. Two were compared with
+the original over HTTP: Jersey 1 with Commons HttpClient 3, and Struts 1 to Spring MVC, where the actions, the
+form bean, the pages and `web.xml` change in one request. Two are checked by the project's own tests: iBATIS 2
+to MyBatis 3 (the DAOs, the SQL maps, the configuration and the pom in one request) and Hibernate's legacy
+Criteria to the JPA Criteria API
 ([results](docs/verified-migrations.md#with-ai)).
 
 The Jakarta targets also move Hibernate (to 6.6 with Jakarta EE 10, to 7.1 with Jakarta EE 11) and the

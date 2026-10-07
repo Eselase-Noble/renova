@@ -241,12 +241,28 @@ rules:
     fix:
       strategy: ai
       hint: >
-        iBATIS 2 ended in 2010. SqlMapClient becomes SqlSession (queryForObject is selectOne, queryForList is
-        selectList, the statement id is namespace.id); SqlMapClientTemplate/SqlMapClientDaoSupport from Spring
-        become SqlSessionTemplate from mybatis-spring. In the map files: sqlMap becomes mapper with a namespace,
-        #name# becomes #{name} and $name$ becomes ${name}, parameterClass/resultClass become
-        parameterType/resultType, <isNotNull>/<isEqual> dynamic tags become <if test="...">, and the DTD is
-        mybatis-3-mapper.dtd. Keep the SQL itself unchanged.
+        iBATIS 2 ended in 2010. SqlMapClient becomes a SqlSessionFactory built by SqlSessionFactoryBuilder from
+        the configuration file, and each call a SqlSession (queryForObject is selectOne, queryForList is
+        selectList, the statement id is namespace.id). A call outside a transaction commits by itself:
+        openSession(true); startTransaction/commitTransaction/endTransaction become one openSession() that is
+        committed at the end and closed in a finally or try-with-resources, which rolls back what was not
+        committed. MyBatis throws the unchecked PersistenceException where iBATIS threw SQLException: where a
+        method declares SQLException, catch PersistenceException and rethrow its cause when that is a
+        SQLException, so callers and tests see what they saw. SqlMapClientTemplate/SqlMapClientDaoSupport from
+        Spring become SqlSessionTemplate from mybatis-spring. The configuration file becomes a MyBatis
+        configuration (mybatis-3-config.dtd: environments with a JDBC transactionManager and a POOLED
+        dataSource with driver, url, username and password; mappers). In the map files: sqlMap becomes mapper
+        with a namespace, #name# becomes #{name} and $name$ becomes ${name}, #value# on a simple parameter
+        stays one placeholder, parameterClass/resultClass become parameterType/resultType, resultMap's class
+        becomes type, <dynamic prepend="where"> becomes <where>, <isNotNull>/<isNotEmpty>/<isEqual>/
+        <isGreaterThan> become <if test="..."> with the prepend word written inside, <iterate> becomes
+        <foreach>, and the DTD is mybatis-3-mapper.dtd. Keep the SQL itself unchanged. In the pom, replace
+        org.apache.ibatis:ibatis-sqlmap with org.mybatis:mybatis 3.5.x.
+      # The DAOs change with the maps and the configuration they read, and with the artifact in the build.
+      params:
+        together: true
+        with: ["**/*.xml"]
+        withContaining: "<sqlMap\\b|<sqlMapConfig\\b|<artifactId>ibatis-sqlmap</artifactId>"
 
   - id: commons-httpclient-3
     title: Commons HttpClient 3 (org.apache.commons.httpclient)

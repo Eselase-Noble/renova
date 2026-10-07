@@ -4,7 +4,7 @@
 #
 # Run: cli/bin/renova benchmark --suite benchmark/legacy.yaml --out <empty dir> --ai anthropic
 #
-# Every run uses the AI provider on your own key: about 25,000 tokens per application with Claude Opus.
+# Every run uses the AI provider on your own key: between 7,000 and 30,000 tokens per application with Claude Opus.
 
 id: java-legacy-frameworks
 appsDir: ../../renova-test-apps
@@ -38,3 +38,22 @@ apps:
           why: "something has to answer *.do" }
       - { file: src/main/webapp/WEB-INF/web.xml, contains: "*.do", why: "old links and bookmarks keep working" }
       - { file: pom.xml, absent: "<groupId>org.apache.struts</groupId>", why: "the old artifacts are gone from the build" }
+
+  # Hibernate 5 reports written with the legacy Criteria API (Restrictions, Projections, Order, MatchMode).
+  - id: hibernate-legacy-criteria
+    path: reports-hibernate-criteria
+    playbook: java8-to-21-jakarta-ee10
+    checks:
+      - { file: "**/*.java", absent: "org.hibernate.criterion", why: "removed in Hibernate 6" }
+      - { file: "**/*.java", absent: "createCriteria(", why: "Session.createCriteria went with it" }
+
+  # iBATIS 2: a DAO, its SQL map with dynamic tags, the configuration file and the artifact, as one change.
+  - id: ibatis-2-to-mybatis-3
+    path: catalog-ibatis2
+    playbook: java8-to-21-jakarta-ee10
+    checks:
+      - { file: "**/*.java", absent: "com.ibatis", why: "iBATIS 2 ended in 2010" }
+      - { file: "**/*.xml", absent: "<sqlMap", why: "a map MyBatis cannot read would fail only when first used" }
+      - { file: "**/*.xml", absent: "<isNotNull", why: "the dynamic tags have no MyBatis reader" }
+      - { file: pom.xml, contains: "<artifactId>mybatis</artifactId>", why: "the successor is in the build" }
+      - { file: pom.xml, absent: "ibatis-sqlmap", why: "the old artifact is gone from the build" }

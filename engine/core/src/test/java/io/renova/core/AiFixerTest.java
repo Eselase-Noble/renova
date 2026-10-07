@@ -279,4 +279,24 @@ class AiFixerTest {
         assertThat(Files.readString(root.resolve("src/Config.java"))).isEqualTo("wiring\n");
         assertThat(root.resolve("notes/README.txt")).doesNotExist();
     }
+
+    @Test
+    void aWholeLayerRuleCanChooseItsOtherFilesByWhatTheyHold(@TempDir Path tmp) throws Exception {
+        ScriptedAi ai = new ScriptedAi(request -> Map.of("src/A.java", "new dao\n"));
+        MigrationContext ctx = context(tmp, ai);
+        Path root = ctx.workspace().root();
+        Files.createDirectories(root.resolve("maps"));
+        Files.writeString(root.resolve("maps/Product.xml"), "<sqlMap namespace=\"Product\"/>\n");
+        Files.writeString(root.resolve("maps/logging.xml"), "<configuration/>\n");
+        io.renova.core.playbook.FixSpec fix = new io.renova.core.playbook.FixSpec("ai", null, "replace the mapper", null, null, null,
+                false, Map.of("together", true, "with", List.of("maps/*.xml"), "withContaining", "<sqlMap\\b"));
+        io.renova.core.playbook.Rule rule = new io.renova.core.playbook.Rule("old-mapper", "Old mapper",
+                io.renova.core.model.Category.API, io.renova.core.model.Severity.BLOCKER, Map.of("type", "fileExists"), fix, null, null);
+        io.renova.core.engine.PlanStep step = new io.renova.core.engine.PlanStep(1, rule, 1, List.of("src/A.java"), List.of());
+
+        new AiFixer().apply(ctx, List.of(step));
+
+        assertThat(ai.requests.getFirst().files()).extracting(RequestFile::path)
+                .contains("maps/Product.xml").doesNotContain("maps/logging.xml");
+    }
 }

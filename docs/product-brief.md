@@ -41,6 +41,7 @@ nobody can say how big it is or whether the result still works.
 | Java EE on an application server | Spring Boot | No AI for the standard APIs |
 | Ant projects | A Maven build, then any of the above | No AI |
 | Struts 1, Jersey 1, Commons HttpClient 3 | Spring MVC, Jersey 3, HttpClient 5 | With AI |
+| iBATIS 2, Hibernate's legacy Criteria | MyBatis 3, the JPA Criteria API on Hibernate 6 | With AI |
 | .NET Framework, .NET Core, .NET 5 to 9 (C# and Visual Basic) | .NET 10 or 8 | No AI |
 | ASP.NET MVC 5 and Web API 2 | ASP.NET Core | With AI |
 | PHP 5.4 to 8.2 (Composer projects, and sites without Composer) | PHP 8.3, 8.4 or 8.5 | No AI |
@@ -61,6 +62,7 @@ was checked and what was not, is in [verified-migrations.md](verified-migrations
 | Stateless (public .NET library, 2016), .NET Framework and NUnit 2 → .NET 10 | Builds, 73 tests pass, no AI |
 | A Struts 1 application → Spring MVC | Builds; same answers as the original on 6 of 9 requests, the other 3 differ in form markup only |
 | A Jersey 1 application → Jersey 3 | Builds, 9 tests pass, same answers as the original on 6 of 6 requests |
+| An iBATIS 2 data layer → MyBatis 3; Hibernate legacy Criteria queries → Hibernate 6 | Each builds and passes its 4 unchanged tests |
 | An ASP.NET MVC 5 application → ASP.NET Core on .NET 10 | Builds and runs; pages, routes, API, validation and anti-forgery checked by hand |
 | FastRoute 1.3 (public PHP library, written for PHP 5.4), → PHP 8.4 | Installs, 204 tests pass, no AI |
 | Laravel 8 and Laravel 10 applications → Laravel 13 on PHP 8.4 | 7 tests pass each, no AI; Laravel 8 beside 13: same answers to 8 of 9 requests, the ninth being the page that prints the version |

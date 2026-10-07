@@ -25,8 +25,10 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
 
 /**
  * Handles the long tail that deterministic rules cannot: proactive edits for rules with strategy
@@ -44,7 +46,8 @@ import java.util.TreeSet;
  *
  * <p>A rule whose fix has {@code params.together} replaces something no single file holds, such as a web
  * framework: all its files go in one request, with the files named by {@code params.with} (pages,
- * descriptors) editable beside them, and new files allowed where {@code params.create} says.
+ * descriptors) editable beside them, and new files allowed where {@code params.create} says. Where the
+ * other files cannot be told by name, {@code params.withContaining} keeps those that match a pattern.
  */
 public final class AiFixer implements Fixer {
 
@@ -73,8 +76,12 @@ public final class AiFixer implements Fixer {
                 continue;
             }
             scan = scan == null ? ScanContext.of(context.project()) : scan;
-            List<String> companions = scan.files(params.strings("with")).stream().map(ScanContext::toProjectPath)
-                    .filter(f -> !context.plugin().isTestFile(f)).toList();
+            // Of the files the globs name, optionally only those that hold the thing being replaced.
+            Optional<Pattern> holding = params.optString("withContaining").map(Pattern::compile);
+            ScanContext scanned = scan;
+            List<String> companions = scan.files(params.strings("with")).stream()
+                    .filter(f -> holding.isEmpty() || holding.get().matcher(String.join("\n", scanned.lines(f))).find())
+                    .map(ScanContext::toProjectPath).filter(f -> !context.plugin().isTestFile(f)).toList();
             step.files().forEach(f -> hintsByFile.put(f, new ArrayList<>()));
             send(context, step.files(), List.of(hint(step)), List.of(), tally,
                     new Layer(companions, step.rule().title(), params.strings("create")));
