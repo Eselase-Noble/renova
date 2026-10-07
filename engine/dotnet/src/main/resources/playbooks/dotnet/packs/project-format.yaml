@@ -81,6 +81,23 @@ rules:
       and routing are the same ideas under new namespaces. What has no counterpart is the hosting: Global.asax,
       Web.config, bundles and the System.Web pipeline.
 
+  - id: wcf-service-application
+    title: WCF services hosted by IIS are hosted with CoreWCF
+    category: C
+    severity: BLOCKER
+    detect: { type: projectKind, kinds: [wcf] }
+    fix:
+      strategy: corewcf
+      params: { version: "1.8.0" }
+    rationale: >
+      Modern .NET has the WCF client and not the server. CoreWCF hosts the same service contracts on ASP.NET
+      Core: the contracts and service classes keep their code under the CoreWCF namespace, Program.cs
+      registers each service with the endpoints Web.config declared (or, where it declared none, the
+      basicHttpBinding endpoint IIS gave it) at the address of its .svc file, and the WSDL is published as
+      before. Bindings other than basicHttpBinding, wsHttpBinding and webHttpBinding, and security,
+      throttling and quota settings from the configuration, are named in the report for a person. A Visual
+      Basic service project is left as it is.
+
   - id: aspnet-web-forms
     title: ASP.NET Web Forms has no modern .NET release
     category: C

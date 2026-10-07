@@ -87,8 +87,10 @@ public final class DotnetPlugin implements EcosystemPlugin {
             facts.put("language", project.visualBasic() ? "Visual Basic" : "C#");
             facts.put("sdkStyle", project.sdkStyle());
             String kind = project.kind();
-            if (kind.equals("aspnet") && hasWebForms(file.getParent())) {
+            if (kind.equals("aspnet") && hasFiles(file.getParent(), ".aspx", ".ascx", ".master")) {
                 kind = "webforms"; // pages with code behind: nothing in ASP.NET Core takes them as they are
+            } else if (kind.equals("aspnet") && hasFiles(file.getParent(), ".svc") && !hasFiles(file.getParent(), ".cshtml", ".vbhtml")) {
+                kind = "wcf"; // services IIS hosts from .svc files, and no pages
             }
             facts.put("kind", kind);
             facts.put("test", project.test());
@@ -160,7 +162,7 @@ public final class DotnetPlugin implements EcosystemPlugin {
 
     @Override
     public List<Fixer> fixers() {
-        return List.of(new DotnetProjectFixer(), new io.renova.dotnet.fix.DotnetSourceFixer());
+        return List.of(new DotnetProjectFixer(), new io.renova.dotnet.fix.DotnetSourceFixer(), new io.renova.dotnet.fix.CoreWcfHostFixer());
     }
 
     @Override
@@ -210,12 +212,12 @@ public final class DotnetPlugin implements EcosystemPlugin {
         return List.of("playbooks/dotnet/dotnet-to-10.yaml", "playbooks/dotnet/dotnet-to-8.yaml");
     }
 
-    private static boolean hasWebForms(Path projectDir) throws IOException {
+    /** Whether the project has a file with one of the extensions, outside what a build or a tool produced. */
+    private static boolean hasFiles(Path projectDir, String... extensions) throws IOException {
         try (Stream<Path> files = Files.walk(projectDir, 6)) {
             return files.anyMatch(f -> {
                 String name = f.getFileName().toString().toLowerCase(Locale.ROOT);
-                return (name.endsWith(".aspx") || name.endsWith(".ascx") || name.endsWith(".master"))
-                        && !Sources.produced(projectDir.relativize(f));
+                return java.util.Arrays.stream(extensions).anyMatch(name::endsWith) && !Sources.produced(projectDir.relativize(f));
             });
         }
     }

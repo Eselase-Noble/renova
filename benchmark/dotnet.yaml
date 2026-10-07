@@ -66,3 +66,19 @@ apps:
       - { file: Stateless.Tests/Stateless.Tests.csproj, absent: "HintPath", why: "the NUnit 2 file is no longer referenced" }
       - { file: "Stateless.Tests/*.cs", absent: "ExpectedException", why: "NUnit 3 has no such attribute" }
       - { file: Stateless.Tests/StateMachineFixture.cs, contains: "Assert.Throws<", why: "the tests still check for the exception" }
+
+  # A WCF service application as IIS hosted it: two .svc files, one service with its endpoints in Web.config
+  # and one with none, settings read with ConfigurationManager, and tests that expect a fault. Hosted with
+  # CoreWCF on ASP.NET Core, at the same addresses.
+  - id: wcf-service-to-corewcf
+    path: rates-wcf
+    playbook: dotnet-to-10
+    checks:
+      - { file: Rates.Service/Rates.Service.csproj, contains: '<Project Sdk="Microsoft.NET.Sdk.Web">', why: "an ASP.NET Core application hosts the services" }
+      - { file: Rates.Service/Rates.Service.csproj, contains: 'PackageReference Include="CoreWCF.Http"', why: "with CoreWCF" }
+      - { file: Rates.Service/Program.cs, contains: 'AddServiceEndpoint<Acme.Rates.RateService, Acme.Rates.IRateService>(new BasicHttpBinding(), "/RateService.svc")', why: "at the address its .svc file had" }
+      - { file: Rates.Service/Program.cs, contains: '"/Admin/AuditService.svc"', why: "a service without an endpoint in Web.config has the one IIS gave it" }
+      - { file: Rates.Service/RateService.svc.cs, absent: "System.ServiceModel", why: "the server side of WCF is CoreWCF" }
+      - { file: Rates.Service/App.config, contains: 'key="Markup"', why: "ConfigurationManager still finds the settings" }
+      - { file: Rates.Tests/RateServiceTests.cs, contains: "CoreWCF.FaultException<UnknownCurrency>", why: "the test expects the fault the service now throws" }
+
