@@ -167,6 +167,11 @@ public final class PhpPlugin implements EcosystemPlugin {
         return Optional.of(new PhpVerifier());
     }
 
+    @Override
+    public Optional<io.renova.core.behaviour.BehaviourRunner> behaviourRunner() {
+        return Optional.of(new io.renova.php.behaviour.PhpBehaviourRunner());
+    }
+
     /** A source file's related file is the composer.json above it: a missing or outdated library is fixed there. */
     @Override
     public List<RelatedFile> relatedFiles(ProjectModel model, String file) {

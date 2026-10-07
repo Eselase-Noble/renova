@@ -62,8 +62,8 @@ was checked and what was not, is in [verified-migrations.md](verified-migrations
 | A Jersey 1 application → Jersey 3 | Builds, 9 tests pass, same answers as the original on 6 of 6 requests |
 | An ASP.NET MVC 5 application → ASP.NET Core on .NET 10 | Builds and runs; pages, routes, API, validation and anti-forgery checked by hand |
 | FastRoute 1.3 (public PHP library, written for PHP 5.4), → PHP 8.4 | Installs, 204 tests pass, no AI |
-| Laravel 8 and Laravel 10 applications → Laravel 13 on PHP 8.4 | Install, 7 tests pass each, no AI |
-| 21 Java, 5 .NET and 5 PHP paths in the benchmark suites | All pass without AI |
+| Laravel 8 and Laravel 10 applications → Laravel 13 on PHP 8.4 | Install, 7 tests pass each, no AI; Laravel 8 beside 13: same answers to 8 of 9 requests, the ninth being the page that prints the version |
+| 21 Java, 5 .NET and 9 PHP paths in the benchmark suites | All pass without AI |
 
 ## What it does not do yet
 

@@ -101,10 +101,21 @@ Run on 7 October 2026, no AI, verified on PHP 8.4.23 with Composer 2.9:
 | Shop (the same on the Laravel 8 skeleton, with `fruitcake/laravel-cors`, `facade/ignition` and `$dates`) | Laravel 8, PHP 7.3/8.0 | Laravel 13, PHP 8.4 | Pass (7 tests) | 5/5 |
 | Orders (same as above) | Laravel 10 | Laravel 12, PHP 8.4 | Pass (7 tests) | 2/2 |
 
+| Ledger (same) | PHP 7.4 | PHP 8.3 | Pass (7 tests, on PHP 8.3) | 1/1 |
+| Ledger (same), with the `phpunit11` add-on | PHP 7.4, PHPUnit 7.5 | PHP 8.5, PHPUnit 11 | Pass (7 tests, on PHP 8.5) | 3/3 |
+| FastRoute 1.3.0 (same), with the `phpunit11` add-on | PHPUnit 4.8 | PHP 8.4, PHPUnit 11, attributes for data providers | Pass (204 tests) | 3/3 |
+| Shop (same) | Laravel 8 | Laravel 11 (out of support), PHP 8.3 | Pass (7 tests) | 2/2 |
+
 Each original was first run as it was, on the PHP it was written for, in Docker (PHP 7.4, 7.1, 8.2 and 8.0):
 all tests passed there, one of FastRoute's 204 skipped. The two Laravel applications are Laravel's real
 skeletons with one small feature added; no application anyone runs a business on has been tried. Not run:
-`php-to-8.3` and `php-to-8.5`, `laravel-11`, any PHP path with AI, Symfony, a project without tests.
+any PHP path with AI, Symfony, a project without tests.
+
+**Side by side.** With `--verify-behaviour`, the Laravel 8 application on PHP 8.0 and its Laravel 13 migration
+on PHP 8.4 were started in containers, each with its own SQLite database, and sent nine requests: the routes
+found in the code and a scenario file that places an order, reads it back, filters by customer, and sends an
+invalid and an unknown one. Eight answers were the same, status and body. The ninth is the welcome page, which
+prints "Laravel v8.83.29 (PHP v8.0.30)" in one and "Laravel v13.35.0 (PHP v8.4.26)" in the other.
 
 ## With AI
 
