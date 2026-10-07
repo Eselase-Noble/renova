@@ -44,7 +44,7 @@ nobody can say how big it is or whether the result still works.
 | .NET Framework, .NET Core, .NET 5 to 9 (C# and Visual Basic) | .NET 10 or 8 | No AI |
 | ASP.NET MVC 5 and Web API 2 | ASP.NET Core | With AI |
 | PHP 5.4 to 8.2 (Composer projects) | PHP 8.3, 8.4 or 8.5 | No AI |
-| Laravel 8, 9, 10 and later | Laravel 11, 12 or 13 | No AI |
+| Laravel 7, 8, 9, 10 and later | Laravel 11, 12 or 13 | No AI |
 
 Maven and Gradle; Kotlin on the JVM; JUnit 4 to 5, Mockito, Log4j, NUnit 2 to 3 and other library upgrades.
 
@@ -62,8 +62,9 @@ was checked and what was not, is in [verified-migrations.md](verified-migrations
 | A Jersey 1 application → Jersey 3 | Builds, 9 tests pass, same answers as the original on 6 of 6 requests |
 | An ASP.NET MVC 5 application → ASP.NET Core on .NET 10 | Builds and runs; pages, routes, API, validation and anti-forgery checked by hand |
 | FastRoute 1.3 (public PHP library, written for PHP 5.4), → PHP 8.4 | Installs, 204 tests pass, no AI |
-| Laravel 8 and Laravel 10 applications → Laravel 13 on PHP 8.4 | Install, 7 tests pass each, no AI; Laravel 8 beside 13: same answers to 8 of 9 requests, the ninth being the page that prints the version |
-| 21 Java, 5 .NET and 9 PHP paths in the benchmark suites | All pass without AI |
+| Laravel 8 and Laravel 10 applications → Laravel 13 on PHP 8.4 | 7 tests pass each, no AI; Laravel 8 beside 13: same answers to 8 of 9 requests, the ninth being the page that prints the version |
+| A Laravel 7 application (closure factories, PHP 7.4) → Laravel 13 on PHP 8.4 | 6 tests pass, no AI; same answers as the original to 9 of 9 requests |
+| 21 Java, 5 .NET and 10 PHP paths in the benchmark suites | All pass without AI |
 
 ## What it does not do yet
 

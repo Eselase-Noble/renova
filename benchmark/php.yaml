@@ -97,3 +97,16 @@ apps:
       # the project allows development versions, as Laravel's older skeletons do, it installs the 11.x branch.
       - { file: composer.lock, matches: '"name": "laravel/framework",\s+"version": "v?11\.', why: "Laravel 11 is what was installed and tested" }
       - { file: composer.json, contains: '"php": "^8.3"', why: "the PHP this target runs on" }
+
+  # Laravel 7, as applications were written before factory classes: closure factories with a state, the
+  # factory() helper in tests, controllers named by string in the routes, the model outside app/Models.
+  - id: laravel-7-to-13
+    path: store-laravel7
+    playbook: laravel-13
+    checks:
+      - { file: composer.lock, matches: '"name": "laravel/framework",\s+"version": "v13\.', why: "Laravel 13 is what was installed and tested" }
+      - { file: database/factories/OrderFactory.php, contains: "namespace Database\\Factories;", why: "where Laravel looks for a model's factory" }
+      - { file: database/factories/OrderFactory.php, contains: "public function bulk()", why: "the state is a method of the factory class" }
+      - { file: app/Order.php, contains: "HasFactory", why: "the model can make its factory" }
+      - { file: tests/Feature/OrdersTest.php, contains: "Order::factory()->bulk()->create(['customer' => 'Yaw'])", why: "the test makes the same records as before" }
+      - { file: composer.json, absent: "fideloper/proxy", why: "trusted proxies are in the framework since Laravel 9" }

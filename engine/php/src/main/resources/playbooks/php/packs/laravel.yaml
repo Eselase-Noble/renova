@@ -159,7 +159,7 @@ rules:
         ($table->change(), renameColumn); keep it, at ^4.0, if the application's own code uses Doctrine.
 
   - id: legacy-factories
-    title: Model factories written as closures
+    title: Model factories written as closures become classes
     category: C
     severity: BLOCKER
     detect:
@@ -167,15 +167,52 @@ rules:
       include: ["database/factories/*.php"]
       pattern: "\\$factory->define\\("
     fix:
-      strategy: ai
-      hint: >
-        Laravel 8 replaced closure factories ($factory->define(User::class, function (Faker $faker) {...})) with
-        factory classes. Turn each into a class in Database\Factories extending
-        Illuminate\Database\Eloquent\Factories\Factory, with the model in protected $model and the same
-        attributes returned by definition(), using $this->faker in place of $faker; states defined with
-        $factory->state become methods that return $this->state([...]). The model needs the HasFactory trait,
-        and callers change from factory(User::class)->create() to User::factory()->create() and
-        factory(User::class, 3) to User::factory()->count(3).
+      strategy: rector
+      recipes: ["RectorLaravel\\Set\\LaravelSetList::LARAVEL_LEGACY_FACTORIES_TO_CLASSES",
+                "RectorLaravel\\Rector\\Class_\\AddHasFactoryToModelsRector"]
+    rationale: >
+      Laravel 8 replaced closure factories ($factory->define(User::class, function (Faker $faker) {...})) with
+      factory classes, and the factory() helper with User::factory(). Rector writes the classes, turns states
+      into methods, gives the models the HasFactory trait and rewrites the calls, in tests too.
+
+  - id: legacy-factory-states
+    title: A factory state is a method of the factory
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.php"]
+      pattern: "->states\\(\\s*'\\w+'\\s*\\)"
+    fix:
+      strategy: replace
+      include: "**/*.php"
+      regex: true
+      find: "->states\\(\\s*'(\\w+)'\\s*\\)"
+      replace: "->$1()"
+    rationale: >
+      factory(Order::class)->states('bulk') named a state; with factory classes the state is a method,
+      Order::factory()->bulk(). A call that names several states at once is left for a person.
+
+  - id: guard-factory-namespace
+    phase: guard
+    title: Factory classes live in Database\Factories
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["database/factories/*.php"]
+      pattern: "extends \\\\?(Illuminate\\\\Database\\\\Eloquent\\\\Factories\\\\)?Factory\\b"
+      unless: "^namespace "
+    fix:
+      strategy: replace
+      include: "database/factories/*.php"
+      regex: true
+      find: "\\A<\\?php\\s*"
+      replace: "<?php\n\nnamespace Database\\\\Factories;\n\n"
+    rationale: >
+      Laravel finds a model's factory by name: Database\Factories\OrderFactory for an Order model. The classes
+      Rector writes from closure factories have no namespace yet, and "Class Database\Factories\OrderFactory
+      not found" is what every test that makes a model then says.
 
   - id: phpunit-configuration
     title: phpunit.xml in the form PHPUnit 10 and later read
