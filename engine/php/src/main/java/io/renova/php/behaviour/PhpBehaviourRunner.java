@@ -57,7 +57,7 @@ public final class PhpBehaviourRunner implements BehaviourRunner {
     @Override
     public Optional<String> unsupported(ProjectModel model) {
         Path root = model.root();
-        if (!Files.isRegularFile(root.resolve("composer.json"))) {
+        if (model.modules().size() > 1) {
             return Optional.of("several Composer projects in one folder; running one application per project for now");
         }
         if (documentRoot(root) == null) {
@@ -136,13 +136,15 @@ public final class PhpBehaviourRunner implements BehaviourRunner {
         Path baseline = workDir.resolve("original-build");
         Path key = workDir.resolve("baseline.key");
         String sourceKey = treeKey(originalSource);
-        if (!Files.isDirectory(baseline.resolve("vendor")) || !Files.isRegularFile(key) || !Files.readString(key).equals(sourceKey)) {
+        if (!Files.isDirectory(baseline) || !Files.isRegularFile(key) || !Files.readString(key).equals(sourceKey)) {
             deleteRecursively(baseline);
             copyTree(originalSource, baseline);
-            installOriginal(baseline, progress);
+            if (Files.isRegularFile(baseline.resolve("composer.json"))) {
+                installOriginal(baseline, progress);
+            }
             Files.writeString(key, sourceKey);
         }
-        if (!Files.isDirectory(workspace.resolve("vendor"))) {
+        if (!Files.isDirectory(workspace.resolve("vendor")) && Files.isRegularFile(originalSource.resolve("composer.json"))) {
             throw new IOException("The migrated copy has no vendor folder; it must be verified (composer update) before it can be run");
         }
         String baselinePhp = originalPhp(baseline);
@@ -159,11 +161,13 @@ public final class PhpBehaviourRunner implements BehaviourRunner {
         StringBuilder start = new StringBuilder("cp -a /src /app && cd /app");
         Map<String, String> environment = new LinkedHashMap<>();
         if (laravel) {
-            String router = Files.isRegularFile(app.resolve("server.php")) ? "server.php"
-                    : "vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php";
+            // Laravel's router script for PHP's own server: in the project until Laravel 8, in the framework since,
+            // where it expects to be started from the public folder, as "artisan serve" does.
+            String serve = Files.isRegularFile(app.resolve("server.php")) ? "exec php -S 0.0.0.0:8080 -t public server.php"
+                    : "cd public && exec php -S 0.0.0.0:8080 ../vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php";
             start.append(" && mkdir -p database storage/framework/cache/data storage/framework/sessions storage/framework/views bootstrap/cache")
                     .append(" && touch database/renova.sqlite && php artisan migrate --force --no-interaction")
-                    .append(" ; exec php -S 0.0.0.0:8080 -t public ").append(router);
+                    .append(" ; ").append(serve);
             environment.putAll(Map.of("APP_KEY", SANDBOX_KEY, "APP_ENV", "local", "APP_DEBUG", "false", "APP_URL", "http://localhost",
                     "DB_CONNECTION", "sqlite", "DB_DATABASE", "/app/database/renova.sqlite", "LOG_CHANNEL", "stderr",
                     "SESSION_DRIVER", "file", "CACHE_DRIVER", "file"));
@@ -201,6 +205,11 @@ public final class PhpBehaviourRunner implements BehaviourRunner {
      * accept, and no older than 7.2, the oldest the image exists for in a usable state.
      */
     static String originalPhp(Path app) throws IOException {
+        if (!Files.isRegularFile(app.resolve("composer.json"))) {
+            // A site from before Composer says nowhere which PHP it runs on: the last PHP 7, unless the playbook's
+            // settings name another image.
+            return "7.4";
+        }
         String lowest = "7.2";
         ComposerFile composer = ComposerFile.read(app.resolve("composer.json"));
         if (composer.php() != null && Versions.isBelow(lowest, composer.php())) {

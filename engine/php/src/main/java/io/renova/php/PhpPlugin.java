@@ -55,10 +55,54 @@ public final class PhpPlugin implements EcosystemPlugin {
     @Override
     public boolean supports(Path root) {
         try {
-            return !composerFiles(root).isEmpty();
+            // Without a composer.json, a site whose pages are in the folder itself is given one when it is migrated.
+            return !composerFiles(root).isEmpty() || plainSite(root);
         } catch (IOException | java.io.UncheckedIOException e) {
             return false;
         }
+    }
+
+    /**
+     * A PHP site from before Composer: PHP files in the folder itself or an index.php in its public folder,
+     * and no composer.json anywhere.
+     */
+    static boolean plainSite(Path root) throws IOException {
+        if (!composerFiles(root).isEmpty()) {
+            return false;
+        }
+        for (String dir : List.of("public", "web", "www", "public_html", "htdocs")) {
+            if (Files.isRegularFile(root.resolve(dir).resolve("index.php"))) {
+                return true;
+            }
+        }
+        try (java.util.stream.Stream<Path> files = Files.list(root)) {
+            return files.anyMatch(f -> f.getFileName().toString().endsWith(".php") && Files.isRegularFile(f));
+        }
+    }
+
+    /**
+     * A site without Composer gets a composer.json in the migrated copy: the place where the PHP version it
+     * needs is written, and where libraries can be added later. It requires nothing and changes nothing the
+     * site does.
+     */
+    @Override
+    public Optional<io.renova.core.engine.StageResult> prepare(Path workspace, Map<String, String> options) throws Exception {
+        if (!plainSite(workspace)) {
+            return Optional.empty();
+        }
+        String name = workspace.getFileName().toString().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
+        Files.writeString(workspace.resolve("composer.json"), """
+                {
+                    "name": "site/%s",
+                    "description": "Written by Renova: this site had no composer.json.",
+                    "type": "project",
+                    "require": {
+                        "php": ">=5.3"
+                    }
+                }
+                """.formatted(name.isEmpty() ? "app" : name));
+        return Optional.of(new io.renova.core.engine.StageResult("prepare", io.renova.core.engine.StageResult.Status.APPLIED,
+                "composer.json written: the site had none, and it is where the PHP version it runs on is recorded", List.of()));
     }
 
     /** PHP code without Composer: Renova reads a project's PHP version and dependencies from composer.json. */
@@ -75,9 +119,8 @@ public final class PhpPlugin implements EcosystemPlugin {
         } catch (IOException | java.io.UncheckedIOException e) {
             return Optional.empty();
         }
-        return Optional.of("This PHP project has no composer.json, which is where Renova reads the PHP version a project needs and "
-                + "the libraries it uses. Add one (\"composer init\" writes it; list the libraries the code includes by hand), then "
-                + "assess the project again.");
+        return Optional.of("This folder has PHP files below it and none in it, and no composer.json: Renova cannot tell where the "
+                + "project starts. Point it at the folder that holds the site's index.php or its composer.json.");
     }
 
     @Override
@@ -86,6 +129,16 @@ public final class PhpPlugin implements EcosystemPlugin {
         List<Module> modules = new ArrayList<>();
         Set<String> phpVersions = new TreeSet<>();
         Set<String> frameworks = new TreeSet<>();
+        if (plainSite(base)) {
+            Map<String, Object> facts = new LinkedHashMap<>();
+            facts.put("buildTool", "none");
+            facts.put("packages", Map.of());
+            facts.put("constraints", Map.of());
+            facts.put("framework", "none");
+            facts.put("generatedBuild", "A composer.json is written in the migrated copy");
+            modules.add(new Module(base.getFileName().toString(), ".", "composer.json", facts));
+            frameworks.add("none");
+        }
         for (Path file : composerFiles(base)) {
             ComposerFile composer;
             try {

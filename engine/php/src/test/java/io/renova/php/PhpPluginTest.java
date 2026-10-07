@@ -140,4 +140,29 @@ class PhpPluginTest {
                 .containsExactlyInAnyOrder("lib/Clock.php", "src/Document.php", "src/Priced.php", "src/Money.php", "src/Rate.php");
         assertThat(plugin.referencedFiles(plugin.model(root), root, "src/Quote.php")).allMatch(r -> !r.editable());
     }
+
+    @Test
+    void aSiteWithoutComposerIsAProjectAndGetsAComposerFileInTheCopy(@TempDir Path root) throws Exception {
+        Path site = root.resolve("Old Shop");
+        write(site, "index.php", "<?php echo 'home';\n");
+        write(site, "includes/db.php", "<?php\n");
+        PhpPlugin plugin = new PhpPlugin();
+
+        assertThat(plugin.supports(site)).isTrue();
+        assertThat(plugin.model(site).modules()).extracting(Module::buildFile, m -> m.fact("php")).containsExactly(
+                org.assertj.core.groups.Tuple.tuple("composer.json", null));
+        assertThat(PluginRegistry.load().defaultPlaybook(site).id()).isEqualTo("php-to-8.4");
+
+        assertThat(plugin.prepare(site, Map.of())).get().extracting(io.renova.core.engine.StageResult::stage).isEqualTo("prepare");
+        assertThat(Files.readString(site.resolve("composer.json"))).contains("\"name\": \"site/old-shop\"", "\"php\": \">=5.3\"");
+        // Now an ordinary Composer project: nothing more to prepare.
+        assertThat(plugin.prepare(site, Map.of())).isEmpty();
+        assertThat(plugin.model(site).modules().getFirst().fact("php")).isEqualTo("5.3");
+
+        // PHP files only further down: not a project Renova can place.
+        Path nested = root.resolve("repo");
+        write(nested, "apps/site/pages/index.php", "<?php\n");
+        assertThat(plugin.supports(nested)).isFalse();
+        assertThat(plugin.unsupportedReason(nested)).get().asString().contains("Point it at the folder");
+    }
 }

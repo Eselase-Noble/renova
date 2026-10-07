@@ -7,9 +7,12 @@
 id: php-targets
 appsDir: ../../renova-test-apps
 
+# behaviour: after a passing verification, the original and the migrated application run side by side in Docker
+# (web applications; libraries are reported as skipped). Not part of whether a run passes: the Laravel 8 and 10
+# welcome pages print the framework's version, which differs by design.
 configurations:
   - id: deterministic
-    behaviour: false
+    behaviour: true
 
 apps:
   # A library written for PHP 7.4 with PHPUnit 7 tests: each(), curly-brace string offsets, implode() with its
@@ -110,3 +113,15 @@ apps:
       - { file: app/Order.php, contains: "HasFactory", why: "the model can make its factory" }
       - { file: tests/Feature/OrdersTest.php, contains: "Order::factory()->bulk()->create(['customer' => 'Yaw'])", why: "the test makes the same records as before" }
       - { file: composer.json, absent: "fideloper/proxy", why: "trusted proxies are in the framework since Laravel 9" }
+
+  # A site from before Composer and frameworks: pages in the folder, an include with each(), create_function(),
+  # curly-brace offsets and reversed implode(). No tests; what shows it still works is the side-by-side run.
+  - id: plain-site-to-84
+    path: brochure-php-plain
+    playbook: php-to-8.4
+    checks:
+      - { file: composer.json, contains: '"php": "^8.4"', why: "the site now says which PHP it runs on" }
+      - { file: includes/catalogue.php, absent: "create_function", why: "removed in PHP 8" }
+      - { file: includes/catalogue.php, absent: "each(", why: "removed in PHP 8" }
+      - { file: index.php, contains: "implode(', ', array_keys($CATALOGUE))", why: "implode() takes the separator first" }
+      - { file: index.php, contains: "<?php require 'includes/catalogue.php'; ?>", why: "the pages are still plain PHP pages" }

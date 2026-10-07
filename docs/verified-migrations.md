@@ -107,6 +107,8 @@ Run on 7 October 2026, no AI, verified on PHP 8.4.23 with Composer 2.9:
 | Shop (same) | Laravel 8 | Laravel 11 (out of support), PHP 8.3 | Pass (7 tests) | 2/2 |
 | Store (Laravel 7's skeleton with the same feature as it was written then: closure factories with a state, `factory()` in tests, controllers named by string, `fideloper/proxy`) | Laravel 7, PHP 7.2 to 7.4 | Laravel 13, PHP 8.4 | Pass (6 tests) | 6/6 |
 
+| Brochure (a site without Composer or tests: three pages and an include using `each()`, `create_function()`, curly-brace offsets, reversed `implode()`) | PHP 5.3 to 7.4 | PHP 8.4, with a `composer.json` | Pass (no tests); side by side on PHP 7.4 and 8.4, the same answer to 6 of 6 requests | 5/5 |
+
 Each original was first run as it was, on the PHP it was written for, in Docker (PHP 7.4, 7.1, 8.2 and 8.0):
 all tests passed there, one of FastRoute's 204 skipped. The two Laravel applications are Laravel's real
 skeletons with one small feature added; no application anyone runs a business on has been tried. Not run:
@@ -116,8 +118,10 @@ Symfony, a project without tests, and the `mysql_*` rule, which goes to AI and h
 on PHP 8.4 were started in containers, each with its own SQLite database, and sent nine requests: the routes
 found in the code and a scenario file that places an order, reads it back, filters by customer, and sends an
 invalid and an unknown one. Eight answers were the same, status and body. The ninth is the welcome page, which
-prints "Laravel v8.83.29 (PHP v8.0.30)" in one and "Laravel v13.35.0 (PHP v8.4.26)" in the other. The Laravel 7
-application on PHP 7.4 beside its Laravel 13 migration on PHP 8.4: all nine answers the same.
+prints "Laravel v8.83.29 (PHP v8.0.30)" in one and "Laravel v13.35.0 (PHP v8.4.26)" in the other. The Laravel 10
+application on PHP 8.3 beside Laravel 13: the same eight and the same one. The Laravel 7 application on PHP 7.4
+beside its Laravel 13 migration on PHP 8.4: all nine answers the same. The suite runs these comparisons on
+every web application in it.
 
 ## With AI
 

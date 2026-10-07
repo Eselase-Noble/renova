@@ -443,7 +443,7 @@ Windows machine, and how, is in [docs/windows-test-plan.md](docs/windows-test-pl
 
 | Playbook | Takes | To | Suggested for |
 |---|---|---|---|
-| `php-to-8.3`, `php-to-8.4`, `php-to-8.5` | Any Composer project, from PHP 5.4 on | That PHP version, and nothing else: frameworks stay | Projects without Laravel (`php-to-8.4`) |
+| `php-to-8.3`, `php-to-8.4`, `php-to-8.5` | Any Composer project, from PHP 5.4 on, or a site without Composer | That PHP version, and nothing else: frameworks stay | Projects without Laravel (`php-to-8.4`) |
 | `laravel-11`, `laravel-12`, `laravel-13` | A Laravel application on any older Laravel | That Laravel, on PHP 8.3 (Laravel 11) or 8.4 | Laravel applications (`laravel-13`) |
 
 What these do today, with no AI ([results](docs/verified-migrations.md#php)):
@@ -463,9 +463,10 @@ Rector's rule sets also move code to newer idioms (constructor promotion, arrow 
 attributes in place of `$fillable`): more is changed than the target strictly needs, and the tests are what
 shows that nothing else did. Closure factories from Laravel 7 and older become factory classes without AI.
 What PHP 8 runs differently from PHP 7 (arithmetic on text, loose comparisons) no rule can decide: the tests
-show it and the AI repair loop fixes it ([one run](docs/verified-migrations.md#with-ai)). Not yet done:
-projects without Composer, the `mysql_*` functions (planned for AI, not run), Symfony and other frameworks'
-own upgrades.
+show it and the AI repair loop fixes it ([one run](docs/verified-migrations.md#with-ai)). A site without
+Composer (PHP files in a folder, as they were uploaded) gets a `composer.json` in the migrated copy and is
+migrated like any other; it usually has no tests, so `--verify-behaviour` is what shows it still works. Not
+yet done: the `mysql_*` functions (planned for AI, not run), Symfony and other frameworks' own upgrades.
 
 `--with phpunit11` (or `php-to-8.4+phpunit11`) goes on from PHPUnit 9 to 11: attributes in place of
 annotations, and a `phpunit.xml` in the form PHPUnit 10 and later read. `--verify-behaviour` runs the original
