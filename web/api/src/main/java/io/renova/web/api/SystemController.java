@@ -67,6 +67,25 @@ public class SystemController {
     public record Listing(String path, String parent, boolean project, List<Entry> entries, boolean truncated) {
     }
 
+    /**
+     * @param valid    whether a licence is installed on this server and current
+     * @param required false in a development build, which migrates without one
+     */
+    public record LicenceInfo(boolean valid, boolean required, String description, String licensee, String edition,
+                              List<String> ecosystems, int seats, String expires) {
+    }
+
+    /** The licence of this server: what it covers and until when. It is installed on the server, not through the API. */
+    @GetMapping("/licence")
+    public LicenceInfo licence(HttpServletRequest request) {
+        access.caller(request);
+        io.renova.core.licence.Licences licences = io.renova.core.licence.Licences.installed();
+        io.renova.core.licence.Licences.Status status = licences.status();
+        return status.licence().map(l -> new LicenceInfo(status.valid(), licences.enforced(), status.describe(), l.licensee(),
+                        l.edition(), l.ecosystems(), l.seats(), String.valueOf(l.expires())))
+                .orElseGet(() -> new LicenceInfo(false, licences.enforced(), status.describe(), null, null, List.of(), 0, null));
+    }
+
     @GetMapping
     public Info info(HttpServletRequest request) {
         access.caller(request);

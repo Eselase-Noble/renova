@@ -88,6 +88,7 @@ public final class SettingsView {
         return Ui.page(
                 Ui.header("Settings", "AI runs on your own provider account. Renova never supplies, pools or shares keys."),
                 messages,
+                licenceSection(),
                 Ui.section("AI provider", "Used for judgement calls, build repair and behaviour repair.", form),
                 Ui.section("API keys and endpoints", "Saved in " + view.configFile() + ", readable only by you. "
                         + "Environment variables such as ANTHROPIC_API_KEY take precedence.", keys));
@@ -143,6 +144,31 @@ public final class SettingsView {
         VBox row = new VBox(8, title, new HBox(8, key, save, remove), new HBox(8, endpoint, saveEndpoint));
         row.setPadding(new Insets(0, 0, 8, 0));
         return row;
+    }
+
+    /** The licence on this machine and a way to install one; checked here, never over the network. */
+    private Node licenceSection() {
+        io.renova.core.licence.Licences licences = io.renova.core.licence.Licences.installed();
+        javafx.scene.control.Label status = Ui.label(licences.status().describe(), Styles.TEXT_BOLD);
+        status.setWrapText(true);
+        Button install = new Button("Install licence file…", Icons.of(Icons.FOLDER_OPEN, 14));
+        install.setOnAction(e -> {
+            javafx.stage.FileChooser chooser = new javafx.stage.FileChooser();
+            chooser.setTitle("Licence file");
+            chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("Renova licence", "*.json", "*.licence", "*.license"));
+            java.io.File file = chooser.showOpenDialog(install.getScene().getWindow());
+            if (file != null) {
+                run(() -> {
+                    String installed = licences.install(file.toPath()).describe();
+                    javafx.application.Platform.runLater(() -> status.setText(installed));
+                    return "Licence installed: " + installed;
+                });
+            }
+        });
+        String rule = licences.enforced()
+                ? "Assessing projects is free. Migrating needs a licence that covers the project's ecosystem. Kept in " + licences.file() + "."
+                : "This is a development build (" + io.renova.core.licence.Licences.version() + "): it migrates without a licence.";
+        return Ui.section("Licence", rule, new VBox(10, status, install));
     }
 
     private interface Action {

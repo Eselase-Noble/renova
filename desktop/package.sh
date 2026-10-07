@@ -20,7 +20,16 @@ mkdir -p "$INPUT"
 cp desktop/target/renova-desktop-*.jar "$INPUT/renova-desktop.jar"
 cp -r desktop/target/lib "$INPUT/lib"
 
+# Signing, where the machine has what it needs. On macOS, with MAC_SIGNING_IDENTITY set to the name on a
+# "Developer ID Application" certificate in the keychain, the application is signed as it is packaged; an
+# unsigned one is refused by Gatekeeper. See docs/deployment.md, "Signing the installers".
+SIGNING=()
+if [[ "$(uname)" == "Darwin" && -n "${MAC_SIGNING_IDENTITY:-}" ]]; then
+  SIGNING=(--mac-sign --mac-signing-key-user-name "$MAC_SIGNING_IDENTITY" --mac-package-identifier io.renova.desktop)
+fi
+
 jpackage --type "$TYPE" \
+  ${SIGNING[@]+"${SIGNING[@]}"} \
   --name Renova \
   --app-version "$VERSION" \
   --vendor "Renova" \

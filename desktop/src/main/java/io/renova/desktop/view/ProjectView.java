@@ -387,7 +387,8 @@ public final class ProjectView {
     private Node addonsMenu() {
         MenuButton menu = new MenuButton(addons.isEmpty() ? "Add-ons" : "Add-ons (" + addons.size() + ")", Icons.of(Icons.SPARK, 14));
         menu.setTooltip(new javafx.scene.control.Tooltip("Optional upgrades to do in the same migration"));
-        for (Playbook addon : engine.addons()) {
+        // Only what can change this project: a .NET project is not offered JUnit.
+        for (Playbook addon : engine.registry().addonsFor(path)) {
             javafx.scene.control.CheckMenuItem item = new javafx.scene.control.CheckMenuItem(addon.name());
             item.setSelected(addons.contains(addon.id()));
             item.setOnAction(e -> {
@@ -406,7 +407,8 @@ public final class ProjectView {
     private Node playbookChooser(Engine.Assessment a) {
         ComboBox<String> choice = new ComboBox<>();
         Map<String, String> labels = new LinkedHashMap<>();
-        for (Playbook p : engine.playbooks()) {
+        // The targets of the project's own ecosystem.
+        for (Playbook p : engine.registry().playbooksFor(path)) {
             labels.put(p.id(), p.name());
         }
         // The assessment's playbook is the target with its add-ons; the chooser shows the target.

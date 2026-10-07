@@ -206,4 +206,22 @@ class DesktopServicesTest {
 
         assertThat(DiffLines.parse(diff, 3)).hasSize(4).last().satisfies(l -> assertThat(l.kind()).isEqualTo(DiffLines.Kind.NOTE));
     }
+
+    @Test
+    void aDotnetProjectIsAssessedAndOfferedItsOwnTargetsOnly(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("Billing.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup>"
+                + "<TargetFramework>net6.0</TargetFramework></PropertyGroup></Project>");
+        Files.writeString(dir.resolve("Invoice.cs"), "class Invoice {}\n");
+        io.renova.desktop.service.Engine engine = new io.renova.desktop.service.Engine();
+
+        io.renova.desktop.service.Engine.Assessment assessment = engine.assess(dir);
+
+        assertThat(assessment.playbook().id()).isEqualTo("dotnet-to-10");
+        assertThat(assessment.plan().steps()).extracting(s -> s.rule().id()).containsExactly("target-framework");
+        assertThat(assessment.plan().automationRate()).isEqualTo(1.0);
+        assertThat(engine.registry().playbooksFor(dir)).extracting(io.renova.core.playbook.Playbook::id)
+                .containsExactlyInAnyOrder("dotnet-to-10", "dotnet-to-8");
+        assertThat(engine.registry().addonsFor(dir)).isEmpty();
+        assertThat(engine.export(assessment, false)).contains(".NET → 10", "automated edit (`dotnet`)");
+    }
 }

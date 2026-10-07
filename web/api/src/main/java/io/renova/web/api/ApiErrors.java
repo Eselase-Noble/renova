@@ -28,6 +28,11 @@ public class ApiErrors {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
     }
 
+    @ExceptionHandler(io.renova.core.licence.LicenceException.class)
+    ResponseEntity<Map<String, String>> licence(io.renova.core.licence.LicenceException e) {
+        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(Map.of("error", e.getMessage()));
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     ResponseEntity<Map<String, String>> conflict(IllegalStateException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()));
