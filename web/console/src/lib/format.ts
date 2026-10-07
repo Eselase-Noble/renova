@@ -40,6 +40,9 @@ export const STRATEGY_NAMES: Record<string, string> = {
   recipe: "Recipe",
   replace: "Text rule",
   maven: "Build file edit",
+  gradle: "Build file edit",
+  dotnet: "Project file edit",
+  "dotnet-source": "Source rewrite",
   ai: "AI",
   manual: "Manual",
 };
@@ -61,8 +64,9 @@ export const initials = (name: string) =>
 
 /** Deterministic and judged work, as the three groups the console reports on. */
 export type Resolver = "automatic" | "ai" | "person";
-export const RESOLVER_OF: Record<string, Resolver> = { recipe: "automatic", replace: "automatic", maven: "automatic", ai: "ai", manual: "person" };
+export const RESOLVER_OF: Record<string, Resolver> = { ai: "ai", manual: "person" };
 export const RESOLVER_NAMES: Record<Resolver, string> = { automatic: "Automatic", ai: "AI, checked by the build", person: "A person" };
-export const resolverOf = (strategy: string): Resolver => RESOLVER_OF[strategy] ?? "person";
+// Every strategy that is not AI or a person is an edit Renova makes by itself (recipes, text rules, build and project file edits).
+export const resolverOf = (strategy: string): Resolver => RESOLVER_OF[strategy] ?? "automatic";
 
 export const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

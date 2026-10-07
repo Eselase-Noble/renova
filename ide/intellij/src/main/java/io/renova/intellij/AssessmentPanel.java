@@ -26,7 +26,8 @@ import java.util.TreeMap;
 final class AssessmentPanel extends JPanel {
 
     private static final Map<String, String> STRATEGIES = Map.of(
-            "recipe", "recipe", "replace", "text rule", "maven", "build file edit", "ai", "AI", "manual", "for a person");
+            "recipe", "recipe", "replace", "text rule", "maven", "build file edit", "gradle", "build file edit",
+            "dotnet", "project file edit", "dotnet-source", "source rewrite", "ai", "AI", "manual", "for a person");
 
     private final Project project;
     private final RenovaProjectService service;
