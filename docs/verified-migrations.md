@@ -107,12 +107,15 @@ Run on 7 October 2026, no AI, verified on PHP 8.4.23 with Composer 2.9:
 | Shop (same) | Laravel 8 | Laravel 11 (out of support), PHP 8.3 | Pass (7 tests) | 2/2 |
 | Store (Laravel 7's skeleton with the same feature as it was written then: closure factories with a state, `factory()` in tests, controllers named by string, `fideloper/proxy`) | Laravel 7, PHP 7.2 to 7.4 | Laravel 13, PHP 8.4 | Pass (6 tests) | 6/6 |
 
+| Notes (Symfony's skeleton with a controller whose routes are annotations, `@Method` from SensioFrameworkExtraBundle, `doctrine/annotations`, functional tests) | Symfony 5.4, PHP 7.2 to 7.4 | Symfony 7.4, PHP 8.4 | Pass (6 tests); side by side on PHP 7.4 and 8.4, the same answer to 6 of 6 requests | 7/7 |
+| Notes (same) | Symfony 5.4 | Symfony 6.4, PHP 8.3 | Pass (6 tests) | 2/2 |
 | Brochure (a site without Composer or tests: three pages and an include using `each()`, `create_function()`, curly-brace offsets, reversed `implode()`) | PHP 5.3 to 7.4 | PHP 8.4, with a `composer.json` | Pass (no tests); side by side on PHP 7.4 and 8.4, the same answer to 6 of 6 requests | 5/5 |
 
 Each original was first run as it was, on the PHP it was written for, in Docker (PHP 7.4, 7.1, 8.2 and 8.0):
 all tests passed there, one of FastRoute's 204 skipped. The two Laravel applications are Laravel's real
 skeletons with one small feature added; no application anyone runs a business on has been tried. Not run:
-Symfony, a project without tests, and the `mysql_*` rule, which goes to AI and has no application to run it on.
+the `mysql_*` rule, which goes to AI and has no application to run it on; a Symfony application with security,
+Doctrine or its own bundles, where removed configuration keys are what an upgrade usually trips on.
 
 **Side by side.** With `--verify-behaviour`, the Laravel 8 application on PHP 8.0 and its Laravel 13 migration
 on PHP 8.4 were started in containers, each with its own SQLite database, and sent nine requests: the routes

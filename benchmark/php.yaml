@@ -125,3 +125,25 @@ apps:
       - { file: includes/catalogue.php, absent: "each(", why: "removed in PHP 8" }
       - { file: index.php, contains: "implode(', ', array_keys($CATALOGUE))", why: "implode() takes the separator first" }
       - { file: index.php, contains: "<?php require 'includes/catalogue.php'; ?>", why: "the pages are still plain PHP pages" }
+
+  # Symfony 5.4 as applications were written then: routes as annotations, @Method from
+  # SensioFrameworkExtraBundle, doctrine/annotations, functional tests with WebTestCase.
+  - id: symfony-54-to-74
+    path: notes-symfony54
+    playbook: symfony-7.4
+    checks:
+      - { file: composer.json, contains: '"symfony/framework-bundle": "7.4.*"', why: "on the target" }
+      - { file: composer.json, matches: '"symfony":\s*\{[^}]*"require": "7\.4\.\*"', why: "Flex holds every Symfony package to the target" }
+      - { file: composer.json, absent: "sensio/framework-extra-bundle", why: "the bundle ended with Symfony 6.4" }
+      - { file: config/bundles.php, absent: "SensioFrameworkExtraBundle", why: "a bundle that is not installed cannot be registered" }
+      - { file: src/Controller/NoteController.php, contains: "#[Route(path: '/notes/{number}', name: 'note_show', requirements: ['number' => '\\d+'], methods: ['GET'])]",
+          why: "the route keeps its path, name, requirement and method, the last of which came from @Method" }
+      - { file: src/Controller/NoteController.php, absent: "Sensio", why: "nothing of the removed bundle is left in the code" }
+      - { file: config/routes/annotations.yaml, contains: "type: attribute", why: "routes are loaded from attributes" }
+
+  - id: symfony-54-to-64
+    path: notes-symfony54
+    playbook: symfony-6.4
+    checks:
+      - { file: composer.json, contains: '"symfony/framework-bundle": "6.4.*"', why: "on the chosen target, not the newest" }
+      - { file: composer.lock, matches: '"name": "symfony/framework-bundle",\s+"version": "v6\.4\.', why: "Symfony 6.4 is what was installed and tested" }

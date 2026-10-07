@@ -1,0 +1,144 @@
+# What Symfony upgrades share whatever the target: annotations that became attributes, the bundle Symfony took
+# into the framework, and the settings of the application that name them.
+
+rules:
+
+  - id: symfony-flex
+    title: Symfony Flex 2
+    category: E
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [symfony/flex], constraintBelow: "2.0" }
+    fix:
+      strategy: composer
+      params: { action: setVersion, constraint: "^2" }
+
+  - id: symfony-attributes
+    title: Routes, validation and mapping written as annotations become attributes
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["src/**/*.php"]
+      pattern: "^\\s*\\*\\s*@(Route|Method|Template|ParamConverter|Security|IsGranted|Cache|Assert\\\\|ORM\\\\)"
+    fix:
+      strategy: rector
+      recipes: ["attributes:symfony", "attributes:sensiolabs", "attributes:doctrine", "composer-based:symfony", "composer-based:twig",
+                "composer-based:doctrine", "import-names"]
+    rationale: >
+      Symfony 7 no longer reads annotations in comments. Rector writes each as the PHP attribute that replaced
+      it (#[Route], #[Assert\NotBlank], #[ORM\Column]) and applies the code changes of every Symfony release up
+      to the one installed.
+
+  - id: symfony-attribute-routes
+    title: Routes are loaded from attributes
+    category: A
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["config/routes.yaml", "config/routes/*.yaml"]
+      pattern: "type:\\s*annotation"
+    fix:
+      strategy: replace
+      include: "config/{routes.yaml,routes/*.yaml}"
+      regex: true
+      find: "type:(\\s*)annotation"
+      replace: "type:$1attribute"
+    rationale: The "annotation" route loader was removed in Symfony 7; "attribute" reads the same controllers.
+
+  - id: sensio-extra-bundle
+    title: SensioFrameworkExtraBundle ended with Symfony 6.4
+    category: E
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [sensio/framework-extra-bundle] }
+    fix:
+      strategy: composer
+      params: { action: remove }
+    rationale: >
+      Everything the bundle gave is in the framework: #[Route] with methods, #[MapEntity], #[IsGranted],
+      #[Cache] and #[Template] from symfony/framework-bundle, security-bundle, http-kernel and twig-bridge.
+
+  - id: sensio-extra-bundle-registered
+    title: The removed bundle is no longer registered
+    category: A
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["config/bundles.php"]
+      pattern: "SensioFrameworkExtraBundle"
+    fix:
+      strategy: replace
+      include: "config/bundles.php"
+      regex: true
+      find: "(?m)^\\s*Sensio\\\\Bundle\\\\FrameworkExtraBundle\\\\SensioFrameworkExtraBundle::class\\s*=>.*\\R"
+      replace: ""
+
+  - id: sensio-extra-bundle-configured
+    title: The removed bundle's settings
+    category: A
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["config/packages/sensio_framework_extra.yaml", "config/packages/*/sensio_framework_extra.yaml"]
+      pattern: "^sensio_framework_extra:"
+    fix:
+      strategy: replace
+      include: "config/packages/{sensio_framework_extra.yaml,*/sensio_framework_extra.yaml}"
+      regex: true
+      find: "(?s)\\A.*\\z"
+      replace: "# SensioFrameworkExtraBundle was removed with the move to attributes; nothing is configured here.\n"
+
+  - id: sensio-annotations-in-code
+    title: Annotations of the removed bundle
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["src/**/*.php"]
+      # @Route and @Method are rewritten by Rector; these have counterparts in other classes of the framework.
+      pattern: "Sensio\\\\Bundle\\\\FrameworkExtraBundle\\\\Configuration\\\\(Template|ParamConverter|Security|IsGranted|Cache|Entity)\\b"
+    fix:
+      strategy: ai
+      hint: >
+        SensioFrameworkExtraBundle is removed from this application. Replace what the file takes from
+        Sensio\Bundle\FrameworkExtraBundle\Configuration with the framework's own, as PHP attributes:
+        @Method("GET") or #[Method('GET')] becomes the methods argument of the route on the same action
+        (#[Route('/x', name: 'x', methods: ['GET'])]); the bundle's Route is
+        Symfony\Component\Routing\Attribute\Route; @ParamConverter becomes #[MapEntity] from
+        Symfony\Bridge\Doctrine\Attribute on the parameter; @IsGranted and @Security become #[IsGranted] from
+        Symfony\Component\Security\Http\Attribute (an expression goes in new Expression('...')); @Cache becomes
+        #[Cache] from Symfony\Component\HttpKernel\Attribute; @Template becomes #[Template] from
+        Symfony\Bridge\Twig\Attribute. Remove the use statements of the bundle. Keep every path, name,
+        requirement and method exactly as it was.
+
+  - id: doctrine-annotations-package
+    title: doctrine/annotations is not needed once nothing is written as an annotation
+    category: E
+    severity: WARNING
+    detect: { type: composerPackage, names: [doctrine/annotations] }
+    fix:
+      strategy: composer
+      params: { action: remove }
+    rationale: >
+      Symfony 7 does not use it, and doctrine/annotations 1 conflicts with libraries Symfony 7 needs. The
+      attributes step above rewrites what read through it.
+
+knowledge:
+
+  - id: symfony-upgrades
+    title: What Symfony's releases changed
+    triggers: ["symfony/", "Symfony\\", "config/packages", "bundles.php", "could not be resolved", "framework.yaml", "security.yaml"]
+    body: |
+      Symfony 6 needs PHP 8.0 (6.4: 8.1) and Symfony 7 needs PHP 8.2. Annotations in comments are gone in
+      Symfony 7: routes, validation constraints, serializer groups and Doctrine mapping are PHP attributes, the
+      route loader type is "attribute", and doctrine/annotations and sensio/framework-extra-bundle are removed.
+      The Route attribute is Symfony\Component\Routing\Attribute\Route (the Annotation namespace still works
+      in 6.4 and 7.x and is deprecated). In configuration: framework.annotations is no longer a setting;
+      security.enable_authenticator_manager was removed (the authenticator system is the only one), guard
+      authenticators (symfony/security-guard) become AbstractAuthenticator classes, encoders are
+      password_hashers, and anonymous: true or lazy is gone from firewalls; framework.session.storage_id
+      became storage_factory_id; framework.handle_all_throwables, php_errors.log and
+      http_method_override should be set explicitly. Commands return an int from execute(). Methods of
+      framework classes that the application overrides gained return types and the override must declare
+      them. Controllers get services by injection, not $this->get(); getDoctrine() is replaced by an injected
+      ManagerRegistry or EntityManagerInterface. When Composer cannot resolve, a bundle has no release for
+      the new Symfony at its constraint: raise that bundle's constraint to its first release that supports it.

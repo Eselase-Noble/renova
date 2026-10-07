@@ -445,6 +445,7 @@ Windows machine, and how, is in [docs/windows-test-plan.md](docs/windows-test-pl
 |---|---|---|---|
 | `php-to-8.3`, `php-to-8.4`, `php-to-8.5` | Any Composer project, from PHP 5.4 on, or a site without Composer | That PHP version, and nothing else: frameworks stay | Projects without Laravel (`php-to-8.4`) |
 | `laravel-11`, `laravel-12`, `laravel-13` | A Laravel application on any older Laravel | That Laravel, on PHP 8.3 (Laravel 11) or 8.4 | Laravel applications (`laravel-13`) |
+| `symfony-6.4`, `symfony-7.4` | A Symfony application on Symfony 4, 5 or 6 | That Symfony (both long-term-support releases), on PHP 8.3 or 8.4 | Symfony applications (`symfony-7.4`) |
 
 What these do today, with no AI ([results](docs/verified-migrations.md#php)):
 
@@ -466,7 +467,13 @@ What PHP 8 runs differently from PHP 7 (arithmetic on text, loose comparisons) n
 show it and the AI repair loop fixes it ([one run](docs/verified-migrations.md#with-ai)). A site without
 Composer (PHP files in a folder, as they were uploaded) gets a `composer.json` in the migrated copy and is
 migrated like any other; it usually has no tests, so `--verify-behaviour` is what shows it still works. Not
-yet done: the `mysql_*` functions (planned for AI, not run), Symfony and other frameworks' own upgrades.
+yet done: the `mysql_*` functions (planned for AI, not run), and frameworks other than Laravel and Symfony.
+
+For Symfony: every `symfony/*` package released with the framework and the version Flex holds them to,
+annotations as attributes (routes, validation, Doctrine mapping), SensioFrameworkExtraBundle out of
+`composer.json`, `bundles.php` and its settings with `@Method` merged into the route, and Rector's Symfony
+rules for each release on the way. Configuration keys a release removed (security, session) are left to the
+build's errors and AI repair, with what changed written out for it.
 
 `--with phpunit11` (or `php-to-8.4+phpunit11`) goes on from PHPUnit 9 to 11: attributes in place of
 annotations, and a `phpunit.xml` in the form PHPUnit 10 and later read. `--verify-behaviour` runs the original
@@ -523,9 +530,10 @@ source migrates without one. See [docs/licensing.md](docs/licensing.md).
    AI, ASP.NET MVC 5 and Web API 2 → ASP.NET Core. Next: a larger real MVC application, Entity Framework 6 →
    EF Core, Windows Forms and WPF verified on Windows, behavioural verification for ASP.NET Core (the original
    needs IIS on Windows), Web Forms.
-7. **PHP:** a chosen PHP version (8.3, 8.4, 8.5) and a chosen Laravel version (11, 12, 13) are in. Next: an
-   option to change only what the target requires, PHP paths that need AI (`mysql_*`, closure factories), a
-   real Laravel application, Symfony, projects without Composer, behavioural verification.
+7. **PHP:** a chosen PHP version (8.3, 8.4, 8.5), Laravel version (11, 12, 13) and Symfony version (6.4, 7.4)
+   are in, with sites without Composer, a PHPUnit add-on and behavioural verification. Next: an option to
+   change only what the target requires, a real Laravel or Symfony application with a database and security
+   configuration, `mysql_*` with AI, Symfony 8.
 
 ## Contributing
 

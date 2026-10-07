@@ -94,4 +94,37 @@ class PhpBehaviourRunnerTest {
         write(root.resolve("old"), "composer.json", "{ \"require\": { \"php\": \">=5.4.0\" } }");
         assertThat(PhpBehaviourRunner.originalPhp(root.resolve("old"))).isEqualTo("7.2");
     }
+
+    @Test
+    void findsASymfonyApplicationsRoutesWrittenEitherWay(@TempDir Path root) throws Exception {
+        write(root, "composer.json", "{ \"require\": { \"php\": \">=7.2.5\", \"symfony/framework-bundle\": \"5.4.*\" } }");
+        write(root, "public/index.php", "<?php\n");
+        write(root, "src/Controller/NoteController.php", """
+                <?php
+                namespace App\\Controller;
+
+                /**
+                 * @Route("/notes")
+                 */
+                class NoteController
+                {
+                    /**
+                     * @Route("/", name="note_list", methods={"GET"})
+                     */
+                    public function list() {}
+
+                    #[Route(path: '/{number}', name: 'note_show', requirements: ['number' => '\\d+'], methods: ['GET', 'HEAD'])]
+                    public function show(int $number) {}
+
+                    #[\\Symfony\\Component\\Routing\\Attribute\\Route('/search')]
+                    public function search() {}
+                }
+                """);
+        ProjectModel model = new PhpPlugin().model(root);
+
+        assertThat(runner.routes(model, root)).extracting(Route::method, Route::template).containsExactly(
+                tuple("GET", "/notes"), tuple("GET", "/notes/{number}"), tuple("HEAD", "/notes/{number}"), tuple(null, "/notes/search"));
+        assertThat(runner.discover(model, root)).extracting(s -> s.steps().getFirst().path())
+                .containsExactly("/", "/notes", "/notes/1", "/notes/search");
+    }
 }

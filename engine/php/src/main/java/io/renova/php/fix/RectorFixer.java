@@ -18,8 +18,10 @@ import java.util.Set;
 /**
  * Fix strategy {@code rector}: runs Rector, which rewrites PHP from its syntax tree as OpenRewrite does Java. A
  * rule's {@code recipes} are Rector set constants ({@code Rector\Set\ValueObject\LevelSetList::UP_TO_PHP_84}),
- * single rule classes, or {@code composer-based:phpunit}: the rules Rector picks itself for the version of a
- * library the project has installed. All of a stage's rules run in one pass.
+ * single rule classes, {@code composer-based:phpunit} (the rules Rector picks itself for the version of a
+ * library the project has installed), {@code attributes:symfony} (annotations in comments become PHP
+ * attributes, for the libraries named), or {@code import-names} (classes Rector wrote by their full name are
+ * imported, and imports nothing uses any more are removed). All of a stage's rules run in one pass.
  *
  * <p>The stage runs after the {@code composer} one (a playbook's composer rules are in categories A and E, its
  * Rector rules in B and C), so the libraries Rector reads, and chooses rules by, are the ones the project is
@@ -34,6 +36,7 @@ public final class RectorFixer implements Fixer {
 
     private static final Duration TIMEOUT = Duration.ofMinutes(60);
     private static final java.util.regex.Pattern COULD_NOT_PROCESS = java.util.regex.Pattern.compile("Could not process \"([^\"]+)\" file");
+    private static final java.util.regex.Pattern CHANGED = java.util.regex.Pattern.compile("\\d+ files? ha(?:s|ve) been changed");
     private static final List<String> DEFAULT_PACKAGES = List.of("rector/rector:2.7.0", "driftingly/rector-laravel:2.6.2");
 
     public static final String STRATEGY = "rector";
@@ -67,8 +70,10 @@ public final class RectorFixer implements Fixer {
             boolean installed = Files.isRegularFile(dir.resolve("vendor/composer/installed.json"));
             if (!installed) {
                 // The types the code uses, for Rector to read: what composer.json asks for now, on whatever PHP is here.
+                // The project's Composer plugins run, as they will when it is verified: Symfony Flex is what holds
+                // every symfony/* package to the release the project asks for.
                 Proc.Result install = Proc.run(PhpRuntimes.composerCommand(php, composer, "update", "--no-interaction", "--no-progress",
-                        "--no-scripts", "--no-plugins", "--ignore-platform-reqs", "-W"), dir, TIMEOUT, PhpRuntimes.environment());
+                        "--no-scripts", "--ignore-platform-reqs", "-W"), dir, TIMEOUT, PhpRuntimes.environment());
                 installed = install.ok() && Files.isRegularFile(dir.resolve("vendor/composer/installed.json"));
                 details.add(module.path() + ": the project's dependencies were " + (installed ? "installed for Rector to read"
                         : "not installable as composer.json asks for them now; Rector ran without them, and without the rules it "
@@ -101,6 +106,13 @@ public final class RectorFixer implements Fixer {
             if (!unreadable.isEmpty()) {
                 details.add(module.path() + ": left as they are, because Rector could not read them as PHP: " + String.join(", ", unreadable));
             }
+            // One rule's result is another's input (an annotation merged into another, then both written as an
+            // attribute): Rector is run again until it has nothing left to change, a few times at most.
+            for (int pass = 2; pass <= 4 && run.ok() && CHANGED.matcher(run.output()).find(); pass++) {
+                details.add("== " + module.path() + ": pass " + (pass - 1) + ": " + lastLine(run.output()));
+                run = Proc.run(List.of(php.executable().toString(), "-d", "memory_limit=-1", rector.toString(), "process",
+                        "--config", config.toString(), "--no-progress-bar", "--no-diffs", "--clear-cache"), dir, TIMEOUT, PhpRuntimes.environment());
+            }
             details.add("== " + module.path() + ": exit " + run.exitCode());
             details.add(run.tail(12));
             if (run.ok()) {
@@ -124,7 +136,11 @@ public final class RectorFixer implements Fixer {
                 .collect(java.util.stream.Collectors.joining());
         String composerBased = recipes.stream().filter(r -> r.startsWith("composer-based:")).map(r -> r.substring("composer-based:".length()) + ": true")
                 .collect(java.util.stream.Collectors.joining(", "));
-        recipes = recipes.stream().filter(r -> !r.startsWith("composer-based:")).collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        String attributes = recipes.stream().filter(r -> r.startsWith("attributes:")).map(r -> r.substring("attributes:".length()) + ": true")
+                .collect(java.util.stream.Collectors.joining(", "));
+        boolean importNames = recipes.contains("import-names");
+        recipes = recipes.stream().filter(r -> !r.startsWith("composer-based:") && !r.startsWith("attributes:") && !r.equals("import-names"))
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         List<String> sets = recipes.stream().filter(r -> r.contains("::")).map(r -> "        \\" + r.replaceFirst("^\\\\", "") + ",").toList();
         List<String> rules = recipes.stream().filter(r -> !r.contains("::")).map(r -> "        \\" + r.replaceFirst("^\\\\", "") + "::class,").toList();
         return """
@@ -135,7 +151,7 @@ public final class RectorFixer implements Fixer {
                 // Written by Renova for one migration; not part of the project.
                 return \\Rector\\Config\\RectorConfig::configure()
                     ->withPaths([%s])
-                    ->withSkip(['*/vendor/*', '*/node_modules/*', '*/storage/*', '*/bootstrap/cache/*', '*/.renova/*', '*.blade.php'%s])
+                    ->withSkip(['*/vendor/*', '*/node_modules/*', '*/storage/*', '*/bootstrap/cache/*', '*/var/*', '*/.renova/*', '*.blade.php'%s])
                     ->withSets([
                 %s
                     ])
@@ -143,7 +159,9 @@ public final class RectorFixer implements Fixer {
                 %s
                     ])%s;
                 """.formatted("'" + dir.toString().replace("\\", "\\\\").replace("'", "\\'") + "'", skip, String.join("\n", sets), String.join("\n", rules),
-                composerBased.isEmpty() ? "" : "\n    ->withComposerBased(" + composerBased + ")");
+                (composerBased.isEmpty() ? "" : "\n    ->withComposerBased(" + composerBased + ")")
+                        + (attributes.isEmpty() ? "" : "\n    ->withAttributesSets(" + attributes + ")")
+                        + (importNames ? "\n    ->withImportNames(importShortClasses: false, removeUnusedImports: true)" : ""));
     }
 
     /** Rector from the cache folder, installed there on first use; null (with the reason in details) if it cannot be. */
@@ -187,5 +205,10 @@ public final class RectorFixer implements Fixer {
             return Path.of(System.getenv("LOCALAPPDATA"), "renova", "cache");
         }
         return Path.of(System.getProperty("user.home"), ".cache", "renova");
+    }
+
+    private static String lastLine(String output) {
+        List<String> lines = output.lines().map(String::strip).filter(l -> !l.isEmpty()).toList();
+        return lines.isEmpty() ? "no output" : lines.getLast();
     }
 }

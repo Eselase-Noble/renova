@@ -49,6 +49,8 @@ public final class PhpBehaviourRunner implements BehaviourRunner {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Pattern ROUTE = Pattern.compile(
             "Route::(get|post|put|patch|delete|any|view|resource|apiResource)\\(\\s*['\"]([^'\"]*)['\"]\\s*,\\s*([^;]*?)\\)\\s*(?:->|;)");
+    /** {@code @Route("/x", name="y", methods={"GET"})} or {@code #[Route(path: '/x', methods: ['GET'])]}: the path, then the rest. */
+    private static final Pattern SYMFONY_ROUTE = Pattern.compile("(?:@|#\\[)(?:[\\w\\\\]*\\\\)?Route\\(\\s*(?:path\\s*[:=]\\s*)?['\"]([^'\"]*)['\"]([^)]*)\\)");
     private static final Pattern CONTROLLER = Pattern.compile("([A-Za-z_][\\w\\\\]*)(?:::class|@\\w+)");
     private static final Pattern VARIABLE = Pattern.compile("\\{(\\w+)\\??}");
     /** A key for the sandbox only: sessions and encrypted cookies need one, and both sides get the same. */
@@ -108,6 +110,39 @@ public final class PhpBehaviourRunner implements BehaviourRunner {
                 }
             }
             return routes;
+        }
+        if (Files.isDirectory(root.resolve("src/Controller"))) {
+            // Symfony: routes written on the controllers, as annotations or attributes; one on the class is a prefix.
+            try (Stream<Path> files = Files.walk(root.resolve("src/Controller"))) {
+                for (Path controller : files.filter(f -> f.toString().endsWith(".php")).sorted().toList()) {
+                    String code = read(controller);
+                    int declared = code.indexOf("\nclass ");
+                    String prefix = "";
+                    Matcher m = SYMFONY_ROUTE.matcher(code);
+                    while (m.find()) {
+                        if (declared >= 0 && m.start() < declared) {
+                            prefix = m.group(1);
+                            continue;
+                        }
+                        String template = (prefix + "/" + m.group(1)).replaceAll("/+", "/").replaceAll("(?<=.)/$", "");
+                        Matcher methods = Pattern.compile("methods\\s*[=:]\\s*[\\[{]([^\\]}]*)[\\]}]").matcher(m.group(2));
+                        String handler = root.relativize(controller).toString().replace('\\', '/');
+                        if (!methods.find()) {
+                            routes.add(new Route(null, template, handler));
+                        } else {
+                            Matcher method = Pattern.compile("[A-Z]+").matcher(methods.group(1));
+                            while (method.find()) {
+                                routes.add(new Route(method.group(), template, handler));
+                            }
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            if (!routes.isEmpty()) {
+                return routes;
+            }
         }
         String docRoot = documentRoot(root);
         if (docRoot != null) {

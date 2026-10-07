@@ -1,0 +1,79 @@
+# A Symfony application → Symfony 6.4 (a long-term-support release) on PHP 8.3, from Symfony 4, 5 or 6. The
+# framework's packages, PHP, annotations as attributes, the bundle the framework took in, and the code changes
+# of every Symfony release on the way, as far as rules can; configuration that a release removed goes to the
+# build's errors, AI repair and a person.
+
+id: symfony-6.4
+name: "Symfony → 6.4 (PHP 8.3)"
+ecosystem: php
+version: 0.1.0
+description: >
+  Moves a Symfony application to Symfony 6.4 on PHP 8.3: every symfony/* package released with the framework,
+  annotations to attributes, SensioFrameworkExtraBundle out, Rector's Symfony rules for each release on the
+  way, and PHP 8.3 syntax. Verified on PHP 8.3 with Composer, a syntax check and the application's tests.
+targets:
+  php: "8.3"
+  symfony: "6.4"
+
+settings:
+  rector:
+    packages: ["rector/rector:2.7.0", "driftingly/rector-laravel:2.6.2"]
+
+include:
+  - packs/symfony.yaml
+  - packs/php-language.yaml
+
+rules:
+
+  - id: php-version
+    title: Require PHP 8.3
+    category: A
+    severity: BLOCKER
+    detect: { type: phpVersionBelow, version: "8.3" }
+    fix:
+      strategy: composer
+      params: { action: setPhp, constraint: "^8.3" }
+    rationale: Symfony 6.4 needs PHP 8.1 or later; 8.3 is a release every package of the framework supports.
+
+  - id: symfony-packages
+    title: Upgrade the Symfony packages to 6.4
+    category: A
+    severity: BLOCKER
+    detect:
+      type: composerPackage
+      names: ["symfony/*"]
+      # Packages that have their own version numbers, not the framework's.
+      except: ["symfony/flex", "symfony/monolog-bundle", "symfony/maker-bundle", "symfony/webpack-encore-bundle",
+               "symfony/polyfill-*", "symfony/contracts", "symfony/*-contracts", "symfony/stimulus-bundle", "symfony/ux-*",
+               "symfony/panther", "symfony/thanks", "symfony/orm-pack", "symfony/test-pack", "symfony/debug-pack",
+               "symfony/profiler-pack", "symfony/twig-pack", "symfony/serializer-pack", "symfony/apache-pack",
+               "symfony/deprecation-contracts", "symfony/requirements-checker", "symfony/mercure*", "symfony/asset-mapper-*"]
+      constraintBelow: "6.4"
+    fix:
+      strategy: composer
+      params: { action: setVersion, constraint: "6.4.*" }
+
+  - id: symfony-flex-require
+    title: The Symfony version Flex holds every package to
+    category: A
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["composer.json"]
+      pattern: "\"require\"\\s*:\\s*\"[2-6]\\.\\d+\\.\\*\""
+    fix:
+      strategy: replace
+      include: "composer.json"
+      regex: true
+      find: "(\"symfony\"\\s*:\\s*\\{[^}]*?\"require\"\\s*:\\s*\")[^\"]*(\")"
+      replace: "$16.4.*$2"
+    rationale: extra.symfony.require restricts every symfony/* package; left at the old release, nothing can be installed.
+
+  - id: symfony-code
+    title: Code changes of every Symfony release up to 6.4, and PHP 8.3 syntax
+    category: C
+    severity: BLOCKER
+    detect: { type: composerPackage, names: [symfony/framework-bundle], constraintBelow: "6.4" }
+    fix:
+      strategy: rector
+      recipes: ["composer-based:symfony", "composer-based:twig", "composer-based:doctrine", "Rector\\Set\\ValueObject\\LevelSetList::UP_TO_PHP_83"]

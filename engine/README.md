@@ -44,7 +44,7 @@ This is the headline number for customers.
 - `core` (`renova-core`): ecosystem-neutral engine (model, playbooks, SPI, analyzer, planner, migrator, workspace, AI loop, reports)
 - `ai-anthropic` (`renova-ai-anthropic`): Claude provider (official Anthropic Java SDK, JSON-schema responses, streaming, refusal handling)
 - `ai-openai` (`renova-ai-openai`): OpenAI provider (official OpenAI Java SDK, strict JSON-schema responses, streaming); works with OpenAI-compatible servers through `openai.baseUrl`
-- `php` (`renova-php`): PHP plugin (Composer project model, `phpVersionBelow` and `composerPackage` detectors, the `composer` and `rector` fixers, a verifier that runs Composer, a syntax check and PHPUnit or Pest on the target PHP, PHP → 8.3/8.4/8.5 and Laravel → 11/12/13 playbooks)
+- `php` (`renova-php`): PHP plugin (Composer project model, `phpVersionBelow` and `composerPackage` detectors, the `composer` and `rector` fixers, a verifier that runs Composer, a syntax check and PHPUnit or Pest on the target PHP, PHP → 8.3/8.4/8.5, Laravel → 11/12/13 and Symfony → 6.4/7.4 playbooks, behaviour verification on PHP's own web server)
 - `dotnet` (`renova-dotnet`): .NET plugin (C# and Visual Basic project model in both project formats, .NET detectors, the `dotnet` project-file fixer, `dotnet build`/`dotnet test` verifier, .NET → 10 and → 8 playbooks)
 - `java` (`renova-java`): Java plugin (Maven/Gradle model, Java detectors, OpenRewrite fixer, Maven verifier, Java 8→21/Jakarta playbook)
 

@@ -87,8 +87,27 @@ public final class PhpPlugin implements EcosystemPlugin {
      */
     @Override
     public Optional<io.renova.core.engine.StageResult> prepare(Path workspace, Map<String, String> options) throws Exception {
+        // What a framework compiled for the versions the project had: a container, routes, views. Read by the
+        // new versions it stops the application before a single test runs.
+        int caches = 0;
+        for (String dir : List.of("var/cache", "bootstrap/cache", "storage/framework/cache/data", "storage/framework/views")) {
+            Path cache = workspace.resolve(dir);
+            if (!Files.isDirectory(cache)) {
+                continue;
+            }
+            try (java.util.stream.Stream<Path> files = Files.walk(cache)) {
+                for (Path p : files.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                    if (!p.equals(cache) && !p.getFileName().toString().equals(".gitignore") && !(Files.isDirectory(p) && hasEntries(p))) {
+                        Files.delete(p);
+                        caches++;
+                    }
+                }
+            }
+        }
         if (!plainSite(workspace)) {
-            return Optional.empty();
+            return caches == 0 ? Optional.empty() : Optional.of(new io.renova.core.engine.StageResult("prepare",
+                    io.renova.core.engine.StageResult.Status.APPLIED, "compiled caches of the framework removed from the copy ("
+                    + caches + " file(s) and folder(s)): they were built for the versions the project had", List.of()));
         }
         String name = workspace.getFileName().toString().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
         Files.writeString(workspace.resolve("composer.json"), """
@@ -192,6 +211,12 @@ public final class PhpPlugin implements EcosystemPlugin {
         return "none";
     }
 
+    private static boolean hasEntries(Path dir) throws IOException {
+        try (java.util.stream.Stream<Path> entries = Files.list(dir)) {
+            return entries.findAny().isPresent();
+        }
+    }
+
     /** A Laravel application goes to the current Laravel; anything else to a PHP most libraries already support. */
     @Override
     public String recommendedPlaybook(Path root, List<String> candidates) {
@@ -201,7 +226,13 @@ public final class PhpPlugin implements EcosystemPlugin {
         } catch (IOException e) {
             // Falls through to the PHP target.
         }
-        String wanted = laravel ? "laravel-13" : "php-to-8.4";
+        boolean symfony = false;
+        try {
+            symfony = model(root).modules().stream().anyMatch(m -> String.valueOf(m.fact("framework")).startsWith("symfony"));
+        } catch (IOException e) {
+            // Falls through to the PHP target.
+        }
+        String wanted = laravel ? "laravel-13" : symfony ? "symfony-7.4" : "php-to-8.4";
         return candidates.contains(wanted) ? wanted : candidates.getFirst();
     }
 
@@ -258,6 +289,7 @@ public final class PhpPlugin implements EcosystemPlugin {
     public List<String> bundledPlaybooks() {
         return List.of("playbooks/php/php-to-8.4.yaml", "playbooks/php/php-to-8.5.yaml", "playbooks/php/php-to-8.3.yaml",
                 "playbooks/php/laravel-13.yaml", "playbooks/php/laravel-12.yaml", "playbooks/php/laravel-11.yaml",
+                "playbooks/php/symfony-7.4.yaml", "playbooks/php/symfony-6.4.yaml",
                 // Add-ons: optional, combined with a target (php-to-8.4+phpunit11).
                 "playbooks/php/addons/phpunit11.yaml");
     }
@@ -270,7 +302,7 @@ public final class PhpPlugin implements EcosystemPlugin {
             }
         }
         String path = relative.toString().replace('\\', '/');
-        return path.startsWith("storage/") || path.startsWith("bootstrap/cache/");
+        return path.startsWith("storage/") || path.startsWith("bootstrap/cache/") || path.startsWith("var/");
     }
 
     /**
