@@ -8,7 +8,7 @@ the web console. Plain HTML, one stylesheet and one script; there is nothing to 
 | `index.html` | Product page |
 | `download.html` | Installers and the other downloads |
 | `docs.html` | Getting started |
-| `styles.css` | Every style, with the light and dark themes |
+| `styles.css` | Every style. Light is the default theme; dark is used when a visitor switches to it |
 | `site.js` | The theme switch, and download links read from the latest GitHub release |
 
 Look at it locally with `python3 -m http.server -d website 8000` and open http://localhost:8000.

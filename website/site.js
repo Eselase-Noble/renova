@@ -3,20 +3,15 @@
 
 const REPO = "Eselase-Noble/renova";
 
-// ---- Theme: the system's until the visitor chooses, then theirs on this device.
+// ---- Theme: light, until the visitor switches; their choice is kept on this device.
 (function theme() {
-  let saved = null;
-  try { saved = localStorage.getItem("renova-theme"); } catch { /* private window: follow the system */ }
-  if (saved === "light" || saved === "dark") document.documentElement.dataset.theme = saved;
+  const root = document.documentElement;
   document.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-theme-toggle]");
-    if (!button) return;
-    const dark = document.documentElement.dataset.theme
-      ? document.documentElement.dataset.theme === "dark"
-      : matchMedia("(prefers-color-scheme: dark)").matches;
-    const next = dark ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    try { localStorage.setItem("renova-theme", next); } catch { /* not remembered, still applied */ }
+    if (!event.target.closest("[data-theme-toggle]")) return;
+    const dark = root.dataset.theme !== "dark";
+    if (dark) root.dataset.theme = "dark";
+    else delete root.dataset.theme;
+    try { localStorage.setItem("renova-theme", dark ? "dark" : "light"); } catch { /* not remembered, still applied */ }
   });
 })();
 
@@ -46,7 +41,7 @@ function megabytes(bytes) {
 }
 
 async function downloads() {
-  const targets = document.querySelectorAll("[data-download], [data-release-version], [data-download-os]");
+  const targets = document.querySelectorAll("[data-download], [data-download-os]");
   if (targets.length === 0) return;
 
   const mine = platform();
@@ -70,12 +65,6 @@ async function downloads() {
       if (match.test(asset.name)) files[kind] = asset;
     }
   }
-  const version = (release.tag_name ?? "").replace(/^v/, "");
-  document.querySelectorAll("[data-release-version]").forEach((el) => { el.textContent = version; });
-  document.querySelectorAll("[data-release-date]").forEach((el) => {
-    el.textContent = new Date(release.published_at).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
-  });
-
   document.querySelectorAll("[data-download]").forEach((el) => {
     const kind = el.dataset.download === "auto" ? mine : el.dataset.download;
     const asset = kind && files[kind];
@@ -84,7 +73,7 @@ async function downloads() {
     const size = el.closest("[data-download-row]")?.querySelector("[data-size]") ?? document.querySelector(`[data-size-for="${el.dataset.download}"]`);
     if (size) size.textContent = megabytes(asset.size);
     const name = document.querySelector(`[data-file-for="${el.dataset.download}"]`);
-    if (name) name.textContent = `${asset.name} · ${megabytes(asset.size)}`;
+    if (name) name.textContent = `${megabytes(asset.size)} · Free to install. Assessing projects needs no licence.`;
   });
   document.querySelectorAll("[data-download-note]").forEach((el) => {
     if (mine) el.textContent = KINDS[mine].note;

@@ -10,7 +10,7 @@
 <meta property="og:type" content="website">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="styles.css">
-<script>try{var t=localStorage.getItem("renova-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<script>try{if(localStorage.getItem("renova-theme")==="dark")document.documentElement.dataset.theme="dark"}catch(e){}</script>
 <script type="module" src="site.js"></script>
 </head>
 <body>
@@ -37,7 +37,7 @@
 <section class="hero">
   <div class="wrap hero-grid">
     <div>
-      <div class="eyebrow"><span class="dot"></span>Version <span data-release-version>0.2</span> · Java, .NET and PHP</div>
+      <div class="eyebrow"><span class="dot"></span>For Java, .NET and PHP systems</div>
       <h1>Move legacy systems to a <span class="grad">current platform</span>, and prove they still work.</h1>
       <p class="lead">Renova assesses an old codebase, migrates a copy of it, builds the result, runs its tests and compares its behaviour with the original. Rules do the mechanical bulk; AI on your own key handles what needs judgement; a report lists exactly what is left.</p>
       <div class="cta">

@@ -1,5 +1,6 @@
 /* Renova website. One stylesheet, no build step. Colours follow the product: neutrals carry a little of the
-   brand hue (268), and the dark theme is the same family, not an inversion. */
+   brand hue (268). The light theme is the default; the dark one, the same family and not an inversion, is used
+   only when the visitor switches to it. */
 
 :root {
   --bg: oklch(0.985 0.003 268);
@@ -23,26 +24,6 @@
   --radius: 14px;
   --wrap: 1120px;
   color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: oklch(0.17 0.02 268);
-    --surface: oklch(0.21 0.024 268);
-    --surface-2: oklch(0.245 0.028 268);
-    --text: oklch(0.95 0.008 268);
-    --muted: oklch(0.72 0.02 268);
-    --border: oklch(0.31 0.03 268);
-    --brand: oklch(0.7 0.16 268);
-    --brand-strong: oklch(0.78 0.13 268);
-    --brand-soft: oklch(0.28 0.06 268);
-    --on-brand: oklch(0.16 0.03 268);
-    --accent: oklch(0.78 0.14 165);
-    --warn: oklch(0.8 0.12 80);
-    --code-bg: oklch(0.13 0.02 268);
-    --shadow: 0 1px 2px oklch(0 0 0 / 30%), 0 10px 30px oklch(0 0 0 / 35%);
-    color-scheme: dark;
-  }
 }
 
 :root[data-theme="dark"] {
