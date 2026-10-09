@@ -1,10 +1,14 @@
-# Publishes the website (the website folder, as it is: no build step) to GitHub Pages when it changes on the
-# production branch. Needs Pages switched on once: Settings → Pages → Source: GitHub Actions.
+# Publishes the website (the website folder, as it is: no build step) to GitHub Pages when it changes on
+# production or main. Needs Pages switched on once: Settings → Pages → Source: GitHub Actions.
+#
+# GitHub lets only the branches named in Settings → Environments → github-pages deploy, and names only the
+# default branch there to begin with. Until production is added to that list its runs are refused and the
+# run from main publishes the site.
 name: Website
 
 on:
   push:
-    branches: [production]
+    branches: [production, main]
     paths: ["website/**", ".github/workflows/website.yml"]
   workflow_dispatch:
 
