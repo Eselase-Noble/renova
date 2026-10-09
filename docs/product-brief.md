@@ -39,7 +39,8 @@ nobody can say how big it is or whether the result still works.
 | Spring Boot 2 or 3 | Spring Boot 3.5 or 4.1 | No AI |
 | Micronaut 2 or 3, Quarkus 1 or 2 | Micronaut 4, Quarkus 3 | No AI |
 | Java EE on an application server | Spring Boot | No AI for the standard APIs |
-| Ant projects | A Maven build, then any of the above | No AI |
+| Ant projects, one or several under one root | A Maven build (with modules), then any of the above | No AI |
+| WCF services hosted by IIS | CoreWCF on ASP.NET Core | No AI |
 | Struts 1, Jersey 1, Commons HttpClient 3 | Spring MVC, Jersey 3, HttpClient 5 | With AI |
 | iBATIS 2, Hibernate's legacy Criteria | MyBatis 3, the JPA Criteria API on Hibernate 6 | With AI |
 | .NET Framework, .NET Core, .NET 5 to 9 (C# and Visual Basic) | .NET 10 or 8 | No AI |
@@ -78,7 +79,8 @@ Said plainly, because a buyer will ask:
 
 - The AI-assisted results above are each one small application, run once. Large Struts or MVC applications
   have not been tried.
-- .NET: Web Forms, WCF services and Entity Framework 6 → EF Core are reported, not migrated. Windows Forms and
+- .NET: Web Forms and Entity Framework 6 → EF Core are reported, not migrated. WCF services are moved when IIS
+  hosted them (one sample, run and called by hand); self-hosted ones are reported. Windows Forms and
   WPF projects are converted and have not been built (that needs Windows). The original .NET Framework
   applications could not be run here, so .NET results are checked by build and tests, not against the original.
 - Java: EJB 2, JAX-RPC, Faces managed beans and iBATIS are planned with the mapping written out and have not

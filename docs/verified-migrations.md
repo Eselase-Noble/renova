@@ -32,6 +32,8 @@ Last run: 6 October 2026, on Java 21 and Maven 3.8; the three Gradle rows at the
 | Payroll web application (servlet, JSP, six jars in `lib` folders, one of them unpublished) | Ant | Java 6, Servlet 2.5 | A Maven build in the standard layout, Java 21, Jakarta EE 10 | Pass | 5/5 |
 | Payroll (same) | Ant | Java 6, Servlet 2.5 | Spring Boot 3.5 WAR that also runs on its own, Java 21 | Pass | 4/4 |
 | Ledger (EJB, CDI, JAX-RS, JPA, JBoss descriptors) | Maven | Java EE 7 on JBoss, Java 8 | Spring Boot 3.5 executable jar, Java 21 | Pass | 8/8 |
+| Ledger (same, built with Gradle: the `war` plugin and `providedCompile` of the platform API) | Gradle | Java EE 7 on JBoss, Java 8 | Spring Boot 3.5 executable jar built by Spring Boot's Gradle plugin, Java 21 | Pass (the start-up test) | run by hand, 9 October 2026 |
+| Depot (two Ant projects, a library and the web application that names its jar, with jars shared from a folder above both and one unpublished jar) | Ant | Java 6, Servlet 2.5 | A Maven parent with two modules, the second depending on the first, Java 21, Jakarta EE 10 | Pass (6 tests in the two modules; the WAR packages the library module) | run by hand, 7 October 2026 |
 | Helpdesk (Struts actions, with a test that sets one up by hand) | Maven | Struts 2.5, Java 8 | Struts 7.4, Jakarta EE 10, Java 21 | Pass | 3/3 |
 | Tasks service in Kotlin (web, JPA, validation) | Maven | Spring Boot 2.7, Kotlin 1.6, Java 11 | Spring Boot 3.5, Kotlin 1.9, Java 21 | Pass | 4/4 |
 | Tasks service in Kotlin (same) | Gradle 7.5 | Spring Boot 2.7, Kotlin 1.6, Java 11 | Spring Boot 3.5, Kotlin 1.9, Java 21, Gradle 8.5 | Pass | 4/4 |
@@ -71,6 +73,7 @@ Run on 7 October 2026 with the .NET SDK 10.0.401 on Linux, no AI:
 | Billing (C# library and NUnit tests; project files in the format before the SDK, `packages.config`, an embedded resource, a stale source file on disk) | .NET Framework 4.8 | .NET 10 | Pass (7 tests) | 6/6 |
 | Ledger (Visual Basic library and tests on the MSTest that came with Visual Studio; no solution file) | .NET Framework 4.7.2 | .NET 10 | Pass (4 tests) | 5/5 |
 | Orders (ASP.NET Core web API, Entity Framework Core, xUnit tests that start the application in memory) | .NET Core 3.1 | .NET 10 | Pass (4 tests) | 3/3 |
+| Rates (a WCF service application as IIS hosted it: two `.svc` files, one service with its endpoints in `Web.config` and one with none, a typed fault, a one-way operation, settings read with `ConfigurationManager`; NUnit tests) | WCF on .NET Framework 4.8 | CoreWCF 1.8 on ASP.NET Core, .NET 10 | Pass (4 tests). Started and called over SOAP by hand: the WSDL, a conversion, the setting from `App.config`, the fault for an unknown currency with its detail, and both services at their `.svc` addresses answer as the code says | run by hand, 9 October 2026 |
 | Orders (same) | .NET Core 3.1 | .NET 8 | Pass (4 tests) | 2/2 |
 | Stateless (public, Apache-2.0: a portable class library, three console examples, tests on NUnit 2.4 kept as a file) | .NET Framework 4.0 / PCL profile 136, as of February 2016 | .NET 10, NUnit 3.14 | Pass (73 tests) | 6/6 |
 
@@ -84,7 +87,8 @@ before its maintainers moved it to the SDK style; `benchmark/fetch-public.sh` fe
 used `[ExpectedException]`, which Renova rewrote as `Assert.Throws`. The other three projects are synthetic
 and small. The .NET Framework originals could not be built on this machine (their format needs Visual Studio's
 MSBuild on Windows), so what is shown is that the migrated projects build and their tests pass, not that the
-originals did. Not run: Entity Framework 6, multi-targeted libraries, Web Forms.
+originals did. For the same reason the WCF result is not compared with the original service: IIS hosted it.
+Not run: Entity Framework 6, multi-targeted libraries, Web Forms.
 
 **Compiled, not yet run.** Three Windows desktop applications (`benchmark/dotnet-windows.yaml`) migrate to
 `net10.0-windows` and compile on Linux with the Windows targeting pack, 12 of 12 checks: Desk (C# Windows
@@ -217,10 +221,14 @@ It is not in the suite, because the suite holds what passes without AI. `benchma
   halves, each with the pages and descriptors; that has not been tried on a real one.
 - **Re-platforming is verified by a start-up test and the project's own tests,** not by comparing behaviour.
   The data source, security domain and anything the server's console configured are listed for a person.
-- **Gradle.** Re-platforming to Spring Boot and the generated build for Ant projects are Maven only, and so is
-  behavioural verification. Kotlin build scripts (`build.gradle.kts`) are handled by the same guards and are
+- **Gradle.** The build generated for Ant projects is a Maven build, and behavioural verification of
+  re-platformed applications is Maven only. Re-platforming a Gradle build has been run on one small Groovy
+  build script; the Kotlin form is covered by unit tests. Kotlin build scripts (`build.gradle.kts`) are handled by the same guards and are
   covered by unit tests, not by a migrated project.
-- **Ant builds with several modules** (one build.xml calling others) get one Maven module from the root build.
+- **Ant builds with several projects** become Maven modules where each project has its own build.xml and
+  sources. A single build.xml that compiles several source folders still gives one module. Dependencies
+  between the projects are read from the paths their builds name; one that is wired another way (an
+  environment variable, a copied jar) has to be added to the module's pom by hand.
 - **Identifying jars needs the network.** Offline, an Ant project's libraries stay files and are not upgraded.
 - **Changes that need judgement.** The original suite ([`benchmark/suite.yaml`](../benchmark/suite.yaml)) has
   four applications built so that the last changes need AI or a person: removed JDK APIs whose replacement

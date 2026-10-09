@@ -335,7 +335,10 @@ standard layout (`src/main/java`, `src/test/java`, `src/main/webapp`), read from
 folders such projects use. Each jar the project carried becomes a declared dependency: the published library
 when the jar names its coordinates or Maven Central has a file with the same checksum, so that upgrades can
 change its version, and otherwise the same file in a repository folder inside the project (`renova-libs`).
-Then the project is migrated like any other. The original is never changed.
+Then the project is migrated like any other. The original is never changed. A build of several Ant projects
+(a root `build.xml` that calls others with `<ant>` or `<subant>`, or folders that each have their own)
+becomes a Maven parent with one module per project: libraries shared from a folder above the projects are
+declared once in the parent, and a project whose build names another's folder depends on that module.
 
 **Kotlin.** Kotlin sources in a Maven or Gradle build are rewritten by the same recipes, and the Kotlin compiler
 (in Gradle, every Kotlin plugin) is moved to one that knows the target Java release. Groovy and Scala sources are read when a project is assessed.
@@ -433,9 +436,17 @@ controllers, Razor views, routes, `Global.asax`, `App_Start` and `Web.config` to
 `appsettings.json` and `_ViewImports.cshtml` added and the files only System.Web read removed. The build and
 the solution's tests check the result ([one run](docs/verified-migrations.md#with-ai)).
 
-Found and planned, not changed: Web Forms and WCF services hosted in IIS are left for a person with the
-mapping written out; BinaryFormatter and JavaScriptSerializer go to AI (not yet run); WCF hosting, Remoting,
-`Thread.Abort` and code-page encodings are listed for a person.
+**WCF services that IIS hosted** (a project with `.svc` files) are hosted with CoreWCF on ASP.NET Core, without
+AI: the contracts and service classes keep their code under the `CoreWCF` namespace, a `Program.cs` registers
+each service at the address its `.svc` file had with the endpoints `Web.config` declared (or the
+basicHttpBinding endpoint IIS gave a service without any), the WSDL is published as before, and `Web.config`
+stays as an `App.config` so that `ConfigurationManager` still finds the settings. Bindings other than
+basicHttpBinding, wsHttpBinding and webHttpBinding, and security, throttling and quota settings, are named in
+the report for a person. C# only.
+
+Found and planned, not changed: Web Forms are left for a person with the mapping written out;
+BinaryFormatter and JavaScriptSerializer go to AI (not yet run); WCF services a program hosts itself
+(`ServiceHost` in code), Remoting, `Thread.Abort` and code-page encodings are listed for a person.
 
 **Windows Forms and WPF** projects (C# and Visual Basic, including Visual Basic's application framework)
 become `net10.0-windows` projects, and the tests that refer to them follow. They compile on any system with
@@ -541,13 +552,13 @@ source migrates without one. See [docs/licensing.md](docs/licensing.md).
    ([what and how](docs/deployment.md#signing-the-installers)).
 5. **More targets and ecosystems:** Java 17/21/25, Spring Boot 3 and 4.1, Spring Framework 7 with Jakarta EE 11,
    Micronaut 4, Quarkus 3, Hibernate 6 and 7, Struts 7, library add-ons, Gradle builds, Ant builds, Kotlin and
-   Java EE → Spring Boot are in, with Gradle builds of Kotlin, Micronaut and Quarkus projects. Next for Java:
-   re-platforming a Gradle build, multi-module Ant builds, AI runs of the remaining legacy frameworks (EJB 2,
-   JAX-RPC, Faces managed beans, iBATIS).
+   Java EE → Spring Boot are in, with Gradle builds of Kotlin, Micronaut and Quarkus projects. Re-platforming a Gradle build and
+   multi-module Ant builds are in. Next for Java: AI runs of the remaining legacy frameworks (EJB 2, JAX-RPC,
+   Faces managed beans).
 6. **.NET:** .NET Framework, .NET Core and older .NET → .NET 10 or 8 is in for C# and Visual Basic class
    libraries, console applications, test projects and ASP.NET Core applications, with NUnit 2 → 3 and, with
-   AI, ASP.NET MVC 5 and Web API 2 → ASP.NET Core. Next: a larger real MVC application, Entity Framework 6 →
-   EF Core, Windows Forms and WPF verified on Windows, Web Forms. Behavioural verification runs ASP.NET Core
+   AI, ASP.NET MVC 5 and Web API 2 → ASP.NET Core; WCF services hosted by IIS move to CoreWCF. Next: a larger
+   real MVC application, Entity Framework 6 → EF Core, Windows Forms and WPF verified on Windows, Web Forms. Behavioural verification runs ASP.NET Core
    applications; classic ASP.NET originals need IIS on Windows.
 7. **PHP:** a chosen PHP version (8.3, 8.4, 8.5), Laravel version (11, 12, 13) and Symfony version (6.4, 7.4, 8.1)
    are in, with sites without Composer, plain PHP sites into Laravel 13, add-ons for PHPUnit 11 and for

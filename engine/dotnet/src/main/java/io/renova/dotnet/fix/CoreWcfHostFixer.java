@@ -386,6 +386,8 @@ public final class CoreWcfHostFixer implements Fixer {
                 using CoreWCF;
                 using CoreWCF.Configuration;
                 using CoreWCF.Description;
+                using Microsoft.AspNetCore.Builder;
+                using Microsoft.Extensions.DependencyInjection;
 
                 var builder = WebApplication.CreateBuilder(args);
                 builder.Services.AddServiceModelServices();

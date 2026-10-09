@@ -749,7 +749,7 @@ public final class SpringBootReplatformer implements Fixer {
                     : "tasks.withType(Test).configureEach {\n    useJUnitPlatform()\n}\n");
         }
         // Lines taken out leave their blank lines behind.
-        build = build.replaceAll("\\n{3,}", "\n\n");
+        build = build.replaceAll("\\n{3,}", "\n\n").replaceAll("(dependencies\\s*\\{\\n)[ \\t]*\\n", "$1");
         notes.add("the Gradle build: Spring Boot " + boot + " manages the versions; " + String.join(", ", starters)
                 + (removed > 0 ? " in place of " + removed + " server API dependenc" + (removed == 1 ? "y" : "ies") : "")
                 + "; packaged as " + (webContent ? "a WAR that also runs on its own (bootWar)" : "an executable jar (bootJar)"));
