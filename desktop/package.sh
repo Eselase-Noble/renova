@@ -38,8 +38,20 @@ DIST=desktop/target/dist
 
 # jpackage makes one thing per run and wants an empty folder for an application image, so each is made in a
 # folder of its own and the results are gathered in DIST.
+# What makes the installed application findable: an entry in the Start menu or the applications menu. Without
+# these an installer puts the files in place and leaves nothing to click.
+shortcuts() { # type
+  case "$1" in
+    # The upgrade id is the same for every version, so installing a newer one replaces the older.
+    msi|exe) echo --win-menu --win-menu-group Renova --win-shortcut --win-dir-chooser --win-upgrade-uuid 94fd60d3-6fd1-4bf8-8b02-f11d73b139f8 ;;
+    deb|rpm) echo --linux-shortcut --linux-menu-group "Development;" ;;
+  esac
+}
+
 package() { # type, destination
+  # shellcheck disable=SC2046  # the options are separate words on purpose
   jpackage --type "$1" \
+    $(shortcuts "$1") \
     ${SIGNING[@]+"${SIGNING[@]}"} \
     --name Renova \
     --app-version "$VERSION" \

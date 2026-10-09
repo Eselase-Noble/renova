@@ -39,7 +39,7 @@
     <nav class="toc" aria-label="On this page">
       <strong>Start</strong>
       <a href="#first">Your first assessment</a>
-      <a href="#desktop">Desktop app</a>
+      <a href="#desktop">Install and start</a>
       <strong>Tools</strong>
       <a href="#cli">Command line</a>
       <a href="#ide">VS Code and IntelliJ</a>
@@ -57,26 +57,29 @@
 
       <h2 id="first">Your first assessment</h2>
       <ol>
-        <li><a href="download.html">Download</a> and install the desktop app.</li>
-        <li>Choose <strong>Add project</strong> and pick the folder that holds the project's <code>pom.xml</code>, <code>build.gradle</code>, <code>build.xml</code>, <code>.sln</code>, <code>composer.json</code> or <code>index.php</code>.</li>
+        <li><a href="download.html">Download</a> and install the desktop app, then <a href="#desktop">start it</a> from your Start menu, Launchpad or applications menu.</li>
+        <li>Choose <strong>Open project folder…</strong> and pick the folder that holds the project's <code>pom.xml</code>, <code>build.gradle</code>, <code>build.xml</code>, <code>.sln</code>, <code>composer.json</code> or <code>index.php</code>.</li>
         <li>Read the assessment: what was found, by category and severity, and the share that needs no human decision.</li>
         <li>Choose a target and an empty folder for the migrated copy, then start the migration.</li>
       </ol>
-      <p>The project you added is only read. Everything Renova writes goes into the folder you chose, as a git repository with one commit per stage and a report in <code>.renova/report.md</code>.</p>
+      <p>The project you opened is only read. Everything Renova writes goes into the folder you chose, as a git repository with one commit per stage and a report in <code>.renova/report.md</code>.</p>
 
-      <h2 id="desktop">Desktop app</h2>
+      <h2 id="desktop">Install and start the desktop app</h2>
       <p>The installer carries its own Java runtime. Projects, settings and results are kept on your device; there is no server and no account.</p>
       <div class="table-wrap"><table>
-        <thead><tr><th>System</th><th>Install</th></tr></thead>
+        <thead><tr><th>System</th><th>Install</th><th>Start it</th></tr></thead>
         <tbody>
-          <tr><td>Windows</td><td>Run the <code>.msi</code>. SmartScreen warns because the installer is not signed yet: <em>More info → Run anyway</em>.</td></tr>
-          <tr><td>macOS</td><td>Take the installer for your Mac: <strong>Apple Silicon</strong> (M1 and later) or <strong>Intel</strong>; Apple menu → About This Mac says which. Open the <code>.dmg</code> and drag Renova to Applications. The first time, right-click the app and choose <em>Open</em>.</td></tr>
-          <tr><td>Debian, Ubuntu, Mint</td><td><code>sudo apt install ./renova_*_amd64.deb</code></td></tr>
+          <tr><td>Windows</td><td>Run the <code>.msi</code>. SmartScreen warns because the installer is not signed yet: <em>More info → Run anyway</em>.</td><td>Open the <strong>Start menu</strong> and type <em>Renova</em>, or use the shortcut on the desktop.</td></tr>
+          <tr><td>macOS</td><td>Take the installer for your Mac: <strong>Apple Silicon</strong> (M1 and later) or <strong>Intel</strong>; Apple menu → About This Mac says which. Open the <code>.dmg</code> and drag Renova to Applications.</td><td>Open <strong>Launchpad</strong> or the Applications folder and choose Renova. The first time, right-click it and choose <em>Open</em>, then <em>Open</em> again.</td></tr>
+          <tr><td>Debian, Ubuntu, Mint</td><td><code>sudo apt install ./renova_*_amd64.deb</code></td><td rowspan="2">Open the <strong>applications menu</strong> and search for <em>Renova</em> (it is under Development). From a terminal: <code>/opt/renova/bin/Renova</code></td></tr>
           <tr><td>Fedora, RHEL, openSUSE</td><td><code>sudo dnf install ./renova-*.x86_64.rpm</code> (openSUSE: <code>sudo zypper install</code>)</td></tr>
-          <tr><td>Arch, Manjaro</td><td><code>sudo pacman -U renova-*.pkg.tar.zst</code>, then start it with <code>renova-desktop</code> or from the menu</td></tr>
-          <tr><td>Any other Linux</td><td>Unpack the <code>.tar.gz</code> anywhere and run <code>Renova/bin/Renova</code>. Nothing is installed; delete the folder to remove it.</td></tr>
+          <tr><td>Arch, Manjaro</td><td><code>sudo pacman -U renova-*.pkg.tar.zst</code></td><td>The applications menu, or <code>renova-desktop</code> in a terminal.</td></tr>
+          <tr><td>Any other Linux</td><td>Unpack the <code>.tar.gz</code> anywhere. Nothing is installed; delete the folder to remove it.</td><td>Run <code>Renova/bin/Renova</code> from the folder you unpacked.</td></tr>
         </tbody>
       </table></div>
+      <p>When it opens it says <em>No projects yet</em>. Choose <strong>Open project folder…</strong> and pick a project: that is the <a href="#first">first assessment</a> above. If the menu entry does not appear on Linux straight away, sign out and in again; some desktops read new entries only then.</p>
+      <h3 id="uninstall">Removing it</h3>
+      <p>Windows: <strong>Settings → Apps → Installed apps → Renova → Uninstall</strong>. macOS: drag Renova from Applications to the Bin. Linux: <code>sudo apt remove renova</code>, <code>sudo dnf remove renova</code> or <code>sudo pacman -R renova</code>. Your projects, migrated copies and settings are not touched; settings are in <code>~/.config/renova</code> (<code>%APPDATA%\renova</code> on Windows).</p>
       <p>Settings hold the AI provider and key, the licence, and where JDKs, the .NET SDK and PHP are found if not in the usual places.</p>
 
       <h2 id="cli">Command line</h2>

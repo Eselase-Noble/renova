@@ -19,6 +19,10 @@ Pushing a version tag builds every part at that version and attaches it to a Git
 | `renova-intellij-VERSION.zip` | **IntelliJ IDEA plugin** (2025.2+) | Nothing |
 | `SHA256SUMS.txt` | Checksums of all of the above | |
 
+Starting the desktop app after installing it: the Start menu or the desktop shortcut on Windows; Launchpad or
+the Applications folder on macOS; the applications menu (Development) on Linux, or `/opt/renova/bin/Renova`,
+`renova-desktop` on Arch, and `Renova/bin/Renova` from the unpacked tarball.
+
 ## Which to give a customer
 
 - **Desktop app** when the code must stay on the developer's own device. It is the default recommendation: one

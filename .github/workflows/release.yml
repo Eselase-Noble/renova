@@ -114,9 +114,9 @@ jobs:
         run: |
           # Each package on the distribution it is for: a package that does not install is not published.
           cd desktop/target/dist && ls -la
-          docker run --rm -v "$PWD:/d:ro" archlinux:latest sh -c 'pacman -U --noconfirm /d/*.pkg.tar.zst && test -x /opt/renova/bin/Renova && test -L /usr/bin/renova-desktop'
-          docker run --rm -v "$PWD:/d:ro" fedora:latest sh -c 'dnf install -y -q /d/*.rpm && test -x /opt/renova/bin/Renova'
-          docker run --rm -v "$PWD:/d:ro" debian:stable-slim sh -c 'apt-get update -q && apt-get install -y -q /d/*.deb && test -x /opt/renova/bin/Renova'
+          docker run --rm -v "$PWD:/d:ro" archlinux:latest sh -c 'pacman -U --noconfirm /d/*.pkg.tar.zst && test -x /opt/renova/bin/Renova && test -L /usr/bin/renova-desktop && test -f /usr/share/applications/renova.desktop'
+          docker run --rm -v "$PWD:/d:ro" fedora:latest sh -c 'dnf install -y -q /d/*.rpm && test -x /opt/renova/bin/Renova && test -f /opt/renova/lib/renova-Renova.desktop'
+          docker run --rm -v "$PWD:/d:ro" debian:stable-slim sh -c 'apt-get update -q && apt-get install -y -q /d/*.deb && test -x /opt/renova/bin/Renova && test -f /opt/renova/lib/renova-Renova.desktop'
           mkdir /tmp/unpacked && tar -xzf renova-*-linux-*.tar.gz -C /tmp/unpacked && test -x /tmp/unpacked/Renova/bin/Renova
       - uses: actions/upload-artifact@v4
         with:
