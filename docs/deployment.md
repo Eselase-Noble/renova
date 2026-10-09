@@ -11,7 +11,8 @@ Pushing a version tag builds every part at that version and attaches it to a Git
 
 | File | What it is | Needs on the target machine |
 |---|---|---|
-| `renova_VERSION_amd64.deb`, `Renova-VERSION.msi`, `Renova-VERSION.dmg` | **Desktop app** for Linux, Windows and macOS, with its own Java runtime | Nothing. Git and Maven to migrate projects |
+| `Renova-VERSION.msi`, `Renova-VERSION.dmg` | **Desktop app** for Windows and macOS, with its own Java runtime | Nothing. Git and Maven to migrate projects |
+| `renova_VERSION_amd64.deb`, `renova-VERSION-1.x86_64.rpm`, `renova-VERSION-1-x86_64.pkg.tar.zst`, `renova-VERSION-linux-x86_64.tar.gz` | **Desktop app** for Linux: Debian and Ubuntu, Fedora and RHEL and openSUSE, Arch, and any distribution (unpack and run `Renova/bin/Renova`) | Nothing. Git and Maven to migrate projects |
 | `renova-web-VERSION.tar.gz` | **Web API and console**, a launcher, systemd units and a guide | Java 21+, Node.js 20+ |
 | `renova-cli-VERSION.zip` | **Command line** for terminals and CI pipelines | Java 21+ |
 | `renova-VERSION.vsix` | **VS Code extension** (the CLI is bundled) | Java 21+ |

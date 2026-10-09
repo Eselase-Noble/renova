@@ -4,6 +4,10 @@
 #
 #   desktop/package.sh                 # app image in desktop/target/dist/Renova
 #   desktop/package.sh --type deb      # or rpm, dmg, pkg, msi, exe (needs that OS's packaging tools)
+#   desktop/package.sh --type deb,rpm,tar.gz,pkg.tar.zst    # several at once; on Linux, every format below
+#
+# Linux formats: deb (Debian, Ubuntu, Mint; needs dpkg), rpm (Fedora, RHEL, openSUSE; needs rpmbuild),
+# tar.gz (any distribution: unpack and run bin/Renova), pkg.tar.zst (Arch, Manjaro; needs zstd and fakeroot).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -15,7 +19,7 @@ VERSION=$(mvn -B -q -pl desktop help:evaluate -Dexpression=project.version -Dfor
 # macOS installers may not have a version that starts with 0: 0.3.1 becomes 1.3.1 there, and only there.
 if [[ "$(uname)" == "Darwin" && "$VERSION" == 0.* ]]; then VERSION="1.${VERSION#0.}"; fi
 INPUT=desktop/target/jpackage-input
-rm -rf "$INPUT" desktop/target/dist
+rm -rf "$INPUT" desktop/target/dist desktop/target/app-image
 mkdir -p "$INPUT"
 cp desktop/target/renova-desktop-*.jar "$INPUT/renova-desktop.jar"
 cp -r desktop/target/lib "$INPUT/lib"
@@ -28,16 +32,89 @@ if [[ "$(uname)" == "Darwin" && -n "${MAC_SIGNING_IDENTITY:-}" ]]; then
   SIGNING=(--mac-sign --mac-signing-key-user-name "$MAC_SIGNING_IDENTITY" --mac-package-identifier io.renova.desktop)
 fi
 
-jpackage --type "$TYPE" \
-  ${SIGNING[@]+"${SIGNING[@]}"} \
-  --name Renova \
-  --app-version "$VERSION" \
-  --vendor "Renova" \
-  --description "Assess and modernise legacy software systems, safely and repeatably." \
-  --input "$INPUT" \
-  --main-jar renova-desktop.jar \
-  --main-class io.renova.desktop.Main \
-  --java-options "-Xmx2g" \
-  --dest desktop/target/dist
+DESCRIPTION="Assess and modernise legacy software systems, safely and repeatably."
+DIST=desktop/target/dist
+
+# jpackage makes one thing per run and wants an empty folder for an application image, so each is made in a
+# folder of its own and the results are gathered in DIST.
+package() { # type, destination
+  jpackage --type "$1" \
+    ${SIGNING[@]+"${SIGNING[@]}"} \
+    --name Renova \
+    --app-version "$VERSION" \
+    --vendor "Renova" \
+    --description "$DESCRIPTION" \
+    --input "$INPUT" \
+    --main-jar renova-desktop.jar \
+    --main-class io.renova.desktop.Main \
+    --java-options "-Xmx2g" \
+    --dest "$2"
+}
+
+# The application as a folder, made once for the formats that are that folder wrapped up.
+IMAGE=""
+image() {
+  if [[ -z "$IMAGE" ]]; then
+    IMAGE=desktop/target/app-image
+    rm -rf "$IMAGE"
+    package app-image "$IMAGE"
+  fi
+}
+
+ARCH=$(uname -m)
+mkdir -p "$DIST"
+IFS=',' read -ra TYPES <<< "$TYPE"
+for type in "${TYPES[@]}"; do
+  case "$type" in
+    app-image)
+      image
+      cp -r "$IMAGE/Renova" "$DIST/Renova"
+      ;;
+    tar.gz)
+      # For any distribution: unpack anywhere and run Renova/bin/Renova.
+      image
+      tar -C "$IMAGE" --owner=0 --group=0 -czf "$DIST/renova-$VERSION-linux-$ARCH.tar.gz" Renova
+      ;;
+    pkg.tar.zst)
+      # An Arch Linux package: the application under /opt/renova, a command and a menu entry.
+      image
+      PKG=desktop/target/arch-pkg
+      rm -rf "$PKG"
+      mkdir -p "$PKG/opt" "$PKG/usr/bin" "$PKG/usr/share/applications"
+      cp -r "$IMAGE/Renova" "$PKG/opt/renova"
+      ln -s /opt/renova/bin/Renova "$PKG/usr/bin/renova-desktop"
+      cat > "$PKG/usr/share/applications/renova.desktop" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=Renova
+Comment=$DESCRIPTION
+Exec=/opt/renova/bin/Renova
+Icon=/opt/renova/lib/Renova.png
+Terminal=false
+Categories=Development;
+DESKTOP
+      cat > "$PKG/.PKGINFO" <<PKGINFO
+pkgname = renova
+pkgbase = renova
+pkgver = $VERSION-1
+pkgdesc = $DESCRIPTION
+url = https://github.com/Eselase-Noble/renova
+builddate = $(date +%s)
+packager = Renova
+size = $(du -sb "$PKG" | cut -f1)
+arch = $ARCH
+license = custom
+PKGINFO
+      # Files owned by root in the package, whoever builds it; .PKGINFO first, as pacman reads it.
+      (cd "$PKG" && fakeroot tar --zstd -cf "../dist/renova-$VERSION-1-$ARCH.pkg.tar.zst" .PKGINFO opt usr)
+      ;;
+    *)
+      OUT=desktop/target/jpackage-$type
+      rm -rf "$OUT"
+      package "$type" "$OUT"
+      mv "$OUT"/* "$DIST/"
+      ;;
+  esac
+done
 
 echo "Built desktop/target/dist ($TYPE)"

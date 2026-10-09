@@ -21,6 +21,9 @@ const KINDS = {
   windows: { match: /\.msi$/i, label: "Windows", note: "Installer (.msi), 64-bit" },
   mac: { match: /\.dmg$/i, label: "macOS", note: "Disk image (.dmg)" },
   linux: { match: /\.deb$/i, label: "Linux", note: "Debian and Ubuntu package (.deb)" },
+  rpm: { match: /\.rpm$/i },
+  arch: { match: /\.pkg\.tar\.zst$/i },
+  targz: { match: /linux.*\.tar\.gz$/i },
   cli: { match: /^renova-cli-.*\.zip$/i },
   vscode: { match: /\.vsix$/i },
   intellij: { match: /^renova-intellij-.*\.zip$/i },
@@ -49,6 +52,8 @@ async function downloads() {
   document.querySelectorAll("[data-download-os]").forEach((el) => {
     if (mine) el.textContent = KINDS[mine].label;
   });
+  // Linux comes in several package formats; the others are offered beside the default.
+  document.querySelectorAll("[data-linux-only]").forEach((el) => { el.hidden = mine !== "linux"; });
 
   let release;
   try {

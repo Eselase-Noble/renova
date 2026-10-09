@@ -71,7 +71,10 @@
         <tbody>
           <tr><td>Windows</td><td>Run the <code>.msi</code>. SmartScreen warns because the installer is not signed yet: <em>More info → Run anyway</em>.</td></tr>
           <tr><td>macOS</td><td>Open the <code>.dmg</code> and drag Renova to Applications. The first time, right-click the app and choose <em>Open</em>.</td></tr>
-          <tr><td>Linux</td><td><code>sudo apt install ./renova_*_amd64.deb</code></td></tr>
+          <tr><td>Debian, Ubuntu, Mint</td><td><code>sudo apt install ./renova_*_amd64.deb</code></td></tr>
+          <tr><td>Fedora, RHEL, openSUSE</td><td><code>sudo dnf install ./renova-*.x86_64.rpm</code> (openSUSE: <code>sudo zypper install</code>)</td></tr>
+          <tr><td>Arch, Manjaro</td><td><code>sudo pacman -U renova-*.pkg.tar.zst</code>, then start it with <code>renova-desktop</code> or from the menu</td></tr>
+          <tr><td>Any other Linux</td><td>Unpack the <code>.tar.gz</code> anywhere and run <code>Renova/bin/Renova</code>. Nothing is installed; delete the folder to remove it.</td></tr>
         </tbody>
       </table></div>
       <p>Settings hold the AI provider and key, the licence, and where JDKs, the .NET SDK and PHP are found if not in the usual places.</p>

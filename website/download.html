@@ -45,6 +45,7 @@
       <div class="dl-primary">
         <h3>Desktop app for <span data-download-os>your computer</span></h3>
         <p class="muted" data-download-note>Windows, macOS and Linux installers are listed beside this.</p>
+        <p class="dl-alt" data-linux-only hidden>Not on Debian or Ubuntu? Take the <a data-download="rpm" href="https://github.com/Eselase-Noble/renova/releases/latest">.rpm</a>, the <a data-download="arch" href="https://github.com/Eselase-Noble/renova/releases/latest">Arch package</a> or the <a data-download="targz" href="https://github.com/Eselase-Noble/renova/releases/latest">.tar.gz</a>.</p>
         <a class="btn btn-primary btn-lg" data-download="auto" href="https://github.com/Eselase-Noble/renova/releases/latest">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 20h16"/></svg>
           Download
@@ -63,10 +64,28 @@
         <span class="size" data-size></span>
         <a class="btn btn-ghost btn-sm" data-download="mac" href="https://github.com/Eselase-Noble/renova/releases/latest">Download</a>
       </div>
-        <div class="dl-item" data-download-row>
-        <div class="grow"><strong>Linux</strong><span>Debian and Ubuntu package (.deb), amd64</span></div>
-        <span class="size" data-size></span>
-        <a class="btn btn-ghost btn-sm" data-download="linux" href="https://github.com/Eselase-Noble/renova/releases/latest">Download</a>
+        <div class="dl-group">
+        <div class="dl-group-head"><strong>Linux</strong><span>64-bit (x86_64). Pick the format your distribution uses.</span></div>
+          <div class="dl-format" data-download-row>
+            <div class="grow"><strong>.deb</strong><span>Debian, Ubuntu, Linux Mint, Pop!_OS</span><code>sudo apt install ./renova_*_amd64.deb</code></div>
+            <span class="size" data-size></span>
+            <a class="btn btn-ghost btn-sm" data-download="linux" href="https://github.com/Eselase-Noble/renova/releases/latest">Download</a>
+          </div>
+          <div class="dl-format" data-download-row>
+            <div class="grow"><strong>.rpm</strong><span>Fedora, RHEL, Rocky, AlmaLinux, openSUSE</span><code>sudo dnf install ./renova-*.x86_64.rpm</code></div>
+            <span class="size" data-size></span>
+            <a class="btn btn-ghost btn-sm" data-download="rpm" href="https://github.com/Eselase-Noble/renova/releases/latest">Download</a>
+          </div>
+          <div class="dl-format" data-download-row>
+            <div class="grow"><strong>.pkg.tar.zst</strong><span>Arch Linux, Manjaro, EndeavourOS</span><code>sudo pacman -U renova-*.pkg.tar.zst</code></div>
+            <span class="size" data-size></span>
+            <a class="btn btn-ghost btn-sm" data-download="arch" href="https://github.com/Eselase-Noble/renova/releases/latest">Download</a>
+          </div>
+          <div class="dl-format" data-download-row>
+            <div class="grow"><strong>.tar.gz</strong><span>Any distribution, no installation</span><code>tar -xzf renova-*-linux-x86_64.tar.gz &amp;&amp; Renova/bin/Renova</code></div>
+            <span class="size" data-size></span>
+            <a class="btn btn-ghost btn-sm" data-download="targz" href="https://github.com/Eselase-Noble/renova/releases/latest">Download</a>
+          </div>
       </div>
       </div>
     </div>
