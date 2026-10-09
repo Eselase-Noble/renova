@@ -19,7 +19,9 @@ const REPO = "Eselase-Noble/renova";
 // Which release file is which: matched by name, because the version is part of it.
 const KINDS = {
   windows: { match: /\.msi$/i, label: "Windows", note: "Installer (.msi), 64-bit" },
-  mac: { match: /\.dmg$/i, label: "macOS", note: "Disk image (.dmg)" },
+  // Before installers were named for their chip there was one .dmg, for Apple Silicon.
+  mac: { match: /^(?!.*-x64)(.*)\.dmg$/i, label: "macOS", note: "Disk image (.dmg) for Apple Silicon" },
+  macintel: { match: /-x64\.dmg$/i, label: "macOS", note: "Disk image (.dmg) for Intel Macs" },
   linux: { match: /\.deb$/i, label: "Linux", note: "Debian and Ubuntu package (.deb)" },
   rpm: { match: /\.rpm$/i },
   arch: { match: /\.pkg\.tar\.zst$/i },
@@ -43,11 +45,30 @@ function megabytes(bytes) {
   return `${Math.round(bytes / (1024 * 1024))} MB`;
 }
 
+// Which chip a Mac has. Chromium browsers say; Safari and Firefox do not, and then Apple Silicon is assumed,
+// which every Mac sold since 2020 has. Both installers are always listed.
+async function intelMac() {
+  try {
+    const hints = await navigator.userAgentData?.getHighEntropyValues?.(["architecture"]);
+    return hints?.architecture === "x86";
+  } catch {
+    return false;
+  }
+}
+
 async function downloads() {
   const targets = document.querySelectorAll("[data-download], [data-download-os]");
   if (targets.length === 0) return;
 
-  const mine = platform();
+  let mine = platform();
+  const intel = mine === "mac" && await intelMac();
+  if (intel) mine = "macintel";
+  document.querySelectorAll("[data-mac-only]").forEach((el) => { el.hidden = !(mine === "mac" || mine === "macintel"); });
+  if (intel) {
+    document.querySelectorAll("[data-mac-chip]").forEach((el) => { el.textContent = "Intel"; });
+    document.querySelectorAll("[data-mac-other]").forEach((el) => { el.textContent = "an Apple Silicon (M-series)"; });
+    document.querySelectorAll("[data-mac-other-link]").forEach((el) => { el.dataset.download = "mac"; });
+  }
   // Before the release is known: the visitor's own system is named, and links lead to the releases page.
   document.querySelectorAll("[data-download-os]").forEach((el) => {
     if (mine) el.textContent = KINDS[mine].label;

@@ -89,7 +89,9 @@ jobs:
         include:
           - { name: Linux, os: ubuntu-latest, type: "deb,rpm,tar.gz,pkg.tar.zst" }
           - { name: Windows, os: windows-latest, type: msi }
-          - { name: macOS, os: macos-latest, type: dmg }
+          # One installer for each kind of Mac: the bundled Java runtime and JavaFX are built for one chip.
+          - { name: macOS Apple Silicon, os: macos-latest, type: dmg }
+          - { name: macOS Intel, os: macos-15-intel, type: dmg }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

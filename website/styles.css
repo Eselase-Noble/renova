@@ -215,6 +215,7 @@ td .pill.ai { background: color-mix(in oklch, var(--warn) 16%, transparent); col
 .dl-format:last-child { border-bottom: 0; }
 .dl-format .grow { flex: 1; min-width: 0; }
 .dl-format strong { font-size: 0.95rem; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.dl-format strong.plain { font-family: inherit; }
 .dl-format span { font-size: 0.86rem; color: var(--muted); margin-left: 8px; }
 .dl-format code { display: block; margin-top: 5px; font-size: 0.78rem; background: none; border: 0; padding: 0; color: var(--muted); overflow-wrap: anywhere; }
 .dl-format .size { margin-left: 0; white-space: nowrap; font-size: 0.8rem; }

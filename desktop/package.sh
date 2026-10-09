@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds a self-contained Renova desktop app with jpackage: the app, its libraries and a Java runtime, so users
-# need nothing installed. Run on each target OS (jpackage builds for the OS it runs on).
+# need nothing installed. Run on each target OS (jpackage builds for the OS it runs on), and on macOS on each
+# kind of Mac: an installer built on Apple Silicon does not run on an Intel Mac, nor the other way round.
 #
 #   desktop/package.sh                 # app image in desktop/target/dist/Renova
 #   desktop/package.sh --type deb      # or rpm, dmg, pkg, msi, exe (needs that OS's packaging tools)
@@ -112,7 +113,16 @@ PKGINFO
       OUT=desktop/target/jpackage-$type
       rm -rf "$OUT"
       package "$type" "$OUT"
-      mv "$OUT"/* "$DIST/"
+      if [[ "$(uname)" == "Darwin" ]]; then
+        # An installer runs only on the kind of Mac it was built on, so its name says which:
+        # arm64 for Apple Silicon (M1 and later), x64 for Intel.
+        for file in "$OUT"/*; do
+          name=$(basename "$file")
+          mv "$file" "$DIST/${name%.*}-$([[ "$ARCH" == "arm64" ]] && echo arm64 || echo x64).${name##*.}"
+        done
+      else
+        mv "$OUT"/* "$DIST/"
+      fi
       ;;
   esac
 done
