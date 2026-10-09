@@ -113,17 +113,24 @@ jobs:
       - name: Build the installer
         shell: bash
         run: desktop/package.sh --type "${{ matrix.type }}"
-      - name: Check that the Linux packages install
+      # Each package is installed on the distribution it is for: one that does not install is not published.
+      # Installing registers the menu entry, which needs the folders a desktop has and a bare image lacks.
+      - name: Check the Arch package installs
         if: runner.os == 'Linux'
-        run: |
-          # Each package on the distribution it is for: a package that does not install is not published.
-          # Installing registers the menu entry, which needs the folders a desktop has and a bare image lacks.
-          cd desktop/target/dist && ls -la
-          DESKTOP='mkdir -p /usr/share/desktop-directories /usr/share/applications /etc/xdg/menus /usr/share/man/man1'
-          docker run --rm -v "$PWD:/d:ro" archlinux:latest sh -c 'pacman -U --noconfirm /d/*.pkg.tar.zst && test -x /opt/renova/bin/Renova && test -L /usr/bin/renova-desktop && test -f /usr/share/applications/renova.desktop'
-          docker run --rm -v "$PWD:/d:ro" fedora:latest sh -c "$DESKTOP"' && dnf install -y -q /d/*.rpm && test -x /opt/renova/bin/Renova && test -f /opt/renova/lib/renova-Renova.desktop && ls /usr/share/applications | grep -i renova'
-          docker run --rm -v "$PWD:/d:ro" debian:stable-slim sh -c "$DESKTOP"' && apt-get update -q && apt-get install -y -q /d/*.deb && test -x /opt/renova/bin/Renova && test -f /opt/renova/lib/renova-Renova.desktop && ls /usr/share/applications | grep -i renova'
-          mkdir /tmp/unpacked && tar -xzf renova-*-linux-*.tar.gz -C /tmp/unpacked && test -x /tmp/unpacked/Renova/bin/Renova
+        working-directory: desktop/target/dist
+        run: docker run --rm -v "$PWD:/d:ro" archlinux:latest sh -c 'pacman -U --noconfirm /d/*.pkg.tar.zst && test -x /opt/renova/bin/Renova && test -L /usr/bin/renova-desktop && test -f /usr/share/applications/renova.desktop'
+      - name: Check the rpm installs
+        if: runner.os == 'Linux'
+        working-directory: desktop/target/dist
+        run: docker run --rm -v "$PWD:/d:ro" fedora:latest sh -c 'mkdir -p /usr/share/desktop-directories /usr/share/applications /etc/xdg/menus && dnf install -y /d/*.rpm && test -x /opt/renova/bin/Renova && test -f /opt/renova/lib/renova-Renova.desktop'
+      - name: Check the deb installs
+        if: runner.os == 'Linux'
+        working-directory: desktop/target/dist
+        run: docker run --rm -v "$PWD:/d:ro" debian:stable-slim sh -c 'mkdir -p /usr/share/desktop-directories /usr/share/applications /etc/xdg/menus /usr/share/man/man1 && apt-get update -q && apt-get install -y /d/*.deb && test -x /opt/renova/bin/Renova && test -f /opt/renova/lib/renova-Renova.desktop'
+      - name: Check the tarball unpacks
+        if: runner.os == 'Linux'
+        working-directory: desktop/target/dist
+        run: mkdir /tmp/unpacked && tar -xzf renova-*-linux-*.tar.gz -C /tmp/unpacked && test -x /tmp/unpacked/Renova/bin/Renova
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.name }}
