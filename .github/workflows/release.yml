@@ -131,6 +131,48 @@ jobs:
         if: runner.os == 'Linux'
         working-directory: desktop/target/dist
         run: mkdir /tmp/unpacked && tar -xzf renova-*-linux-*.tar.gz -C /tmp/unpacked && test -x /tmp/unpacked/Renova/bin/Renova
+      # The installed application is started and has to stay running: an installer that installs and then does
+      # not open is not published. What it printed is put in an annotation when it stops.
+      - name: Check the application starts (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y -q xvfb libgtk-3-0 libxtst6 libgl1 > /dev/null
+          set +e
+          xvfb-run -a timeout 30 /tmp/unpacked/Renova/bin/Renova > start.log 2>&1
+          code=$?
+          if [ "$code" != "124" ]; then echo "::error::Renova stopped by itself on Linux (exit $code): $(tail -c 1500 start.log | tr '\n' ' ')"; exit 1; fi
+      - name: Check the application starts (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          hdiutil attach desktop/target/dist/*.dmg -nobrowse -mountpoint /tmp/renova-dmg
+          cp -R /tmp/renova-dmg/Renova.app /tmp/Renova.app
+          hdiutil detach /tmp/renova-dmg
+          codesign -dv /tmp/Renova.app 2>&1 | head -5 || true
+          /tmp/Renova.app/Contents/MacOS/Renova > start.log 2>&1 &
+          pid=$!
+          sleep 30
+          if ! kill -0 "$pid" 2>/dev/null; then wait "$pid"; echo "::error::Renova stopped by itself on macOS (exit $?): $(tail -c 1500 start.log | tr '\n' ' ')"; exit 1; fi
+          kill "$pid"
+      - name: Check the application installs and starts (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem desktop/target/dist/*.msi).FullName
+          $install = Start-Process msiexec -ArgumentList "/i `"$msi`" /qn /norestart /l*v install.log" -Wait -PassThru
+          $exe = "C:\Program Files\Renova\Renova.exe"
+          if ($install.ExitCode -ne 0 -or !(Test-Path $exe)) {
+            Write-Output "::error::The installer did not install Renova (exit $($install.ExitCode)): $((Get-Content install.log -Tail 12) -join ' ')"
+            exit 1
+          }
+          $menu = Get-ChildItem "$env:ProgramData\Microsoft\Windows\Start Menu\Programs" -Recurse -Filter "Renova*.lnk"
+          if (!$menu) { Write-Output "::error::The installer made no Start menu entry"; exit 1 }
+          $app = Start-Process $exe -PassThru -RedirectStandardError start-err.log -RedirectStandardOutput start-out.log
+          Start-Sleep -Seconds 30
+          if ($app.HasExited) {
+            Write-Output "::error::Renova stopped by itself on Windows (exit $($app.ExitCode)): $((Get-Content start-err.log, start-out.log -Tail 20) -join ' ')"
+            exit 1
+          }
+          Stop-Process -Id $app.Id -Force
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.name }}
