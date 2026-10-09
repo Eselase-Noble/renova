@@ -79,7 +79,8 @@ Said plainly, because a buyer will ask:
 
 - The AI-assisted results above are each one small application, run once. Large Struts or MVC applications
   have not been tried.
-- .NET: Web Forms and Entity Framework 6 → EF Core are reported, not migrated. WCF services are moved when IIS
+- .NET: Web Forms → Razor Pages and Entity Framework 6 → EF Core are written as AI-assisted paths and have not
+  been run once; until they have, treat them as reported, not migrated. WCF services are moved when IIS
   hosted them (one sample, run and called by hand); self-hosted ones are reported. Windows Forms and
   WPF projects are converted and have not been built (that needs Windows). The original .NET Framework
   applications could not be run here, so .NET results are checked by build and tests, not against the original.

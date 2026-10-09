@@ -1,0 +1,108 @@
+# Add-on: Entity Framework 6 → Entity Framework Core, combined with a target as in dotnet-to-10+efcore. The
+# .NET targets keep EF6, which runs on modern .NET from 6.4; this goes on to EF Core. The names change by
+# rule; what changed in meaning needs AI, and a database to prove it.
+
+id: efcore
+name: "Entity Framework 6 → EF Core"
+ecosystem: dotnet
+version: 0.1.0
+description: >
+  Moves code written for Entity Framework 6 to Entity Framework Core of the target's release: the package and
+  the namespaces by rule, and with AI the context's configuration, the relationships of the model, raw SQL,
+  initializers and validation. EF Core loads related data and translates queries differently from EF6: the
+  build and the project's tests are checked, and queries should be run against a copy of the database before
+  the result is trusted.
+
+settings:
+  kind: addon
+
+rules:
+
+  - id: efcore-package
+    title: Entity Framework Core in place of EntityFramework
+    category: E
+    severity: BLOCKER
+    detect: { type: nugetPackage, ids: [EntityFramework] }
+    fix:
+      strategy: dotnet
+      params:
+        action: replacePackage
+        packages: ["Microsoft.EntityFrameworkCore.SqlServer:${target}.*", "Microsoft.EntityFrameworkCore.Proxies:${target}.*"]
+    rationale: >
+      EF6's default provider was SQL Server, and it loaded related entities on first use through proxies of
+      classes with virtual navigation properties; the two packages are what gives EF Core the same. A
+      project on another database needs that database's EF Core provider in place of the first.
+
+  - id: efcore-names
+    title: Namespaces and names Entity Framework Core has for the same things
+    category: B
+    severity: BLOCKER
+    detect: { type: namespace, prefixes: [System.Data.Entity] }
+    fix:
+      strategy: dotnet-source
+      params: { action: efcore }
+    rationale: >
+      System.Data.Entity is Microsoft.EntityFrameworkCore, DbModelBuilder is ModelBuilder,
+      WillCascadeOnDelete is OnDelete, HasDatabaseGeneratedOption is ValueGenerated…: renames that mean the
+      same before and after.
+
+  - id: efcore-model
+    title: The context, the model and the queries, as Entity Framework Core writes them
+    category: C
+    severity: BLOCKER
+    detect: { type: namespace, prefixes: [System.Data.Entity] }
+    fix:
+      strategy: ai
+      hint: >
+        This code was written for Entity Framework 6 and is moving to Entity Framework Core; namespaces and
+        simple renames are done. Change what differs in meaning, and nothing else. The context: a
+        constructor that passed a connection string name or "name=X" to the base class has no counterpart;
+        keep a parameterless constructor that works as before by overriding OnConfiguring to call
+        UseSqlServer with the same connection string (read where the old code's configuration had it:
+        ConfigurationManager.ConnectionStrings["X"].ConnectionString) and UseLazyLoadingProxies() when
+        entities have virtual navigation properties, guarded by "if (!optionsBuilder.IsConfigured)"; add a
+        constructor taking DbContextOptions<TContext> beside it so tests and dependency injection can supply
+        another database. Database.SetInitializer calls are removed (EF Core creates nothing on its own;
+        say so in the rationale). The model: OnModelCreating(DbModelBuilder) is OnModelCreating(ModelBuilder);
+        HasRequired(a => a.B).WithMany(b => b.As) is HasOne(a => a.B).WithMany(b => b.As).IsRequired();
+        HasOptional is HasOne(...).IsRequired(false); WithRequired/WithOptional become WithOne;
+        HasMany(...).WithMany(...).Map(m => m.ToTable("T").MapLeftKey("L").MapRightKey("R")) is
+        UsingEntity with the same table and column names; modelBuilder.Configurations.Add(new XMap()) is
+        modelBuilder.ApplyConfiguration(new XMap()), and a class extending EntityTypeConfiguration<T> that
+        configures in its constructor implements IEntityTypeConfiguration<T> with the same calls on the
+        builder in Configure; conventions removed with modelBuilder.Conventions.Remove<...>() have no
+        switch: PluralizingTableNameConvention removed means each entity needs ToTable with the singular
+        name the database has; HasColumnType, HasMaxLength, IsRequired, HasPrecision and ToTable stay.
+        Keys of several properties need HasKey(e => new { e.A, e.B }) in the model; [Key] with [Column(Order)]
+        is not enough. Queries: Include with a string or a lambda stays; Database.SqlQuery<T>(sql, args) is
+        Database.SqlQueryRaw<T>(sql, args); DbSet.SqlQuery is FromSqlRaw; DbSet.AddOrUpdate has no
+        counterpart: find the entity by its key and add or update it; DbSet.Find, Add, Remove, AsNoTracking,
+        SaveChanges and SaveChangesAsync stay; DbEntityValidationException does not exist because EF Core
+        does not validate on save: where the code relied on it, validate with
+        Validator.ValidateObject before SaveChanges and catch ValidationException; DbUpdateException and
+        DbUpdateConcurrencyException keep their names; Database.Log = x is LogTo(x) in OnConfiguring;
+        ObjectContext, EntityObject and EDMX models have no counterpart and are left with a note. A query
+        that EF6 quietly evaluated in memory throws in EF Core: keep the query as it is and do not add
+        ToList() to make it pass unless the old one already loaded the rows.
+      params:
+        together: true
+    rationale: >
+      These are the changes Microsoft's porting guide lists as different in behaviour or shape. They are
+      checked by the build and the project's tests; a test that needs a database needs one, and EF Core's
+      SQL differs from EF6's, so queries that matter should be run against a copy of the real database.
+
+  - id: efcore-edmx
+    title: A model drawn in the designer (EDMX) has no counterpart
+    category: C
+    severity: BLOCKER
+    detect:
+      type: fileContains
+      include: ["**/*.edmx"]
+      pattern: "<edmx:Edmx\\b"
+    fix:
+      strategy: manual
+      hint: >
+        Entity Framework Core has no EDMX designer and no ObjectContext. Generate the entity classes and the
+        context from the database with "dotnet ef dbcontext scaffold" (Database First), then move what the
+        partial classes added onto the generated ones, and remove the .edmx, .tt and generated .cs files.
+        Stored procedures the model mapped as functions are called with FromSqlRaw or ExecuteSqlRaw.

@@ -88,7 +88,9 @@ used `[ExpectedException]`, which Renova rewrote as `Assert.Throws`. The other t
 and small. The .NET Framework originals could not be built on this machine (their format needs Visual Studio's
 MSBuild on Windows), so what is shown is that the migrated projects build and their tests pass, not that the
 originals did. For the same reason the WCF result is not compared with the original service: IIS hosted it.
-Not run: Entity Framework 6, multi-targeted libraries, Web Forms.
+Not run: multi-targeted libraries; and, written with their samples but waiting for an AI run, Entity
+Framework 6 → EF Core (`dotnet-to-10+efcore`) and Web Forms → Razor Pages. Without AI the EF Core add-on makes
+its rule-based changes (package, namespaces, renamed members) and leaves a project that does not build.
 
 **Compiled, not yet run.** Three Windows desktop applications (`benchmark/dotnet-windows.yaml`) migrate to
 `net10.0-windows` and compile on Linux with the Windows targeting pack, 12 of 12 checks: Desk (C# Windows

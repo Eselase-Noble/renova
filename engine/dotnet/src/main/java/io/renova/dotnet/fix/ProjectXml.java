@@ -104,8 +104,10 @@ public final class ProjectXml {
         String quoted = Pattern.quote(id);
         String single = Pattern.compile("(?im)^[ \\t]*<PackageReference\\s+(?:Include|Update)=\"" + quoted + "\"[^>]*/>[ \\t]*\\R?")
                 .matcher(xml).replaceAll("");
-        return Pattern.compile("(?ims)^[ \\t]*<PackageReference\\s+(?:Include|Update)=\"" + quoted + "\"[^>]*>.*?</PackageReference>[ \\t]*\\R?")
+        String removed = Pattern.compile("(?ims)^[ \\t]*<PackageReference\\s+(?:Include|Update)=\"" + quoted + "\"[^>]*>.*?</PackageReference>[ \\t]*\\R?")
                 .matcher(single).replaceAll("");
+        // The group that held nothing else goes with it, and the blank line that followed.
+        return removed.equals(xml) ? xml : removed.replaceAll("(?m)^[ \\t]*<ItemGroup>\\s*</ItemGroup>[ \\t]*\\R(?:[ \\t]*\\R)?", "");
     }
 
     /** Sets a property where the file has it, or adds it to the first property group. */

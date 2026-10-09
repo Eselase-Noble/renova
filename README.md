@@ -444,8 +444,14 @@ stays as an `App.config` so that `ConfigurationManager` still finds the settings
 basicHttpBinding, wsHttpBinding and webHttpBinding, and security, throttling and quota settings, are named in
 the report for a person. C# only.
 
-Found and planned, not changed: Web Forms are left for a person with the mapping written out;
-BinaryFormatter and JavaScriptSerializer go to AI (not yet run); WCF services a program hosts itself
+**Entity Framework 6 → EF Core** is an add-on (`dotnet-to-10+efcore`): without it EF6 is kept, on the 6.5
+release that runs on modern .NET. The package, the namespaces and the members that were only renamed change
+by rule; the context's configuration, required and optional relationships, raw SQL, initializers and
+validation go to AI with the mapping written out. **Web Forms** projects go to AI as a whole, to Razor Pages
+that keep each page's `.aspx` address. Both are written and have not been run with AI yet; without an AI
+provider the Entity Framework add-on leaves a project that does not build, and Web Forms are left for a person.
+
+Found and planned, not changed: BinaryFormatter and JavaScriptSerializer go to AI (not yet run); WCF services a program hosts itself
 (`ServiceHost` in code), Remoting, `Thread.Abort` and code-page encodings are listed for a person.
 
 **Windows Forms and WPF** projects (C# and Visual Basic, including Visual Basic's application framework)
@@ -557,8 +563,9 @@ source migrates without one. See [docs/licensing.md](docs/licensing.md).
    Faces managed beans).
 6. **.NET:** .NET Framework, .NET Core and older .NET → .NET 10 or 8 is in for C# and Visual Basic class
    libraries, console applications, test projects and ASP.NET Core applications, with NUnit 2 → 3 and, with
-   AI, ASP.NET MVC 5 and Web API 2 → ASP.NET Core; WCF services hosted by IIS move to CoreWCF. Next: a larger
-   real MVC application, Entity Framework 6 → EF Core, Windows Forms and WPF verified on Windows, Web Forms. Behavioural verification runs ASP.NET Core
+   AI, ASP.NET MVC 5 and Web API 2 → ASP.NET Core; WCF services hosted by IIS move to CoreWCF. Next: AI runs
+   of the Entity Framework 6 → EF Core add-on and of Web Forms → Razor Pages (both written), a larger real MVC
+   application, Windows Forms and WPF verified on Windows. Behavioural verification runs ASP.NET Core
    applications; classic ASP.NET originals need IIS on Windows.
 7. **PHP:** a chosen PHP version (8.3, 8.4, 8.5), Laravel version (11, 12, 13) and Symfony version (6.4, 7.4, 8.1)
    are in, with sites without Composer, plain PHP sites into Laravel 13, add-ons for PHPUnit 11 and for

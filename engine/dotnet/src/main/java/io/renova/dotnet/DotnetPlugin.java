@@ -209,7 +209,9 @@ public final class DotnetPlugin implements EcosystemPlugin {
 
     @Override
     public List<String> bundledPlaybooks() {
-        return List.of("playbooks/dotnet/dotnet-to-10.yaml", "playbooks/dotnet/dotnet-to-8.yaml");
+        return List.of("playbooks/dotnet/dotnet-to-10.yaml", "playbooks/dotnet/dotnet-to-8.yaml",
+                // Add-ons: optional, combined with a target (dotnet-to-10+efcore).
+                "playbooks/dotnet/addons/efcore.yaml");
     }
 
     /** Whether the project has a file with one of the extensions, outside what a build or a tool produced. */

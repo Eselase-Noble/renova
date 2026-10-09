@@ -1,5 +1,6 @@
-# Renova .NET suite, the paths that need AI: an application on classic ASP.NET (System.Web), which no rule can
-# carry across and which is replaced as one change, then built and its solution's tests run.
+# Renova .NET suite, the paths that need AI: applications on classic ASP.NET (System.Web), which no rule can
+# carry across and which are replaced as one change, and Entity Framework 6 code moving to EF Core; each is
+# then built and its solution's tests run. The first entry has been run; the other two are written and not run.
 #
 # Run: cli/bin/renova benchmark --suite benchmark/dotnet-ai.yaml --out <empty dir> --ai anthropic
 #
@@ -29,3 +30,31 @@ apps:
       - { file: Shop.Web/Controllers/ProductsController.cs, contains: "ValidateAntiForgeryToken", why: "the form is still protected" }
       - { file: Shop.Web/Views/Products/Index.cshtml, contains: "Html.ActionLink", why: "views are kept, not rewritten" }
       - { file: Shop.Core/Shop.Core.csproj, contains: '<Project Sdk="Microsoft.NET.Sdk">', why: "the library it uses is converted without AI" }
+
+  # Entity Framework 6: a context that finds its connection by name and switches the initializer off, a model
+  # configured in a class, a required relationship without cascade, raw SQL, lazy loading through virtual
+  # properties, and DbEntityValidationException. Not run yet.
+  - id: ef6-to-efcore
+    path: stock-ef6
+    playbook: dotnet-to-10+efcore
+    checks:
+      - { file: Stock.Data/Stock.Data.csproj, contains: 'Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.*"', why: "EF Core of the target's release" }
+      - { file: Stock.Data/Stock.Data.csproj, absent: 'Include="EntityFramework"', why: "EF6 is gone from the build" }
+      - { file: "Stock.Data/*.cs", absent: "System.Data.Entity", why: "EF6's namespaces are gone" }
+      - { file: Stock.Data/StockContext.cs, contains: "DbContextOptions<StockContext>", why: "tests and dependency injection can supply a database" }
+      - { file: Stock.Data/ProductMap.cs, contains: "IEntityTypeConfiguration<Product>", why: "the model is still configured in its own class" }
+      - { file: Stock.Data/ProductMap.cs, contains: "DeleteBehavior.Restrict", why: "deleting a supplier still does not delete its products" }
+      - { file: Stock.Data/StockQueries.cs, contains: "select coalesce(sum(OnHand * UnitPrice), 0) from Product", why: "the SQL is the SQL it was" }
+
+  # Web Forms: a master page, a list with a filter that posts back, a form with validators, a message kept in
+  # the session across a redirect, Global.asax and Web.config. Not run yet.
+  - id: webforms-to-razor-pages
+    path: visits-webforms
+    playbook: dotnet-to-10
+    checks:
+      - { file: Visits.Web/Visits.Web.csproj, contains: 'Sdk="Microsoft.NET.Sdk.Web"', why: "an ASP.NET Core project" }
+      - { file: "Visits.Web/Pages/*.cshtml", contains: '@page "/Register.aspx"', why: "pages keep their addresses" }
+      - { file: "Visits.Web/**/*.cs", absent: "System.Web", why: "modern .NET has no System.Web" }
+      - { file: "Visits.Web/**/*.cshtml", contains: "The visitor needs a name.", why: "the validators' messages are kept" }
+      - { file: Visits.Web/appsettings.json, contains: "Ridge Tower", why: "the settings Web.config held are still given to the application" }
+

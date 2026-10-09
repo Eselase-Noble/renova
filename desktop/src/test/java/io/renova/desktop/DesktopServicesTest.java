@@ -221,7 +221,7 @@ class DesktopServicesTest {
         assertThat(assessment.plan().automationRate()).isEqualTo(1.0);
         assertThat(engine.registry().playbooksFor(dir)).extracting(io.renova.core.playbook.Playbook::id)
                 .containsExactlyInAnyOrder("dotnet-to-10", "dotnet-to-8");
-        assertThat(engine.registry().addonsFor(dir)).isEmpty();
+        assertThat(engine.registry().addonsFor(dir)).extracting(io.renova.core.playbook.Playbook::id).containsExactly("efcore");
         assertThat(engine.export(assessment, false)).contains(".NET → 10", "automated edit (`dotnet`)");
     }
 }

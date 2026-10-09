@@ -27,7 +27,8 @@ import java.util.Map;
  *       packages.config; {@code assemblies} names the parts of .NET Framework that are packages now.</li>
  *   <li>{@code action: setTargetFramework, version: "10.0"} moves the project to modern .NET.</li>
  *   <li>{@code action: setPackageVersion, version: "x"} sets the version of the packages the rule found.</li>
- *   <li>{@code action: addPackage, packages: ["Id:1.0"]} adds packages a project does not have yet.</li>
+ *   <li>{@code action: addPackage, packages: ["Id:1.0"]} adds packages a project does not have yet. In a version,
+ *       <code>${target}</code> is the .NET release the playbook moves to: {@code "Id:${target}.*"} is {@code 10.0.*}.</li>
  *   <li>{@code action: replacePackage, packages: ["New:1.0"]} removes the packages the rule found and adds these.</li>
  *   <li>{@code action: removePackage} removes the packages the rule found.</li>
  *   <li>{@code action: setProperty, name: X, value: y} sets an MSBuild property.</li>
@@ -82,7 +83,7 @@ public final class DotnetProjectFixer implements Fixer {
                 } else if (!sdkStyle) {
                     note = "left as it is: not in the SDK style";
                 } else {
-                    content = edit(content, action, params, step, file);
+                    content = edit(content, action, params, step, file, context.playbook().targets().getOrDefault("dotnet", "10.0"));
                 }
                 if (!content.equals(before)) {
                     Files.writeString(path, content, StandardCharsets.UTF_8);
@@ -94,7 +95,8 @@ public final class DotnetProjectFixer implements Fixer {
         return new StageResult(STRATEGY, StageResult.Status.APPLIED, changed + " project file edit(s) by " + steps.size() + " rule(s)", details);
     }
 
-    private static String edit(String xml, String action, Params params, PlanStep step, String file) {
+    /** @param target the .NET release the playbook moves to ("10.0"), which <code>${target}</code> in a package version stands for */
+    private static String edit(String xml, String action, Params params, PlanStep step, String file, String target) {
         List<String> found = step.findings().stream().filter(f -> f.file().equals(file) && f.data().containsKey("package"))
                 .map(f -> f.data().get("package")).distinct().toList();
         switch (action) {
@@ -116,7 +118,7 @@ public final class DotnetProjectFixer implements Fixer {
         if (action.equals("addPackage") || action.equals("replacePackage")) {
             for (String one : params.requiredStrings("packages")) {
                 String[] idVersion = one.split(":", 2);
-                xml = ProjectXml.addPackage(xml, idVersion[0], idVersion.length > 1 ? idVersion[1] : null);
+                xml = ProjectXml.addPackage(xml, idVersion[0], idVersion.length > 1 ? idVersion[1].replace("${target}", target) : null);
             }
         }
         return xml;

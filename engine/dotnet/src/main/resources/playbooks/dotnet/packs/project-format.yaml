@@ -99,18 +99,67 @@ rules:
       Basic service project is left as it is.
 
   - id: aspnet-web-forms
-    title: ASP.NET Web Forms has no modern .NET release
+    title: ASP.NET Web Forms to Razor Pages on ASP.NET Core
     category: C
     severity: BLOCKER
-    detect: { type: projectKind, kinds: [webforms] }
+    detect:
+      type: projectKind
+      kinds: [webforms]
+      files: ["**/*.aspx", "**/*.ascx", "**/*.master", "**/*.cs", "**/*.vb", "Web.config", "Web.*.config", "Global.asax",
+              "packages.config", "**/*.asax", "**/*.sitemap"]
     fix:
-      strategy: manual
+      strategy: ai
       hint: >
-        Web Forms pages (.aspx, .ascx, .master) with code behind, view state and server controls have no
-        counterpart in ASP.NET Core, and the project is left as it is. Pages are rewritten as Razor Pages or
-        Blazor components, one at a time: keep the old application running and put a proxy (YARP) in front, so
-        each rewritten page takes over its URL. Class libraries the web project uses are migrated by the other
-        rules and can serve both applications meanwhile.
+        This project is ASP.NET Web Forms, which modern .NET does not have: pages with code behind, server
+        controls, view state and postbacks. Move the whole project to Razor Pages on ASP.NET Core on the
+        goal's .NET version, keeping every address and what each page does.
+        Project file: rewrite it as <Project Sdk="Microsoft.NET.Sdk.Web"> with <TargetFramework>netN.0</TargetFramework>
+        (N from the goal), the RootNamespace and AssemblyName it had, its ProjectReference items, and only the
+        NuGet packages the code still uses in versions that support that .NET. Do not list source files.
+        Remove through "deletes": every .aspx, .ascx and .master file with its .cs or .vb code-behind and
+        .designer file, packages.config, Global.asax and its code, Properties/AssemblyInfo.cs, Web.config and
+        its transforms, and App_Start files. Start-up: add Program.cs with WebApplication.CreateBuilder,
+        AddRazorPages(), static files, routing and MapRazorPages(); what Application_Start set up becomes
+        service registrations; end it with "public partial class Program { }".
+        Pages: each X.aspx becomes Pages/X.cshtml with a page model Pages/X.cshtml.cs, and keeps its address
+        with @page "/X.aspx" (Default.aspx also answers "/" through a second route or a redirect page). The
+        master page becomes Pages/Shared/_Layout.cshtml with @RenderBody() where the ContentPlaceHolder was,
+        and other placeholders become sections; add Pages/_ViewStart.cshtml and Pages/_ViewImports.cshtml
+        (@namespace, @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers). A user control (.ascx) becomes a
+        partial view or a view component. Code behind: Page_Load with !IsPostBack is OnGet; Page_Load on a
+        postback and each control's event handler (Button_Click) is an OnPost handler, one per button with
+        asp-page-handler, taking what the handler read from controls as [BindProperty] properties; values
+        kept in ViewState between postbacks become hidden fields or are loaded again; Response.Redirect is
+        RedirectToPage or Redirect to the same address; Request.QueryString["x"] is a handler parameter or
+        Request.Query["x"]; Session["x"] needs AddSession/UseSession and HttpContext.Session;
+        Server.MapPath uses IWebHostEnvironment. Controls: asp:Label and asp:Literal are the value printed
+        (Razor encodes as the Label did not: use Html.Raw only where the old page set markup on purpose);
+        asp:TextBox, asp:DropDownList, asp:CheckBox are input, select and input tags with asp-for;
+        asp:Button is a submit button; asp:HyperLink is an anchor; asp:Repeater, asp:GridView, asp:ListView
+        and asp:DataList become a foreach over the page model's data writing the same table or list markup
+        (paging and sorting the grid did by postback become query-string parameters, and are named in the
+        rationale); asp:RequiredFieldValidator, RangeValidator, RegularExpressionValidator and
+        CompareValidator become data annotations on the bound properties with asp-validation-for and the
+        same messages, and asp:ValidationSummary is asp-validation-summary; data source controls
+        (SqlDataSource, ObjectDataSource) become the query they ran, in the page model, with the same SQL.
+        Keep the HTML around the controls, the ids and CSS classes scripts and stylesheets rely on, and the
+        texts. Static files (Content, Scripts, images) cannot be moved here: serve the existing folders with
+        app.UseStaticFiles and a PhysicalFileProvider for each at its old request path. Configuration:
+        appSettings and connectionStrings from Web.config become appsettings.json, read through
+        IConfiguration. Forms authentication, membership and roles, HTTP modules and handlers, and
+        UpdatePanel partial rendering have no file to go to: say in the rationale which there were and that
+        they need a person.
+      # The project is replaced as one change: pages, code behind and configuration together, with the files
+      # ASP.NET Core needs added and the ones only System.Web read removed.
+      params:
+        together: true
+        create: ["**/*.cs", "**/*.cshtml", "**/appsettings*.json", "**/Properties/launchSettings.json"]
+    rationale: >
+      Web Forms has no successor that takes its pages as they are. Razor Pages is the closest in shape: a
+      page with its own code file, handlers for the form posts, and a layout where the master page was.
+      What does not carry over is the control tree and view state, so each page is rewritten; the addresses,
+      the markup and the behaviour are what is kept. Without an AI provider this step is left for a person,
+      and class libraries the web project uses are still migrated by the other rules.
 
   - id: guard-windows-reference
     phase: guard
