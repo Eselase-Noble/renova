@@ -115,10 +115,19 @@ jobs:
         run: desktop/package.sh --type "${{ matrix.type }}"
       # Each package is installed on the distribution it is for: one that does not install is not published.
       # Installing registers the menu entry, which needs the folders a desktop has and a bare image lacks.
-      - name: Check the Arch package installs
+      - name: Check the Arch package installs and the application starts on Arch
         if: runner.os == 'Linux'
         working-directory: desktop/target/dist
-        run: docker run --rm -v "$PWD:/d:ro" archlinux:latest sh -c 'pacman -U --noconfirm /d/*.pkg.tar.zst && test -x /opt/renova/bin/Renova && test -L /usr/bin/renova-desktop && test -f /usr/share/applications/renova.desktop'
+        run: |
+          set +e
+          out=$(docker run --rm -v "$PWD:/d:ro" archlinux:latest sh -c '
+            pacman -Sy --noconfirm > /dev/null 2>&1
+            pacman -U --noconfirm /d/*.pkg.tar.zst > /tmp/pacman.log 2>&1 || { tail -15 /tmp/pacman.log; echo "result=not-installed"; exit; }
+            test -L /usr/bin/renova-desktop && test -f /usr/share/applications/renova.desktop || { echo "result=no-menu-entry"; exit; }
+            pacman -S --noconfirm xorg-server-xvfb xorg-xauth > /dev/null 2>&1
+            xvfb-run -a timeout 30 renova-desktop; echo "result=$?"' 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "result=124" || { echo "::error::Renova from the Arch package did not stay running: $(echo "$out" | tail -c 1500 | tr '\n' ' ')"; exit 1; }
       - name: Check the rpm installs and the application starts on Fedora
         if: runner.os == 'Linux'
         working-directory: desktop/target/dist

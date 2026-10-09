@@ -38,13 +38,20 @@ DIST=desktop/target/dist
 
 # jpackage makes one thing per run and wants an empty folder for an application image, so each is made in a
 # folder of its own and the results are gathered in DIST.
+# The system libraries JavaFX loads when the application starts: GTK 3 for its windows, X11 extensions, OpenGL and sound.
+RPM_LIBRARIES="libgtk-3.so.0()(64bit),libgdk-3.so.0()(64bit),libXtst.so.6()(64bit),libXxf86vm.so.1()(64bit),libGL.so.1()(64bit),libasound.so.2()(64bit),libfreetype.so.6()(64bit),libfontconfig.so.1()(64bit)"
+
 # What makes the installed application findable: an entry in the Start menu or the applications menu. Without
 # these an installer puts the files in place and leaves nothing to click.
 shortcuts() { # type
   case "$1" in
     # The upgrade id is the same for every version, so installing a newer one replaces the older.
     msi|exe) echo --win-menu --win-menu-group Renova --win-shortcut --win-dir-chooser --win-upgrade-uuid 94fd60d3-6fd1-4bf8-8b02-f11d73b139f8 ;;
-    deb|rpm) echo --linux-shortcut --linux-menu-group "Development;" ;;
+    deb) echo --linux-shortcut --linux-menu-group "Development;" ;;
+    # An rpm built on a machine without rpm's own database finds none of the libraries the application loads,
+    # so the package would install on a system that lacks them and then not start. They are named as the
+    # libraries themselves, which every rpm distribution provides under its own package names.
+    rpm) echo --linux-shortcut --linux-menu-group "Development;" --linux-package-deps "$RPM_LIBRARIES" ;;
   esac
 }
 
@@ -117,6 +124,13 @@ packager = Renova
 size = $(du -sb "$PKG" | cut -f1)
 arch = $ARCH
 license = custom
+depend = gtk3
+depend = libxtst
+depend = libxxf86vm
+depend = libglvnd
+depend = alsa-lib
+depend = freetype2
+depend = fontconfig
 PKGINFO
       # Files owned by root in the package, whoever builds it; .PKGINFO first, as pacman reads it.
       (cd "$PKG" && fakeroot tar --zstd -cf "../dist/renova-$VERSION-1-$ARCH.pkg.tar.zst" .PKGINFO opt usr)
