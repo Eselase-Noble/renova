@@ -119,14 +119,32 @@ jobs:
         if: runner.os == 'Linux'
         working-directory: desktop/target/dist
         run: docker run --rm -v "$PWD:/d:ro" archlinux:latest sh -c 'pacman -U --noconfirm /d/*.pkg.tar.zst && test -x /opt/renova/bin/Renova && test -L /usr/bin/renova-desktop && test -f /usr/share/applications/renova.desktop'
-      - name: Check the rpm installs
+      - name: Check the rpm installs and the application starts on Fedora
         if: runner.os == 'Linux'
         working-directory: desktop/target/dist
-        run: docker run --rm -v "$PWD:/d:ro" fedora:latest sh -c 'mkdir -p /usr/share/desktop-directories /usr/share/applications /etc/xdg/menus && dnf install -y /d/*.rpm && test -x /opt/renova/bin/Renova && test -f /opt/renova/lib/renova-Renova.desktop'
-      - name: Check the deb installs
+        run: |
+          set +e
+          out=$(docker run --rm -v "$PWD:/d:ro" fedora:latest sh -c '
+            mkdir -p /usr/share/desktop-directories /usr/share/applications /etc/xdg/menus
+            dnf install -y -q xorg-x11-server-Xvfb xorg-x11-xauth /d/*.rpm > /tmp/dnf.log 2>&1 || { tail -15 /tmp/dnf.log; echo "result=not-installed"; exit; }
+            test -f /opt/renova/lib/renova-Renova.desktop || { echo "result=no-menu-entry"; exit; }
+            xvfb-run -a timeout 30 /opt/renova/bin/Renova; echo "result=$?"' 2>&1)
+          echo "$out"
+          # 124: still running when the 30 seconds were up, which is what a started application does.
+          echo "$out" | grep -q "result=124" || { echo "::error::Renova from the rpm did not stay running on Fedora: $(echo "$out" | tail -c 1500 | tr '\n' ' ')"; exit 1; }
+      - name: Check the deb installs and the application starts on Debian
         if: runner.os == 'Linux'
         working-directory: desktop/target/dist
-        run: docker run --rm -v "$PWD:/d:ro" debian:stable-slim sh -c 'mkdir -p /usr/share/desktop-directories /usr/share/applications /etc/xdg/menus /usr/share/man/man1 && apt-get update -q && apt-get install -y /d/*.deb && test -x /opt/renova/bin/Renova && test -f /opt/renova/lib/renova-Renova.desktop'
+        run: |
+          set +e
+          out=$(docker run --rm -v "$PWD:/d:ro" debian:stable-slim sh -c '
+            mkdir -p /usr/share/desktop-directories /usr/share/applications /etc/xdg/menus /usr/share/man/man1
+            apt-get update -q > /dev/null
+            apt-get install -y -q xvfb xauth /d/*.deb > /tmp/apt.log 2>&1 || { tail -15 /tmp/apt.log; echo "result=not-installed"; exit; }
+            test -f /opt/renova/lib/renova-Renova.desktop || { echo "result=no-menu-entry"; exit; }
+            xvfb-run -a timeout 30 /opt/renova/bin/Renova; echo "result=$?"' 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "result=124" || { echo "::error::Renova from the deb did not stay running on Debian: $(echo "$out" | tail -c 1500 | tr '\n' ' ')"; exit 1; }
       - name: Check the tarball unpacks
         if: runner.os == 'Linux'
         working-directory: desktop/target/dist
