@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Renova documentation</title>
+<meta name="description" content="Install Renova and run a first migration: desktop app, command line, VS Code, IntelliJ, web console, AI keys, behaviour comparison and licences.">
+<meta property="og:title" content="Renova documentation">
+<meta property="og:description" content="Install Renova and run a first migration: desktop app, command line, VS Code, IntelliJ, web console, AI keys, behaviour comparison and licences.">
+<meta property="og:type" content="website">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<script>try{var t=localStorage.getItem("renova-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<script type="module" src="site.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site-header">
+  <div class="wrap nav">
+    <a class="brand" href="index.html"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="mark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="oklch(0.62 0.19 268)"/><stop offset="1" stop-color="oklch(0.45 0.21 276)"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#mark)"/><path d="M9 17.5 16 11l7 6.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 23.5 16 17l7 6.5" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Renova</span></a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="index.html">Product</a>
+      <a href="download.html">Download</a>
+      <a href="docs.html" aria-current="page">Docs</a>
+      <a href="https://github.com/Eselase-Noble/renova">GitHub</a>
+    </nav>
+    <div class="nav-end">
+      <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch between light and dark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+      <a class="btn btn-primary btn-sm" href="download.html">Download</a>
+    </div>
+  </div>
+</header>
+<main id="main">
+
+<section>
+  <div class="wrap docs">
+    <nav class="toc" aria-label="On this page">
+      <strong>Start</strong>
+      <a href="#first">Your first assessment</a>
+      <a href="#desktop">Desktop app</a>
+      <strong>Tools</strong>
+      <a href="#cli">Command line</a>
+      <a href="#ide">VS Code and IntelliJ</a>
+      <a href="#console">Web console</a>
+      <strong>Setup</strong>
+      <a href="#targets">Choosing a target</a>
+      <a href="#ai">AI on your own key</a>
+      <a href="#behaviour">Comparing behaviour</a>
+      <a href="#licence">Licences</a>
+      <a href="#more">More</a>
+    </nav>
+    <article class="doc">
+      <h1 style="font-size:clamp(1.9rem,4vw,2.6rem)">Documentation</h1>
+      <p class="lead">Enough to install Renova and run a first migration. The complete reference lives beside the code on <a href="https://github.com/Eselase-Noble/renova#readme">GitHub</a>.</p>
+
+      <h2 id="first">Your first assessment</h2>
+      <ol>
+        <li><a href="download.html">Download</a> and install the desktop app.</li>
+        <li>Choose <strong>Add project</strong> and pick the folder that holds the project's <code>pom.xml</code>, <code>build.gradle</code>, <code>build.xml</code>, <code>.sln</code>, <code>composer.json</code> or <code>index.php</code>.</li>
+        <li>Read the assessment: what was found, by category and severity, and the share that needs no human decision.</li>
+        <li>Choose a target and an empty folder for the migrated copy, then start the migration.</li>
+      </ol>
+      <p>The project you added is only read. Everything Renova writes goes into the folder you chose, as a git repository with one commit per stage and a report in <code>.renova/report.md</code>.</p>
+
+      <h2 id="desktop">Desktop app</h2>
+      <p>The installer carries its own Java runtime. Projects, settings and results are kept on your device; there is no server and no account.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>System</th><th>Install</th></tr></thead>
+        <tbody>
+          <tr><td>Windows</td><td>Run the <code>.msi</code>. SmartScreen warns because the installer is not signed yet: <em>More info → Run anyway</em>.</td></tr>
+          <tr><td>macOS</td><td>Open the <code>.dmg</code> and drag Renova to Applications. The first time, right-click the app and choose <em>Open</em>.</td></tr>
+          <tr><td>Linux</td><td><code>sudo apt install ./renova_*_amd64.deb</code></td></tr>
+        </tbody>
+      </table></div>
+      <p>Settings hold the AI provider and key, the licence, and where JDKs, the .NET SDK and PHP are found if not in the usual places.</p>
+
+      <h2 id="cli">Command line</h2>
+      <p>Unzip <code>renova-cli-*.zip</code> and put its <code>bin</code> folder on your PATH. It needs Java 21 or later, whatever language the project is written in.</p>
+      <pre class="code"><span class="d"># What can be migrated, and to what</span>
+renova playbooks
+
+<span class="d"># Assess a project: read-only. Markdown by default, JSON for tooling</span>
+renova analyze /path/to/project
+renova analyze /path/to/project -f json -o assessment.json
+
+<span class="d"># Rank every project under a folder, easiest first</span>
+renova portfolio /path/to/all-projects -f csv -o portfolio.csv
+
+<span class="d"># Migrate a copy into an empty folder</span>
+renova migrate /path/to/project --out /path/to/migrated -p java8-to-21-jakarta-ee10
+
+<span class="d"># With an add-on, and comparing behaviour with the original</span>
+renova migrate /path/to/project --out /path/to/migrated -p dotnet-to-10+efcore --verify-behaviour</pre>
+      <p><code>migrate</code> exits with <code>0</code> when the migrated build passes (and, with <code>--verify-behaviour</code>, the application behaves the same), <code>1</code> otherwise and <code>2</code> on a usage error, so a pipeline can gate on it. Useful options: <code>--ai none</code> to run without AI, <code>--skip-tests</code> to only compile, <code>--offline</code> for Maven, <code>--max-ai-iterations</code> for the number of repair rounds.</p>
+
+      <h2 id="ide">VS Code and IntelliJ</h2>
+      <h3>VS Code</h3>
+      <p>Install the <code>.vsix</code> with <strong>Extensions: Install from VSIX…</strong>. Open a folder with a project in it and run <strong>Renova: Assess Workspace</strong>. Findings appear as diagnostics and in the Renova view, each with who resolves it: a rule, AI checked by the build, or a person. <strong>Renova: Migrate…</strong> writes a migrated copy to a folder you choose.</p>
+      <h3>IntelliJ IDEA</h3>
+      <p>In <strong>Settings → Plugins</strong> choose the gear, then <strong>Install Plugin from Disk…</strong> and pick the zip. It needs IntelliJ IDEA 2025.2 or later. The Renova tool window shows the assessment and the plan, and starts migrations.</p>
+      <p>Both use the same settings file as the CLI and the desktop app, so the AI key and the licence are set once.</p>
+
+      <h2 id="console">Web console</h2>
+      <p>The web bundle is the API and a browser console in one archive. It needs Java 21 and Node.js 20.</p>
+      <pre class="code">tar -xzf renova-web-*.tar.gz && cd renova-web-*
+bin/renova-web local      <span class="d"># one person, this machine only, no sign-in</span>
+bin/renova-web            <span class="d"># a team: accounts, organisations, roles, audit log</span></pre>
+      <p>On a server, people sign in with a password or through your identity provider over OpenID Connect (Entra ID, Okta, Google Workspace, Keycloak). The bundle's README covers systemd, HTTPS behind a reverse proxy, backup and upgrade; single sign-on is described in the <a href="https://github.com/Eselase-Noble/renova/blob/production/docs/deployment.md#single-sign-on-for-the-web-console">deployment guide</a>.</p>
+
+      <h2 id="targets">Choosing a target</h2>
+      <p>A target is a playbook. Renova suggests one for the project; any other that fits can be chosen, and add-ons are combined with <code>+</code>.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Project</th><th>Targets</th><th>Add-ons</th></tr></thead>
+        <tbody>
+          <tr><td>Java</td><td><code>java-to-17</code>, <code>java-to-21</code>, <code>java-to-25</code>, <code>java8-to-21-jakarta-ee10</code>, <code>spring-boot-3</code>, <code>spring-boot-4</code>, <code>jakarta-ee-to-spring-boot</code>, <code>micronaut-4</code>, <code>quarkus-3</code></td><td><code>junit5</code>, <code>log4j2</code>, <code>struts7</code>, <code>httpclient5</code> and others</td></tr>
+          <tr><td>.NET</td><td><code>dotnet-to-10</code>, <code>dotnet-to-8</code></td><td><code>efcore</code></td></tr>
+          <tr><td>PHP</td><td><code>php-to-8.3</code>, <code>php-to-8.4</code>, <code>php-to-8.5</code>, <code>laravel-11</code>, <code>laravel-12</code>, <code>laravel-13</code>, <code>symfony-6.4</code>, <code>symfony-7.4</code>, <code>symfony-8.1</code>, <code>php-to-laravel-13</code></td><td><code>phpunit11</code>, <code>conservative</code></td></tr>
+        </tbody>
+      </table></div>
+      <p><code>renova playbooks</code> prints the list your version has, with what each does.</p>
+
+      <h2 id="ai">AI on your own key</h2>
+      <p>Most of a migration needs no AI. Where a change needs judgement (a framework with no successor release, behaviour that differs on the new platform, a build error no rule explains), Renova sends that code to the provider you configure, applies the answer and lets the build decide whether it stands.</p>
+      <ul>
+        <li>Set the provider and key in the desktop app's settings, or with <code>renova config</code>. Anthropic and OpenAI are supported.</li>
+        <li>The key is yours; requests go from your machine to your provider. Token use is reported per migration.</li>
+        <li>Without a key, AI steps are listed in the report as work for a person.</li>
+        <li>Tests are never edited to make them pass.</li>
+      </ul>
+
+      <h2 id="behaviour">Comparing behaviour</h2>
+      <p>With <code>--verify-behaviour</code> (a switch in the apps), after the build passes Renova starts the original and the migrated application in containers, sends both the same requests and compares status, redirect, content type and body. It needs Docker.</p>
+      <p>Requests are found from the code. For forms, query strings and sequences, add a <code>renova-scenarios.yaml</code> to the project:</p>
+      <pre class="code">scenarios:
+  - id: book-and-read
+    steps:
+      - {{ method: POST, path: /new.php, form: {{ patient: "Yaw Boakye", day: "2024-03-11" }} }}
+      - {{ path: "/view.php?id=4" }}</pre>
+
+      <h2 id="licence">Licences</h2>
+      <p><strong>Assessing is free.</strong> Everything up to starting a migration works without a licence, so you can see what Renova finds in your own code first.</p>
+      <p><strong>Migrating needs a licence file</strong> that covers the project's ecosystem. The file is signed; Renova checks the signature on your machine and sends nothing anywhere, so it works without internet access.</p>
+      <pre class="code">renova licence install acme.json   <span class="d"># make this file the machine's licence</span>
+renova licence                     <span class="d"># what is installed and what it allows</span></pre>
+      <p>In the desktop app: <strong>Settings → Licence → Install licence file…</strong>. On a server or build agent, set <code>RENOVA_LICENCE</code> to the file's path. To ask for a licence or a trial, <a href="https://github.com/Eselase-Noble/renova/issues/new?title=Licence%20request">open a request</a>.</p>
+
+      <h2 id="more">More</h2>
+      <ul>
+        <li><a href="https://github.com/Eselase-Noble/renova/blob/production/docs/verified-migrations.md">Verified migrations</a>: every path that has been run, with results, and what has not.</li>
+        <li><a href="https://github.com/Eselase-Noble/renova/blob/production/docs/product-brief.md">Product brief</a>: one page for decision makers.</li>
+        <li><a href="https://github.com/Eselase-Noble/renova#playbooks">Playbooks</a>: how rules are written and how to add your own.</li>
+        <li><a href="https://github.com/Eselase-Noble/renova/blob/production/docs/deployment.md">Deployment</a>: the web bundle on a server, single sign-on, releases.</li>
+        <li><a href="https://github.com/Eselase-Noble/renova/issues">Support</a>: questions and problems.</li>
+      </ul>
+    </article>
+  </div>
+</section>
+
+</main>
+<footer>
+  <div class="wrap foot">
+    <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="mark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="oklch(0.62 0.19 268)"/><stop offset="1" stop-color="oklch(0.45 0.21 276)"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#mark)"/><path d="M9 17.5 16 11l7 6.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 23.5 16 17l7 6.5" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Renova</span></div>
+    <nav aria-label="Footer">
+      <a href="index.html">Product</a>
+      <a href="download.html">Download</a>
+      <a href="docs.html">Docs</a>
+      <a href="https://github.com/Eselase-Noble/renova/blob/production/docs/verified-migrations.md">Verified migrations</a>
+      <a href="https://github.com/Eselase-Noble/renova/releases">Releases</a>
+      <a href="https://github.com/Eselase-Noble/renova/issues">Support</a>
+    </nav>
+    <span>Your code stays on your machine.</span>
+  </div>
+</footer>
+</body>
+</html>

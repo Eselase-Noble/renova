@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Download Renova</title>
+<meta name="description" content="Download the Renova desktop app for Windows, macOS and Linux, the command line, the VS Code extension, the IntelliJ plugin and the web console.">
+<meta property="og:title" content="Download Renova">
+<meta property="og:description" content="Download the Renova desktop app for Windows, macOS and Linux, the command line, the VS Code extension, the IntelliJ plugin and the web console.">
+<meta property="og:type" content="website">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<script>try{var t=localStorage.getItem("renova-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<script type="module" src="site.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site-header">
+  <div class="wrap nav">
+    <a class="brand" href="index.html"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="mark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="oklch(0.62 0.19 268)"/><stop offset="1" stop-color="oklch(0.45 0.21 276)"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#mark)"/><path d="M9 17.5 16 11l7 6.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 23.5 16 17l7 6.5" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Renova</span></a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="index.html">Product</a>
+      <a href="download.html" aria-current="page">Download</a>
+      <a href="docs.html">Docs</a>
+      <a href="https://github.com/Eselase-Noble/renova">GitHub</a>
+    </nav>
+    <div class="nav-end">
+      <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch between light and dark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+      <a class="btn btn-primary btn-sm" href="download.html">Download</a>
+    </div>
+  </div>
+</header>
+<main id="main">
+
+<section class="hero">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow"><span class="dot"></span>Version <span data-release-version>0.2</span> <span class="muted" data-release-date></span></div>
+      <h1>Download Renova</h1>
+      <p class="lead">The desktop app is the simplest way to start: one installer, its own Java runtime, no server and no account.</p>
+    </div>
+    <div class="dl-hero">
+      <div class="dl-primary">
+        <h3>Desktop app for <span data-download-os>your computer</span></h3>
+        <p class="muted" data-download-note>Windows, macOS and Linux installers are listed beside this.</p>
+        <a class="btn btn-primary btn-lg" data-download="auto" href="https://github.com/Eselase-Noble/renova/releases/latest">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 20h16"/></svg>
+          Download
+        </a>
+        <p class="dl-meta" data-file-for="auto">Opens the latest release on GitHub.</p>
+        <div class="callout" style="margin-top:18px"><strong>First start.</strong> The installers are not code-signed yet, so Windows SmartScreen and macOS Gatekeeper warn before opening. On Windows choose <em>More info → Run anyway</em>; on macOS right-click the app and choose <em>Open</em>. Check the file against <a data-download="sums" href="https://github.com/Eselase-Noble/renova/releases/latest">SHA256SUMS.txt</a> if you want to be sure it is ours.</div>
+      </div>
+      <div class="dl-list">
+        <div class="dl-item" data-download-row>
+        <div class="grow"><strong>Windows</strong><span>Installer (.msi), 64-bit, Windows 10 and later</span></div>
+        <span class="size" data-size></span>
+        <a class="btn btn-ghost btn-sm" data-download="windows" href="https://github.com/Eselase-Noble/renova/releases/latest">Download</a>
+      </div>
+        <div class="dl-item" data-download-row>
+        <div class="grow"><strong>macOS</strong><span>Disk image (.dmg)</span></div>
+        <span class="size" data-size></span>
+        <a class="btn btn-ghost btn-sm" data-download="mac" href="https://github.com/Eselase-Noble/renova/releases/latest">Download</a>
+      </div>
+        <div class="dl-item" data-download-row>
+        <div class="grow"><strong>Linux</strong><span>Debian and Ubuntu package (.deb), amd64</span></div>
+        <span class="size" data-size></span>
+        <a class="btn btn-ghost btn-sm" data-download="linux" href="https://github.com/Eselase-Noble/renova/releases/latest">Download</a>
+      </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section-alt">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">Other ways to run it</div>
+      <h2>Command line, editors and the team console</h2>
+    </div>
+    <div class="dl-list">
+      <div class="dl-item" data-download-row>
+        <div class="grow"><strong>Command line</strong><span>A zip for terminals and CI pipelines. Needs Java 21 or later.</span></div>
+        <span class="size" data-size></span>
+        <a class="btn btn-ghost btn-sm" data-download="cli" href="https://github.com/Eselase-Noble/renova/releases/latest">Download</a>
+      </div>
+      <div class="dl-item" data-download-row>
+        <div class="grow"><strong>VS Code extension</strong><span>A .vsix with the CLI inside. Install with “Extensions: Install from VSIX…”. Needs Java 21 or later.</span></div>
+        <span class="size" data-size></span>
+        <a class="btn btn-ghost btn-sm" data-download="vscode" href="https://github.com/Eselase-Noble/renova/releases/latest">Download</a>
+      </div>
+      <div class="dl-item" data-download-row>
+        <div class="grow"><strong>IntelliJ IDEA plugin</strong><span>A zip for IntelliJ IDEA 2025.2 and later. Install with “Install Plugin from Disk…”.</span></div>
+        <span class="size" data-size></span>
+        <a class="btn btn-ghost btn-sm" data-download="intellij" href="https://github.com/Eselase-Noble/renova/releases/latest">Download</a>
+      </div>
+      <div class="dl-item" data-download-row>
+        <div class="grow"><strong>Web API and console</strong><span>For a team on its own server, or one person in a browser. Needs Java 21 and Node.js 20.</span></div>
+        <span class="size" data-size></span>
+        <a class="btn btn-ghost btn-sm" data-download="web" href="https://github.com/Eselase-Noble/renova/releases/latest">Download</a>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:16px">All files and earlier versions are on the <a href="https://github.com/Eselase-Noble/renova/releases">releases page</a>. Installation steps for each are in the <a href="docs.html">docs</a>.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">Before you migrate</div>
+      <h2>What your machine needs</h2>
+      <p>Renova itself needs nothing more than the installer. To build and test the migrated project it uses that project's own tools.</p>
+    </div>
+    <div class="grid grid-3">
+      <div class="card"><span class="tag">Java projects</span><h3>Git, and Maven or Gradle</h3><p>A JDK for the target is found on the machine or downloaded. Network access to Maven Central, or your own mirror.</p></div>
+      <div class="card"><span class="tag">.NET projects</span><h3>The .NET SDK of the target</h3><p>.NET 10 or 8, and network access to nuget.org or your own feed. Windows Forms and WPF build on Windows.</p></div>
+      <div class="card"><span class="tag">PHP projects</span><h3>Composer and the target PHP</h3><p>PHP 8.3, 8.4 or 8.5 beside whatever PHP is installed. Renova finds the usual install locations.</p></div>
+    </div>
+    <div class="callout" style="margin-top:18px"><strong>Optional.</strong> Docker, to run the original beside the migrated application and compare their answers. An Anthropic or OpenAI API key, for the steps that need AI.</div>
+    <div class="callout" id="licence"><strong>Licence.</strong> Assessing projects is free and needs no licence. Migrating needs a licence file for the ecosystem; it is checked on your machine and nothing is sent anywhere. <a href="docs.html#licence">How licences work</a> · <a href="https://github.com/Eselase-Noble/renova/issues/new?title=Licence%20request">Request one</a>.</div>
+  </div>
+</section>
+
+</main>
+<footer>
+  <div class="wrap foot">
+    <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="mark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="oklch(0.62 0.19 268)"/><stop offset="1" stop-color="oklch(0.45 0.21 276)"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#mark)"/><path d="M9 17.5 16 11l7 6.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 23.5 16 17l7 6.5" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Renova</span></div>
+    <nav aria-label="Footer">
+      <a href="index.html">Product</a>
+      <a href="download.html">Download</a>
+      <a href="docs.html">Docs</a>
+      <a href="https://github.com/Eselase-Noble/renova/blob/production/docs/verified-migrations.md">Verified migrations</a>
+      <a href="https://github.com/Eselase-Noble/renova/releases">Releases</a>
+      <a href="https://github.com/Eselase-Noble/renova/issues">Support</a>
+    </nav>
+    <span>Your code stays on your machine.</span>
+  </div>
+</footer>
+</body>
+</html>

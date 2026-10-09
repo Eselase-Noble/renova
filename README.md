@@ -87,6 +87,7 @@ Every finding belongs to a change category, and plan steps run in the order A â†
 | [`engine/ai-openai`](engine) | AI provider for OpenAI or any OpenAI-compatible server (Azure OpenAI, vLLM, Ollama), using the user's own key | Working |
 | [`cli`](cli) | `renova` command for terminals and CI pipelines | Working |
 | [`web`](web) | REST API (Spring Boot) and web console (Next.js): local mode for one machine, or accounts and organisations on your own server | Working |
+| [`website`](website) | The public site: product page, downloads and a getting-started guide; static files published to GitHub Pages | Working |
 | [`desktop`](desktop) | JavaFX desktop app running the engine on your machine, packaged with jpackage | Working |
 | [`ide`](ide) | IntelliJ IDEA plugin and VS Code extension: findings in the editor, migrate from the IDE | Working |
 

@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Renova: migrate legacy Java, .NET and PHP, verified</title>
+<meta name="description" content="Renova assesses a legacy codebase, migrates a copy, builds it, runs its tests and compares its behaviour with the original. Desktop app, CLI, VS Code and IntelliJ.">
+<meta property="og:title" content="Renova: migrate legacy Java, .NET and PHP, verified">
+<meta property="og:description" content="Renova assesses a legacy codebase, migrates a copy, builds it, runs its tests and compares its behaviour with the original. Desktop app, CLI, VS Code and IntelliJ.">
+<meta property="og:type" content="website">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+<script>try{var t=localStorage.getItem("renova-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+<script type="module" src="site.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<header class="site-header">
+  <div class="wrap nav">
+    <a class="brand" href="index.html"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="mark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="oklch(0.62 0.19 268)"/><stop offset="1" stop-color="oklch(0.45 0.21 276)"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#mark)"/><path d="M9 17.5 16 11l7 6.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 23.5 16 17l7 6.5" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Renova</span></a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="index.html" aria-current="page">Product</a>
+      <a href="download.html">Download</a>
+      <a href="docs.html">Docs</a>
+      <a href="https://github.com/Eselase-Noble/renova">GitHub</a>
+    </nav>
+    <div class="nav-end">
+      <button class="icon-btn" type="button" data-theme-toggle aria-label="Switch between light and dark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+      <a class="btn btn-primary btn-sm" href="download.html">Download</a>
+    </div>
+  </div>
+</header>
+<main id="main">
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow"><span class="dot"></span>Version <span data-release-version>0.2</span> · Java, .NET and PHP</div>
+      <h1>Move legacy systems to a <span class="grad">current platform</span>, and prove they still work.</h1>
+      <p class="lead">Renova assesses an old codebase, migrates a copy of it, builds the result, runs its tests and compares its behaviour with the original. Rules do the mechanical bulk; AI on your own key handles what needs judgement; a report lists exactly what is left.</p>
+      <div class="cta">
+        <a class="btn btn-primary btn-lg" href="download.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 20h16"/></svg>
+          Download the desktop app
+        </a>
+        <a class="btn btn-ghost btn-lg" href="docs.html">Read the docs</a>
+      </div>
+      <p class="cta-note">Assessing a project is free. Windows, macOS and Linux; also a CLI, a VS Code extension and an IntelliJ plugin.</p>
+    </div>
+    <div class="terminal" aria-label="Example of a migration in the terminal">
+      <div class="terminal-bar"><i></i><i></i><i></i><span>renova migrate</span></div>
+<pre><span class="p">$</span> renova migrate ./orders --out ./orders-21
+<span class="d">Plan: 14 steps for 212 findings, 93% automated</span>
+<span class="d">»</span> Copying project <span class="d">(the original is never changed)</span>
+<span class="d">»</span> Stage recipe: 9 step(s)
+<span class="d">»</span> Stage ai: 2 step(s)
+<span class="d">»</span> Checking 13 guard rule(s) on the migrated code
+<span class="d">»</span> Verifying build
+<span class="d">»</span> Running the original and the migrated app side by side
+  recipe     <span class="ok">APPLIED</span>  Java 21, Jakarta EE 10, Spring Boot 3.5
+  ai         <span class="ok">APPLIED</span>  3 file(s) edited
+  build      <span class="ok">PASSES</span>   41 test(s) ran and passed
+  behaviour  <span class="ok">SAME</span>     all 9 request(s) answered the same
+<span class="d">Report: ./orders-21/.renova/report.md</span></pre>
+    </div>
+  </div>
+</section>
+
+<section class="section-alt" id="migrates">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">What it migrates</div>
+      <h2>Three ecosystems, one way of working</h2>
+      <p>Every path is a playbook of rules. Pick the target; Renova finds what has to change and says how much of it needs no human decision.</p>
+    </div>
+    <div class="grid grid-3">
+      <div class="card">
+        <span class="tag">Java</span>
+        <h3>Java 8 and Java EE to Java 21 and beyond</h3>
+        <ul>
+          <li>Java 8, 11, 17 → 17, 21 or 25</li>
+          <li><code>javax</code> → Jakarta EE 10 and 11</li>
+          <li>Spring Boot 2 → 3.5 and 4.1; Spring Framework 7</li>
+          <li>Java EE on an application server → Spring Boot</li>
+          <li>Micronaut 4, Quarkus 3, Hibernate 6 and 7, Struts 7</li>
+          <li>Maven, Gradle and Ant builds; Kotlin sources</li>
+        </ul>
+      </div>
+      <div class="card">
+        <span class="tag">.NET</span>
+        <h3>.NET Framework to .NET 8 or 10</h3>
+        <ul>
+          <li>C# and Visual Basic, old project format → SDK style</li>
+          <li><code>packages.config</code> → package references</li>
+          <li>NUnit 2 → 3; MSTest and xUnit made runnable</li>
+          <li>WCF services hosted by IIS → CoreWCF</li>
+          <li>ASP.NET MVC 5 and Web API 2 → ASP.NET Core, with AI</li>
+          <li>Windows Forms and WPF projects converted</li>
+        </ul>
+      </div>
+      <div class="card">
+        <span class="tag">PHP</span>
+        <h3>PHP 5 and 7 to PHP 8.3, 8.4 or 8.5</h3>
+        <ul>
+          <li>Removed functions and syntax rewritten by Rector</li>
+          <li>Laravel 7 to 10 → Laravel 11, 12 or 13</li>
+          <li>Symfony 4 to 7 → 6.4, 7.4 or 8.1</li>
+          <li>Sites without Composer get one</li>
+          <li>Plain PHP sites moved inside Laravel 13</li>
+          <li>PHPUnit brought to a release that runs</li>
+        </ul>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:18px">The full list, with what has been run and what has not, is in <a href="https://github.com/Eselase-Noble/renova/blob/production/docs/verified-migrations.md">verified migrations</a>.</p>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">How it works</div>
+      <h2>Assess first. Change a copy. Check everything.</h2>
+      <p>The same five steps whether you start from the desktop app, a terminal, your editor or a CI pipeline.</p>
+    </div>
+    <div class="pipeline">
+      <div class="step"><h3>Assess</h3><p>A read-only scan lists every place that has to change, by category and severity, with an automation rate.</p></div>
+      <div class="step"><h3>Plan</h3><p>Findings become ordered steps: build and dependencies first, behaviour-sensitive changes last.</p></div>
+      <div class="step"><h3>Migrate</h3><p>Syntax-aware rewrites and rules run on a copy. Each stage is one git commit you can review or revert.</p></div>
+      <div class="step"><h3>Verify</h3><p>The migrated project is built and its own tests run. Failures feed an AI repair loop; tests are never bent to pass.</p></div>
+      <div class="step"><h3>Compare</h3><p>The original and the result run side by side in containers and answer the same requests. Differences are reported.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section-alt" id="why">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">Why teams choose it</div>
+      <h2>Built for code that cannot leave the building</h2>
+    </div>
+    <div class="grid grid-3">
+      <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.2 7.8 8 9 4.800-1.200 8-4.500 8-9V6Z"/><path d="m9 12 2 2 4-4"/></svg></div><h3>Your source is never touched</h3><p>Renova works on a copy in a workspace of its own. The project you point it at is read, never written.</p></div>
+      <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div><h3>Runs on your machine</h3><p>The desktop app needs no server, no account and no open port. Code and migrated copies stay on the device.</p></div>
+      <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9m-3 3 2.500 2.500M14 9l2 2"/></svg></div><h3>Your own AI key</h3><p>AI steps use your Anthropic or OpenAI account. Only those requests leave the machine, and token use is reported per migration.</p></div>
+      <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div><h3>Migrations are data</h3><p>A migration path is a YAML playbook. Add your own conventions or a new target without changing the engine.</p></div>
+      <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></div><h3>Verified, not assumed</h3><p>A migration ends with a build result, a test result and, for web applications, a request-by-request comparison.</p></div>
+      <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></div><h3>An honest report</h3><p>What changed, stage by stage, and what is left for a person, written like a migration guide you can hand to a reviewer.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="tools">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">Where you use it</div>
+      <h2>One engine behind every surface</h2>
+      <p>They share settings, playbooks and results, so a plan made in the editor is the plan the pipeline runs.</p>
+    </div>
+    <div class="grid grid-4">
+      <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div><h3>Desktop app</h3><p>The recommended way in. One installer with its own Java runtime, for Windows, macOS and Linux.</p><a class="card-link" href="download.html">Download →</a></div>
+      <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 8 4 4-4 4M12 17h7"/></svg></div><h3>Command line</h3><p>For terminals and CI. Exit codes tell a pipeline whether the migrated build passes.</p><a class="card-link" href="docs.html#cli">CLI guide →</a></div>
+      <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 8-4 4 4 4m8-8 4 4-4 4M13.500 5l-3 14"/></svg></div><h3>VS Code and IntelliJ</h3><p>Findings as diagnostics in the editor, the plan in a side view, and migration from the IDE.</p><a class="card-link" href="docs.html#ide">IDE guide →</a></div>
+      <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.800 3 2.800 15 0 18M12 3c-2.800 3-2.800 15 0 18"/></svg></div><h3>Web console</h3><p>For a team on its own server: organisations, roles, audit log and single sign-on.</p><a class="card-link" href="docs.html#console">Console guide →</a></div>
+    </div>
+  </div>
+</section>
+
+<section class="section-alt" id="results">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">What has been shown</div>
+      <h2>Results you can repeat</h2>
+      <p>Each of these ended with a passing build and passing tests. The projects and the commands are in the repository.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Project</th><th>From → to</th><th>Result</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>Spring PetClinic (public)</td><td>Spring Boot 2.7 → 3.5 and 4.1, Maven and Gradle</td><td>Builds, 41 tests pass</td><td><span class="pill">No AI</span></td></tr>
+          <tr><td>Stateless (public .NET library, 2016)</td><td>.NET Framework, NUnit 2 → .NET 10</td><td>Builds, 73 tests pass</td><td><span class="pill">No AI</span></td></tr>
+          <tr><td>FastRoute 1.3 (public PHP library)</td><td>PHP 5.4 → PHP 8.4</td><td>Installs, 204 tests pass</td><td><span class="pill">No AI</span></td></tr>
+          <tr><td>A Laravel 7 application</td><td>Laravel 7, PHP 7.4 → Laravel 13, PHP 8.4</td><td>Same answers as the original to 9 of 9 requests</td><td><span class="pill">No AI</span></td></tr>
+          <tr><td>A plain PHP site with a database and a form</td><td>PHP 7.4 → inside Laravel 13</td><td>Same answers to 13 of 13 requests</td><td><span class="pill">No AI</span></td></tr>
+          <tr><td>An ASP.NET Core 3.1 API</td><td>.NET Core 3.1 → .NET 10</td><td>Same answers to 9 of 9 requests</td><td><span class="pill">No AI</span></td></tr>
+          <tr><td>A WCF service application</td><td>WCF on IIS → CoreWCF on .NET 10</td><td>Builds, 4 tests pass, answers over SOAP</td><td><span class="pill">No AI</span></td></tr>
+          <tr><td>A Struts 1 application</td><td>Struts 1.3 → Spring MVC, Java 21</td><td>Builds; 6 of 9 requests identical, 3 differ in form markup</td><td><span class="pill ai">With AI</span></td></tr>
+          <tr><td>An ASP.NET MVC 5 application</td><td>MVC 5 → ASP.NET Core on .NET 10</td><td>Builds and runs</td><td><span class="pill ai">With AI</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout" style="margin-top:18px"><strong>Said plainly.</strong> These are small applications and a few public libraries, not a large business system. Renova does the mechanical bulk and verifies it; on a real codebase expect a developer to finish and sign off what the report lists. <a href="https://github.com/Eselase-Noble/renova/blob/production/docs/verified-migrations.md">Everything that has and has not been run</a> is written down.</div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="band">
+      <div>
+        <h2>See what Renova finds in your own code</h2>
+        <p>Install the desktop app, point it at a project and read the assessment. It is free, it is read-only, and nothing leaves your machine.</p>
+      </div>
+      <div class="cta">
+        <a class="btn btn-primary btn-lg" href="download.html">Download</a>
+        <a class="btn btn-ghost btn-lg" href="docs.html#licence">About licences</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer>
+  <div class="wrap foot">
+    <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="mark" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="oklch(0.62 0.19 268)"/><stop offset="1" stop-color="oklch(0.45 0.21 276)"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#mark)"/><path d="M9 17.5 16 11l7 6.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 23.5 16 17l7 6.5" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Renova</span></div>
+    <nav aria-label="Footer">
+      <a href="index.html">Product</a>
+      <a href="download.html">Download</a>
+      <a href="docs.html">Docs</a>
+      <a href="https://github.com/Eselase-Noble/renova/blob/production/docs/verified-migrations.md">Verified migrations</a>
+      <a href="https://github.com/Eselase-Noble/renova/releases">Releases</a>
+      <a href="https://github.com/Eselase-Noble/renova/issues">Support</a>
+    </nav>
+    <span>Your code stays on your machine.</span>
+  </div>
+</footer>
+</body>
+</html>
