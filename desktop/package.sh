@@ -39,26 +39,30 @@ DIST=desktop/target/dist
 # jpackage makes one thing per run and wants an empty folder for an application image, so each is made in a
 # folder of its own and the results are gathered in DIST.
 # The system libraries JavaFX loads when the application starts: GTK 3 for its windows, X11 extensions, OpenGL and sound.
+DEB_LIBRARIES="libgtk-3-0t64 | libgtk-3-0, libxtst6, libxxf86vm1, libgl1, libasound2t64 | libasound2, libfreetype6, libfontconfig1"
 RPM_LIBRARIES="libgtk-3.so.0()(64bit),libgdk-3.so.0()(64bit),libXtst.so.6()(64bit),libXxf86vm.so.1()(64bit),libGL.so.1()(64bit),libasound.so.2()(64bit),libfreetype.so.6()(64bit),libfontconfig.so.1()(64bit)"
 
-# What makes the installed application findable: an entry in the Start menu or the applications menu. Without
-# these an installer puts the files in place and leaves nothing to click.
-shortcuts() { # type
+# What makes the installed application findable (an entry in the Start menu or the applications menu: without
+# one an installer puts the files in place and leaves nothing to click), and on Linux the system libraries it
+# needs. JavaFX unpacks its native libraries when it starts, so no packaging tool sees what they load, and a
+# package without these installs on a system that lacks them and then does not start.
+EXTRA=()
+extras() { # type
+  EXTRA=()
   case "$1" in
     # The upgrade id is the same for every version, so installing a newer one replaces the older.
-    msi|exe) echo --win-menu --win-menu-group Renova --win-shortcut --win-dir-chooser --win-upgrade-uuid 94fd60d3-6fd1-4bf8-8b02-f11d73b139f8 ;;
-    deb) echo --linux-shortcut --linux-menu-group "Development;" ;;
-    # An rpm built on a machine without rpm's own database finds none of the libraries the application loads,
-    # so the package would install on a system that lacks them and then not start. They are named as the
-    # libraries themselves, which every rpm distribution provides under its own package names.
-    rpm) echo --linux-shortcut --linux-menu-group "Development;" --linux-package-deps "$RPM_LIBRARIES" ;;
+    msi|exe) EXTRA=(--win-menu --win-menu-group Renova --win-shortcut --win-dir-chooser --win-upgrade-uuid 94fd60d3-6fd1-4bf8-8b02-f11d73b139f8) ;;
+    # Debian and Ubuntu name some of these differently from release to release (the "t64" names).
+    deb) EXTRA=(--linux-shortcut --linux-menu-group "Development;" --linux-package-deps "$DEB_LIBRARIES") ;;
+    # Named as the libraries themselves, which every rpm distribution provides under its own package names.
+    rpm) EXTRA=(--linux-shortcut --linux-menu-group "Development;" --linux-package-deps "$RPM_LIBRARIES") ;;
   esac
 }
 
 package() { # type, destination
-  # shellcheck disable=SC2046  # the options are separate words on purpose
+  extras "$1"
   jpackage --type "$1" \
-    $(shortcuts "$1") \
+    ${EXTRA[@]+"${EXTRA[@]}"} \
     ${SIGNING[@]+"${SIGNING[@]}"} \
     --name Renova \
     --app-version "$VERSION" \
