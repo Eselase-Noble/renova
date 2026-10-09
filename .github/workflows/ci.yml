@@ -80,9 +80,12 @@ jobs:
           cache: maven
       - name: Install the engine into the local Maven repository
         run: mvn -B -q install -DskipTests
+      # Without the Gradle cache: a run cancelled mid-build saved a half-written one on main, and every run that
+      # restored it failed within seconds. The build is tried again if a download fails.
       - uses: gradle/actions/setup-gradle@v4
-      # The build downloads IntelliJ IDEA itself from JetBrains, and that download fails now and then: the
-      # step is tried up to three times before the job is called failed.
+        with:
+          cache-disabled: true
+      # The build downloads IntelliJ IDEA itself from JetBrains: the step is tried up to three times.
       - name: Build and test the plugin
         working-directory: ide/intellij
         run: |

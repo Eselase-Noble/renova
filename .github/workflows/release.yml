@@ -59,7 +59,11 @@ jobs:
       - name: VS Code extension
         working-directory: ide/vscode
         run: npm ci && npm run package
+      # Without the Gradle cache: a run cancelled mid-build saved a half-written one on main, and every run that
+      # restored it failed within seconds. The build is tried again if a download fails.
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-disabled: true
       # The build downloads IntelliJ IDEA itself from JetBrains, and that download fails now and then.
       - name: IntelliJ plugin
         working-directory: ide/intellij
@@ -113,10 +117,12 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           # Each package on the distribution it is for: a package that does not install is not published.
+          # Installing registers the menu entry, which needs the folders a desktop has and a bare image lacks.
           cd desktop/target/dist && ls -la
+          DESKTOP='mkdir -p /usr/share/desktop-directories /usr/share/applications /etc/xdg/menus /usr/share/man/man1'
           docker run --rm -v "$PWD:/d:ro" archlinux:latest sh -c 'pacman -U --noconfirm /d/*.pkg.tar.zst && test -x /opt/renova/bin/Renova && test -L /usr/bin/renova-desktop && test -f /usr/share/applications/renova.desktop'
-          docker run --rm -v "$PWD:/d:ro" fedora:latest sh -c 'dnf install -y -q /d/*.rpm && test -x /opt/renova/bin/Renova && test -f /opt/renova/lib/renova-Renova.desktop'
-          docker run --rm -v "$PWD:/d:ro" debian:stable-slim sh -c 'apt-get update -q && apt-get install -y -q /d/*.deb && test -x /opt/renova/bin/Renova && test -f /opt/renova/lib/renova-Renova.desktop'
+          docker run --rm -v "$PWD:/d:ro" fedora:latest sh -c "$DESKTOP"' && dnf install -y -q /d/*.rpm && test -x /opt/renova/bin/Renova && test -f /opt/renova/lib/renova-Renova.desktop && ls /usr/share/applications | grep -i renova'
+          docker run --rm -v "$PWD:/d:ro" debian:stable-slim sh -c "$DESKTOP"' && apt-get update -q && apt-get install -y -q /d/*.deb && test -x /opt/renova/bin/Renova && test -f /opt/renova/lib/renova-Renova.desktop && ls /usr/share/applications | grep -i renova'
           mkdir /tmp/unpacked && tar -xzf renova-*-linux-*.tar.gz -C /tmp/unpacked && test -x /tmp/unpacked/Renova/bin/Renova
       - uses: actions/upload-artifact@v4
         with:
