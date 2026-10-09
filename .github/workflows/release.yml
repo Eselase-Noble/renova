@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
@@ -60,9 +60,16 @@ jobs:
         working-directory: ide/vscode
         run: npm ci && npm run package
       - uses: gradle/actions/setup-gradle@v4
+      # The build downloads IntelliJ IDEA itself from JetBrains, and that download fails now and then.
       - name: IntelliJ plugin
         working-directory: ide/intellij
-        run: ./gradlew buildPlugin
+        run: |
+          for attempt in 1 2 3; do
+            ./gradlew buildPlugin --stacktrace && exit 0
+            echo "::warning::Attempt $attempt of the IntelliJ plugin build failed"
+            sleep 30
+          done
+          exit 1
       - uses: actions/upload-artifact@v4
         with:
           name: bundles
@@ -86,7 +93,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21

@@ -13,9 +13,9 @@ the web console. Plain HTML, one stylesheet and one script; there is nothing to 
 
 Look at it locally with `python3 -m http.server -d website 8000` and open http://localhost:8000.
 
-It is published to GitHub Pages by `.github/workflows/website.yml` whenever this folder changes on
-`production` or `main`. GitHub accepts deployments only from the branches listed under **Settings →
-Environments → github-pages**; add `production` there, or its runs are refused and only `main` publishes. Switch Pages on once in the repository: **Settings → Pages → Source: GitHub Actions**. For
+It is published to GitHub Pages by `.github/workflows/website.yml` whenever this folder changes on `main`.
+GitHub accepts deployments only from the branches listed under **Settings → Environments → github-pages**,
+which is `main` unless you add another. Switch Pages on once in the repository: **Settings → Pages → Source: GitHub Actions**. For
 your own domain, set it there and add a `CNAME` file to this folder with the domain in it.
 
 Download buttons ask GitHub for the latest release when the page opens, so a new release needs no change here.
